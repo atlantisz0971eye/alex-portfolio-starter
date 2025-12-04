@@ -1,0 +1,7 @@
+v0.1	原型阶段	- 使用 sounddevice 捕获麦克风并回放- 初步集成 rtlsdr，实现 SDR 采样与 FM 解调- 仅命令行运行，交互性低	- Used sounddevice to capture mic input- Integrated rtlsdr for SDR sampling + FM demodulation- Command-line only, low interactivity
+v0.3	FX 初版	- 加入 低通滤波 + 颤音 + 粉红噪声 效果链- 支持三种模式：CLEAN / FX / FX+FM- 热键：1/2/3 切换模式；q 退出	- Added Low-pass + Tremolo + Pink Noise FX chain- Supported 3 modes: CLEAN / FX / FX+FM- Hotkeys: 1/2/3 switch modes; q quit
+v0.5	多轨录音	- 新增录音功能：r 开始/停止- 自动保存 clean/fx/fxfm 三轨 WAV 文件- 文件命名加入时间戳 + tag	- Added recording: r start/stop- Auto-save clean/fx/fxfm 3-track WAV- File names with timestamp + tag
+v0.7	可调腐烂感	- 热键扩展：调节 混合度、FM 覆盖、噪声量、低通上下限、颤音速率/深度- 支持调节 SDR 频率/增益- 引入 RSSI 映射窗口，增强动态感	- Extended hotkeys: control mix, FM overlay, noise level, LPF min/max, tremolo rate/depth- Added SDR freq/gain control- Added RSSI mapping window for dynamics
+v1.0	稳定版	- 完整热键系统 + 状态打印- 修复 stdin 卡死问题，退出自动恢复终端- 增强错误处理，设备不可用时优雅退出	- Full hotkey system + status print- Fixed stdin freeze, auto restore terminal- Better error handling, graceful exit
+v1.2	应用化	- 新增 run.sh：自动识别声卡、SDR- 新增 launch.sh + install.sh：支持桌面双击启动- 统一录音目录 ~/captures	- Added run.sh: auto-detect devices- Added launch.sh + install.sh: desktop launcher- Unified save path ~/captures
+v1.3	优化	- 录音结束/退出时自动保存残余数据- 精简运行日志，优化错误输出- PortAudio 格式错误自动 fallback	- Auto-save pending data on stop/exit- Simplified logs, cleaner error handling- Auto fallback for PortAudio format errors

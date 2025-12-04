@@ -1,0 +1,7 @@
+{
+  "name": "@fontsource/satoshi",
+  "version": "1.0.0",
+  "description": "Local shim providing Satoshi font css files",
+  "main": "300.css",
+  "license": "MIT"
+}

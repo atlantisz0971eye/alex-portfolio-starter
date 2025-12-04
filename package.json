@@ -1,0 +1,31 @@
+{
+  "name": "alex-portfolio-starter",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "clean": "rimraf .next",
+    "dev:clean": "rimraf .next && next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@fontsource/satoshi": "file:packages/fontsource-satoshi",
+    "@tailwindcss/typography": "^0.5.19",
+    "lucide-react": "0.446.0",
+    "next": "14.2.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-markdown": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "18.2.66",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.41",
+    "rimraf": "^5.0.5",
+    "tailwindcss": "3.4.10",
+    "typescript": "5.6.2"
+  }
+}
