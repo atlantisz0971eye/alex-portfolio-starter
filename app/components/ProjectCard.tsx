@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Project } from "../types/project";
+import { getProjectTypeLabel } from "../lib/projectType";
 import { isTouchDevice, prefersReducedMotion } from "../utils/environment";
 
 type TiltElement = HTMLDivElement & {
@@ -24,21 +25,6 @@ type ProjectCardProps = {
   updatesTxt: Record<string, string | null>;
   compact?: boolean;
 };
-
-function getProjectType(slug: string): string {
-  switch (slug) {
-    case "fitting-reality":
-      return "Interactive Installation";
-    case "electromagnetic-decay":
-      return "Audio-Reactive Installation";
-    case "dys-utopia":
-      return "Interactive Instantiation Model";
-    case "bloom-system":
-      return "Experimental Imaging System";
-    default:
-      return "";
-  }
-}
 
 export function ProjectCard({
   project,
@@ -138,7 +124,7 @@ export function ProjectCard({
   };
   const cardClassName =
     "card project-card card-compact tilt-card project-tilt relative overflow-hidden rounded-2xl transition-colors w-full will-change-transform shadow-xl";
-  const projectType = getProjectType(project.slug);
+  const projectType = getProjectTypeLabel(project.slug);
 
   return (
     <div className="w-full flex flex-col items-center">

@@ -173,7 +173,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
         title: "Connection",
         color: "from-amber-900 via-amber-800 to-amber-700",
         intro:
-          "Close to natural growth soil and multicultural backgrounds; as the premise and germination environment of the previous two parts.",
+          "Explores how subjective experience enters the system as data and, through feedback loops, is transformed into new visual and emotional patterns.",
         projects: [
           {
             slug: "bloom-system",
@@ -181,7 +181,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             status: "planning",
             summary:
               "Organizing the 'geography–memory–identity' triangle through images, sounds, and textual narratives; exploring contemporary re-narratives of ethnic/regional cultures. — [Add: field materials and plans]",
-            tags: ["Hometown", "Ethnic/Regional Culture", "Field Narratives"],
+            tags: ["Body Data", "Noise System", "Image Distortion"],
             bg: { src: "/bg-roots.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
             docTxt: "/docs/roots-and-lands.md",
@@ -382,7 +382,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
         title: "连接",
         color: "from-amber-900 via-amber-800 to-amber-700",
         intro:
-          "贴近自然的成长土壤与多元文化背景；作为前两部分的前提与萌发环境。",
+          "探讨主观体验如何以数据的形式进入系统，并在反馈循环中转化为新的视觉与情绪模式。",
         projects: [
           {
             slug: "bloom-system",
@@ -390,7 +390,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             status: "planning",
             summary:
               "以影像、声音与文字叙事组织‘地理—记忆—身份’三角；探索民族/地域文化的当代再叙事。——【补充：田野素材与计划】",
-            tags: ["家乡", "民族/地域文化", "田野叙事"],
+            tags: ["身体数据", "噪声系统", "图像扰动"],
             bg: { src: "/bg-roots.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
             docTxt: "/docs/roots-and-lands.md",

@@ -1,3 +1,5 @@
+import { glassButtonClass } from "../lib/ui";
+
 type SidebarNavItem = {
   id: "tian" | "ren" | "di" | "bio";
   label: string;
@@ -23,12 +25,14 @@ const LABEL_MAP: Record<SidebarNavItem["id"], { en: string; zh: string }> = {
 
 export default function SidebarNav({ lang }: SidebarNavProps) {
   return (
-    <aside className="sidebar-glass hidden md:flex top-20 left-4">
+    <aside className="hidden md:flex fixed top-20 left-4 z-[180] flex-col gap-2 text-white">
       {NAV_ITEMS.map((item) => (
-        <a key={item.id} href={`#${item.id}`}>
-          <button className="px-3 py-2 rounded-xl border border-white/15 bg-white/5 backdrop-blur hover:bg-white/10 transition-all duration-200 shadow-sm hover:shadow scale-100 hover:scale-105">
-            {LABEL_MAP[item.id][lang]}
-          </button>
+        <a
+          key={item.id}
+          href={`#${item.id}`}
+          className={`inline-flex items-center ${glassButtonClass}`}
+        >
+          {LABEL_MAP[item.id][lang]}
         </a>
       ))}
     </aside>

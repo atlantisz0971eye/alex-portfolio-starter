@@ -1,8 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, type KeyboardEvent } from "react";
 import { Info, Search } from "lucide-react";
 import type { SearchResult } from "../types/project";
+import { glassButtonClass } from "../lib/ui";
+const InfoDrawerContent = dynamic(() => import("./InfoDrawerContent"));
 
 type HeaderBarProps = {
   lang: "en" | "zh";
@@ -88,7 +91,7 @@ export function HeaderBar({
           </div>
           <button
             onClick={onToggleLang}
-            className="px-3 py-2 rounded-xl border border-white/15 bg-white/5 backdrop-blur text-sm hover:bg-white/10 transition-all duration-200 shadow-sm hover:shadow scale-100 hover:scale-105"
+            className={`${glassButtonClass} text-sm`}
             aria-label={lang === "en" ? "Switch to Chinese" : "切换到英文"}
           >
             {lang === "en" ? "中文" : "EN"}
@@ -102,59 +105,19 @@ export function HeaderBar({
 
 function InfoSection({ lang, contentDump }: { lang: "en" | "zh"; contentDump: string }) {
   const [open, setOpen] = useState(false);
+  const infoLabel = lang === "en" ? "Open information drawer" : "打开信息抽屉";
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen((prev) => !prev)} className="btn-ghost" aria-expanded={open}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="btn-ghost"
+        aria-expanded={open}
+        aria-label={infoLabel}
+      >
         <Info className="w-4 h-4" />
       </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-[600px] max-w-[90vw] card text-sm space-y-4 z-50 backdrop-blur">
-          <div>
-            <h4 className="font-semibold mb-2">{lang === "en" ? "Information Architecture (IA)" : "信息架构（IA）"}</h4>
-            <pre className="whitespace-pre-wrap text-xs bg-white/5 p-3 rounded-lg border border-white/10">
-{lang === "en" ? 
-`Site Root
-├── Home (Overview: Technology · Rumination · Connection intro + latest/featured works)
-├── Technology / 科技
-│   ├── Fitting Reality (Project page)
-│   └── Electromagnetic Decay (Project page)
-├── Rumination / 反刍
-│   └── Dys/Utopia (Project page)
-├── Connection / 连接
-│   └── Roots / Hometown Series (Ongoing, phase logs/material wall)
-├── About (Artist statement / CV / Statement)
-└── Contact (Contact info / Social media)`
-:
-`Site Root
-├── Home (总述：科技·反刍·连接引子 + 最新/精选作品)
-├── 科技 / Technology
-│   ├── 拟合现实 (项目页)
-│   └── 电磁腐烂 (项目页)
-├── 反刍 / Rumination
-│   └── Dys/Utopia (项目页)
-├── 连接 / Connection
-│   └── 根源/家乡系列 (进行中，阶段性日志/素材墙)
-├── About (艺术家自述 / CV / Statement)
-└── Contact (联系方式 / 社媒)`}
-            </pre>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-2">{lang === "en" ? "Content Data Structure (Example)" : "内容数据结构（示意）"}</h4>
-            <pre className="whitespace-pre-wrap text-xs bg-white/5 p-3 rounded-lg border border-white/10 overflow-auto max-h-[240px]">
-{contentDump}
-            </pre>
-          </div>
-          <div className="text-white/80 text-sm leading-relaxed">
-            <p className="mb-2">{lang === "en" ? "Implementation Suggestions:" : "落地建议："}</p>
-            <ul className="list-disc ml-5 space-y-1">
-              <li>{lang === "en" ? "Split projects into MDX/JSON; generate project pages with dynamic routes /[theme]/[slug]." : "将 projects 拆成 MDX/JSON；用动态路由 /[theme]/[slug] 生成项目页。"}</li>
-              <li>{lang === "en" ? "Content hosting: local MDX (Contentlayer), or Headless CMS (Sanity/Strapi/Contentful)." : "内容托管：本地 MDX（Contentlayer），或 Headless CMS（Sanity/Strapi/Contentful）。"}</li>
-              <li>{lang === "en" ? "Deployment: Vercel/Netlify." : "部署：Vercel/Netlify。"}</li>
-            </ul>
-          </div>
-        </div>
-      )}
+      {open && <InfoDrawerContent lang={lang} contentDump={contentDump} />}
     </div>
   );
 }

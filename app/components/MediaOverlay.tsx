@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { MediaGroup, MediaGroups, MediaItem, Project, Theme } from "../types/project";
 import type { useMediaHub } from "../hooks/useMediaHub";
+import { getProjectTypeLabel } from "../lib/projectType";
 import { isTouchDevice } from "../utils/environment";
 
 type MediaOverlayProps = {
@@ -23,16 +24,6 @@ type MediaIndexRecord = {
 type ProjectWithBrief = Project & { briefTxt?: string };
 
 const FALLBACK_LABEL: Record<"en" | "zh", string> = { en: "Set", zh: "组" };
-const PROJECT_TYPE_MAP: Record<string, string> = {
-  "fitting-reality": "Interactive Installation",
-  "electromagnetic-decay": "Audio-Reactive Installation",
-  "dys-utopia": "Interactive Instantiation Model",
-  "bloom-system": "Experimental Imaging System",
-};
-function getProjectType(slug: string): string {
-  return PROJECT_TYPE_MAP[slug] ?? "";
-}
-
 const inferTypeFromExt = (src: string): MediaItem["type"] | undefined => {
   const lower = src.toLowerCase();
   const imageExts = ["jpg", "jpeg", "png", "webp", "gif", "tif", "tiff"];
@@ -71,6 +62,7 @@ const normalizeMediaItems = (items?: MediaItem[] | null): MediaItem[] => {
 
 const buildGroups = (project: Project, lang: "en" | "zh", idx?: MediaIndexRecord | null): MediaGroups => {
   const { mediaGroups, media } = project;
+  const mediaCollections = Array.isArray(media) ? undefined : media;
   const wrapFromIndex = (section?: Record<string, string[]>) =>
     section ? Object.entries(section).map(([label, items]) => ({ label, items })) : undefined;
   const wrap = (groups: MediaGroup[] | undefined, items?: string[], indexSection?: Record<string, string[]>) => {
@@ -81,9 +73,9 @@ const buildGroups = (project: Project, lang: "en" | "zh", idx?: MediaIndexRecord
     return [{ label: `${FALLBACK_LABEL[lang]} 1`, items }];
   };
   return {
-    images: wrap(mediaGroups?.images, (media as any)?.images, idx ? idx.images : undefined),
-    videos: wrap(mediaGroups?.videos, (media as any)?.videos, idx ? idx.videos : undefined),
-    audios: wrap(mediaGroups?.audios, (media as any)?.audios, idx ? idx.audios : undefined),
+    images: wrap(mediaGroups?.images, mediaCollections?.images, idx ? idx.images : undefined),
+    videos: wrap(mediaGroups?.videos, mediaCollections?.videos, idx ? idx.videos : undefined),
+    audios: wrap(mediaGroups?.audios, mediaCollections?.audios, idx ? idx.audios : undefined),
   };
 };
 
@@ -242,7 +234,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                   <p className="text-sm text-white/60 leading-relaxed mt-2">{lang === "en" ? "Loading brief…" : "正在加载简介…"}</p>
                 ) : (
                   <p className="whitespace-pre-wrap leading-relaxed text-sm text-white/80 mt-2">
-                    {briefContent !== null && briefContent !== "" ? briefContent : getProjectType(project.slug)}
+                    {briefContent !== null && briefContent !== "" ? briefContent : getProjectTypeLabel(project.slug)}
                   </p>
                 )}
               </div>
@@ -275,7 +267,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                 <p className="text-sm text-white/70">{lang === "en" ? "Context not found." : "未找到语境内容。"}</p>
               )
             ) : (
-              <p className="text-sm text-white/70">{getProjectType(project.slug)}</p>
+              <p className="text-sm text-white/70">{getProjectTypeLabel(project.slug)}</p>
             )}
             <div className="mt-4 flex flex-wrap gap-2">
               {project.tags.slice(0, 4).map((tag) => (
@@ -294,7 +286,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                       onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                       onClick={() => isTouchDevice && setPreviewImage(item)}
                     >
-                      <img src={item.src} alt={item.title || `${project.title} concept`} className="w-full h-full object-cover" />
+                      <img src={item.src} alt={item.title || `${project.title} concept`} className="w-full h-full object-cover" loading="lazy" />
                     </button>
                     {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                   </div>
@@ -340,7 +332,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                       onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                       onClick={() => isTouchDevice && setPreviewImage(item)}
                     >
-                      <img src={item.src} alt={item.title || `${project.title} system`} className="w-full h-full object-cover" />
+                      <img src={item.src} alt={item.title || `${project.title} system`} className="w-full h-full object-cover" loading="lazy" />
                     </button>
                     {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                   </div>
@@ -362,7 +354,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                     onDoubleClick={() => !isTouchDevice && setPreviewImage({ type: "image", role: "experience", src: mainHeroImage })}
                     onClick={() => isTouchDevice && setPreviewImage({ type: "image", role: "experience", src: mainHeroImage })}
                   >
-                    <img src={mainHeroImage} alt={`${project.title} hero`} className="w-full h-full object-cover" />
+                    <img src={mainHeroImage} alt={`${project.title} hero`} className="w-full h-full object-cover" loading="lazy" />
                   </button>
                 )}
                 {mainExperienceVideo && (
@@ -386,7 +378,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                           onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                           onClick={() => isTouchDevice && setPreviewImage(item)}
                         >
-                          <img src={item.src} alt={item.title || `${project.title} experience`} className="w-full h-full object-cover" />
+                          <img src={item.src} alt={item.title || `${project.title} experience`} className="w-full h-full object-cover" loading="lazy" />
                         </button>
                         {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                       </>
@@ -401,7 +393,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
               </div>
             )}
             <p className="text-sm text-white/75 leading-relaxed mt-4">
-              {lang === "en" ? "You enter the space and" : "你步入空间，"} {getProjectType(project.slug)}
+              {lang === "en" ? "You enter the space and" : "你步入空间，"} {getProjectTypeLabel(project.slug)}
             </p>
           </Card>
         );
@@ -438,7 +430,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
               )}
               <aside className="space-y-4">
                 <h2 className="text-xl font-semibold">{project.title}</h2>
-                <p className="text-sm text-white/85 leading-relaxed">{getProjectType(project.slug)}</p>
+                <p className="text-sm text-white/85 leading-relaxed">{getProjectTypeLabel(project.slug)}</p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {project.tags.map((tag) => (
                     <span key={tag} className="tag">
@@ -458,7 +450,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                         }}
                         onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                       >
-                        <img src={item.src} alt={item.title || `${project.title} thumb`} className="w-full h-full object-cover" />
+                        <img src={item.src} alt={item.title || `${project.title} thumb`} className="w-full h-full object-cover" loading="lazy" />
                       </button>
                     ))}
                   </div>
@@ -505,7 +497,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
             ✕
           </button>
           <div className="max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage.src} alt={previewImage.title || "Preview"} className="max-w-full max-h-[90vh] object-contain rounded-xl" />
+            <img src={previewImage.src} alt={previewImage.title || "Preview"} className="max-w-full max-h-[90vh] object-contain rounded-xl" loading="lazy" />
           </div>
         </div>
       )}
