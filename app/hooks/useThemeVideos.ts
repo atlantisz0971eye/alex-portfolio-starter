@@ -14,7 +14,7 @@ type UseThemeVideosParams = {
 };
 
 export type ThemeVideoEntry = {
-  ref: React.RefObject<HTMLVideoElement | null>;
+  ref: React.RefObject<HTMLVideoElement>;
   ready: boolean;
   error: string | null;
   path: string;
@@ -40,9 +40,9 @@ export function useThemeVideos({
   mediaHubOpenSlug,
   searchOpen,
 }: UseThemeVideosParams) {
-  const technologyVideoRef = useRef<HTMLVideoElement | null>(null);
-  const ruminationVideoRef = useRef<HTMLVideoElement | null>(null);
-  const connectionVideoRef = useRef<HTMLVideoElement | null>(null);
+  const technologyVideoRef = useRef<HTMLVideoElement>(null!);
+  const ruminationVideoRef = useRef<HTMLVideoElement>(null!);
+  const connectionVideoRef = useRef<HTMLVideoElement>(null!);
 
   const [technologyVideoReady, setTechnologyVideoReady] = useState(false);
   const [technologyVideoError, setTechnologyVideoError] = useState<string | null>(null);
