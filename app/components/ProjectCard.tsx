@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -151,17 +152,18 @@ export function ProjectCard({
               }`}
               aria-hidden
             >
-              <img
-                src={project.bg?.src}
+              <Image
+                src={project.bg!.src}
                 alt=""
                 loading="lazy"
-                className="bg-cover pointer-events-none select-none"
+                width={1200}
+                height={675}
+                className="bg-cover pointer-events-none select-none h-full w-full object-cover"
                 style={{
                   objectFit: bgObjectFit,
                   objectPosition: bgObjectPosition,
-                  width: "100%",
-                  height: "100%",
                 }}
+                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 70vw, 50vw"
               />
             </div>
             <div

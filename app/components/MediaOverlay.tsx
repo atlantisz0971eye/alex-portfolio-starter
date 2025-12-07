@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { MediaGroup, MediaGroups, MediaItem, Project, Theme } from "../types/project";
@@ -163,6 +164,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
   const conceptImages = mediaItems.filter((m) => m.role === "concept" && m.type === "image");
   const experienceImages = experienceMedia.filter((m) => m.type === "image");
   const experienceVideos = experienceMedia.filter((m) => m.type === "video");
+  const mainExperienceVideoItem = experienceVideos[0];
   const filmstripImages = heroImages.length ? heroImages : experienceImages;
   // briefTxt path is derived from title -> underscores (see content.ts helper) and lives under /public/brief
   const briefSrc = (project as ProjectWithBrief).briefTxt;
@@ -216,7 +218,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
   const heroImage = groups.images?.[0]?.items?.[0];
   const heroVideo = groups.videos?.[0]?.items?.[0];
   const mainHeroImage = heroImages[0]?.src || experienceImages[0]?.src || heroImage;
-  const mainExperienceVideo = experienceVideos[0]?.src || heroVideo;
+  const mainExperienceVideo = mainExperienceVideoItem?.src || heroVideo;
   const extraExperienceMedia = experienceMedia.filter(
     (m) => m.src !== mainHeroImage && m.src !== mainExperienceVideo
   );
@@ -286,7 +288,15 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                       onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                       onClick={() => isTouchDevice && setPreviewImage(item)}
                     >
-                      <img src={item.src} alt={item.title || `${project.title} concept`} className="w-full h-full object-cover" loading="lazy" />
+                      <Image
+                        src={item.src}
+                        alt={item.title || `${project.title} concept`}
+                        width={1200}
+                        height={800}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                      />
                     </button>
                     {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                   </div>
@@ -332,7 +342,15 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                       onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                       onClick={() => isTouchDevice && setPreviewImage(item)}
                     >
-                      <img src={item.src} alt={item.title || `${project.title} system`} className="w-full h-full object-cover" loading="lazy" />
+                      <Image
+                        src={item.src}
+                        alt={item.title || `${project.title} system`}
+                        width={1200}
+                        height={800}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                      />
                     </button>
                     {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                   </div>
@@ -354,12 +372,28 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                     onDoubleClick={() => !isTouchDevice && setPreviewImage({ type: "image", role: "experience", src: mainHeroImage })}
                     onClick={() => isTouchDevice && setPreviewImage({ type: "image", role: "experience", src: mainHeroImage })}
                   >
-                    <img src={mainHeroImage} alt={`${project.title} hero`} className="w-full h-full object-cover" loading="lazy" />
+                    <Image
+                      src={mainHeroImage}
+                      alt={`${project.title} hero`}
+                      width={1400}
+                      height={900}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
                   </button>
                 )}
                 {mainExperienceVideo && (
                   <div className="rounded-xl overflow-hidden border border-white/10 bg-black/40">
-                    <video key={mainExperienceVideo} src={mainExperienceVideo} controls preload="metadata" className="w-full h-full object-cover" />
+                    <video
+                      key={mainExperienceVideo}
+                      src={mainExperienceVideo}
+                      controls
+                      preload="none"
+                      poster={mainExperienceVideoItem?.thumb}
+                      className="w-full h-full object-cover"
+                      playsInline
+                    />
                   </div>
                 )}
               </div>
@@ -378,13 +412,28 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                           onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                           onClick={() => isTouchDevice && setPreviewImage(item)}
                         >
-                          <img src={item.src} alt={item.title || `${project.title} experience`} className="w-full h-full object-cover" loading="lazy" />
+                          <Image
+                            src={item.src}
+                            alt={item.title || `${project.title} experience`}
+                            width={1200}
+                            height={800}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                          />
                         </button>
                         {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                       </>
                     ) : (
                       <div className="bg-black/50">
-                        <video src={item.src} controls preload="metadata" className="w-full h-full object-cover" />
+                        <video
+                          src={item.src}
+                          controls
+                          preload="none"
+                          poster={item.thumb}
+                          className="w-full h-full object-cover"
+                          playsInline
+                        />
                         {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                       </div>
                     )}
@@ -450,7 +499,15 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                         }}
                         onDoubleClick={() => !isTouchDevice && setPreviewImage(item)}
                       >
-                        <img src={item.src} alt={item.title || `${project.title} thumb`} className="w-full h-full object-cover" loading="lazy" />
+                        <Image
+                          src={item.src}
+                          alt={item.title || `${project.title} thumb`}
+                          width={900}
+                          height={600}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          sizes="(max-width: 768px) 100vw, 35vw"
+                        />
                       </button>
                     ))}
                   </div>
@@ -496,8 +553,16 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
           >
             ✕
           </button>
-          <div className="max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage.src} alt={previewImage.title || "Preview"} className="max-w-full max-h-[90vh] object-contain rounded-xl" loading="lazy" />
+          <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <Image
+              src={previewImage.src}
+              alt={previewImage.title || "Preview"}
+              width={1600}
+              height={900}
+              className="max-w-full max-h-[90vh] object-contain rounded-xl"
+              loading="lazy"
+              sizes="90vw"
+            />
           </div>
         </div>
       )}

@@ -1,9 +1,7 @@
 "use client";
 
-"use client";
-
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type UseThemeVideosParams = {
   allowTechnologyVideo: boolean;
@@ -14,7 +12,7 @@ type UseThemeVideosParams = {
 };
 
 export type ThemeVideoEntry = {
-  ref: React.RefObject<HTMLVideoElement>;
+  ref: React.RefCallback<HTMLVideoElement>;
   ready: boolean;
   error: string | null;
   path: string;
@@ -40,9 +38,9 @@ export function useThemeVideos({
   mediaHubOpenSlug,
   searchOpen,
 }: UseThemeVideosParams) {
-  const technologyVideoRef = useRef<HTMLVideoElement>(null!);
-  const ruminationVideoRef = useRef<HTMLVideoElement>(null!);
-  const connectionVideoRef = useRef<HTMLVideoElement>(null!);
+  const [technologyNode, setTechnologyNode] = useState<HTMLVideoElement | null>(null);
+  const [ruminationNode, setRuminationNode] = useState<HTMLVideoElement | null>(null);
+  const [connectionNode, setConnectionNode] = useState<HTMLVideoElement | null>(null);
 
   const [technologyVideoReady, setTechnologyVideoReady] = useState(false);
   const [technologyVideoError, setTechnologyVideoError] = useState<string | null>(null);
@@ -53,9 +51,9 @@ export function useThemeVideos({
 
   useEffect(() => {
     const videos: HTMLVideoElement[] = [];
-    if (allowTechnologyVideo && technologyVideoRef.current) videos.push(technologyVideoRef.current);
-    if (allowRuminationVideo && ruminationVideoRef.current) videos.push(ruminationVideoRef.current);
-    if (allowConnectionVideo && connectionVideoRef.current) videos.push(connectionVideoRef.current);
+    if (allowTechnologyVideo && technologyNode) videos.push(technologyNode);
+    if (allowRuminationVideo && ruminationNode) videos.push(ruminationNode);
+    if (allowConnectionVideo && connectionNode) videos.push(connectionNode);
     if (videos.length === 0) return;
 
     const timers = new WeakMap<HTMLVideoElement, number>();
@@ -142,10 +140,31 @@ export function useThemeVideos({
         tryPause(el);
       });
     };
-  }, [allowTechnologyVideo, allowRuminationVideo, allowConnectionVideo, mediaHubOpenSlug, searchOpen]);
+  }, [
+    allowTechnologyVideo,
+    allowRuminationVideo,
+    allowConnectionVideo,
+    mediaHubOpenSlug,
+    searchOpen,
+    technologyNode,
+    ruminationNode,
+    connectionNode,
+  ]);
+
+  const technologyRef: React.RefCallback<HTMLVideoElement> = useCallback((node) => {
+    setTechnologyNode(node);
+  }, []);
+
+  const ruminationRef: React.RefCallback<HTMLVideoElement> = useCallback((node) => {
+    setRuminationNode(node);
+  }, []);
+
+  const connectionRef: React.RefCallback<HTMLVideoElement> = useCallback((node) => {
+    setConnectionNode(node);
+  }, []);
 
   const technology: ThemeVideoEntry = {
-    ref: technologyVideoRef,
+    ref: technologyRef,
     ready: technologyVideoReady,
     error: technologyVideoError,
     path: TECH_VIDEO_PATH,
@@ -167,7 +186,7 @@ export function useThemeVideos({
   };
 
   const rumination: ThemeVideoEntry = {
-    ref: ruminationVideoRef,
+    ref: ruminationRef,
     ready: ruminationVideoReady,
     error: ruminationVideoError,
     path: RUM_VIDEO_PATH,
@@ -189,7 +208,7 @@ export function useThemeVideos({
   };
 
   const connection: ThemeVideoEntry = {
-    ref: connectionVideoRef,
+    ref: connectionRef,
     ready: connectionVideoReady,
     error: connectionVideoError,
     path: CONNECTION_VIDEO_PATH,

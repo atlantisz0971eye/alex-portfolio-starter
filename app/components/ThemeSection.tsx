@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { ProjectCard } from "./ProjectCard";
 import type { Theme } from "../types/project";
 import type { ThemeVideos } from "../hooks/useThemeVideos";
@@ -29,20 +30,38 @@ export function ThemeSection({
   onToggleUpdates,
   onViewProject,
 }: ThemeSectionProps) {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [isSectionVisible, setIsSectionVisible] = useState(false);
   const projects = theme.projects ?? [];
   const isTechnology = theme.id === "tian";
   const isRumination = theme.id === "ren";
   const isConnection = theme.id === "di";
 
-  const showTechnologyVideo = isTechnology && videoState.technology.show;
-  const shouldRenderTechnologyVideo = isTechnology;
-  const showRuminationVideo = isRumination && videoState.rumination.show;
-  const shouldRenderRuminationVideo = isRumination;
-  const showConnectionVideo = isConnection && videoState.connection.show;
-  const shouldRenderConnectionVideo = isConnection;
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsSectionVisible(entry.isIntersecting && entry.intersectionRatio >= 0.35);
+        });
+      },
+      { threshold: [0, 0.2, 0.35, 0.6, 0.85] }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const showTechnologyVideo = isTechnology && videoState.technology.show && isSectionVisible;
+  const shouldRenderTechnologyVideo = showTechnologyVideo;
+  const showRuminationVideo = isRumination && videoState.rumination.show && isSectionVisible;
+  const shouldRenderRuminationVideo = showRuminationVideo;
+  const showConnectionVideo = isConnection && videoState.connection.show && isSectionVisible;
+  const shouldRenderConnectionVideo = showConnectionVideo;
 
   return (
     <section
+      ref={sectionRef}
       id={theme.id}
       className="section-wrap relative overflow-hidden snap-child min-h-[100svh] w-full"
       onMouseMove={(e) => {
