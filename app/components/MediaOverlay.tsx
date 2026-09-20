@@ -126,10 +126,10 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
   }, [hub.openSlug]);
 
   useEffect(() => {
-    if (!project) return;
+    if (!project?.mediaIndex) return;
     if (mediaIndexCache[project.slug] !== undefined) return;
     let aborted = false;
-    fetch(`/media/${project.slug}.json`)
+    fetch(project.mediaIndex)
       .then((response) => {
         if (!response.ok) throw new Error(response.statusText);
         return response.json();
@@ -179,6 +179,14 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
   useEffect(() => {
     setTab("brief");
   }, [hub.openSlug]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   useEffect(() => {
     if (!briefSrc) return;
@@ -453,31 +461,31 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/90 backdrop-blur z-[300] overflow-auto" onClick={closeOverlay} aria-modal="true" role="dialog">
+      <div className="media-overlay fixed inset-0 bg-black/90 backdrop-blur z-[300] overflow-auto overscroll-contain" onClick={closeOverlay} aria-modal="true" role="dialog">
         <div
           ref={overlayRef}
-          className="relative w-full max-w-screen-xl mx-auto min-h-screen px-4 md:px-8 lg:px-10 pt-16 pb-10"
+          className="media-overlay__shell relative w-full max-w-screen-xl mx-auto min-h-screen px-4 md:px-8 lg:px-10 pt-16 pb-10"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="relative rounded-3xl bg-black/40 border border-white/10 p-6 md:p-8 shadow-2xl">
+          <div className="media-overlay__panel relative rounded-3xl bg-black/40 border border-white/10 p-6 md:p-8 shadow-2xl">
             <button
               onClick={closeOverlay}
-              className="absolute top-4 right-4 text-white hover:text-gray-300"
+              className="media-overlay__close absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-black/40 text-white hover:text-gray-300"
               aria-label="Close media overlay"
             >
               ✕
             </button>
-            <div className="flex items-center justify-between mb-6 pr-10">
-              <BackButton onClick={closeOverlay} />
+            <div className="media-overlay__topbar flex items-center justify-between mb-6 pr-10">
+              <BackButton onClick={closeOverlay} label={lang === "en" ? "Back" : "返回"} />
             </div>
-            <div className="relative grid md:grid-cols-[260px,1fr] gap-6">
+            <div className="media-overlay__grid relative grid md:grid-cols-[260px,1fr] gap-6">
               {project.bg?.src && (
                 <div
                   className="absolute inset-0 -z-10 bg-center bg-cover blur-xl opacity-30 pointer-events-none"
                   style={{ backgroundImage: `url(${project.bg.src})`, backgroundPosition: project.bg.position || "center" }}
                 />
               )}
-              <aside className="space-y-4">
+              <aside className="media-overlay__aside space-y-4">
                 <h2 className="text-xl font-semibold">{project.title}</h2>
                 <p className="text-sm text-white/85 leading-relaxed">{getProjectTypeLabel(project.slug)}</p>
                 <div className="flex flex-wrap gap-2 mt-2">
@@ -488,7 +496,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                   ))}
                 </div>
                 {filmstripImages.length > 0 && (
-                  <div className="flex flex-col gap-2 mt-4">
+                  <div className="media-overlay__filmstrip flex flex-col gap-2 mt-4">
                     {filmstripImages.map((item, idx) => (
                       <button
                         key={`${item.src}-${idx}`}
@@ -513,7 +521,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                   </div>
                 )}
                 {project.updates && project.updates.length > 0 && (
-                  <div className="mt-4">
+                  <div className="media-overlay__updates mt-4">
                     <h3 className="text-sm font-semibold mb-2">{lang === "en" ? "Updates" : "更新日志"}</h3>
                     <ul className="space-y-1 text-xs text-white/70 max-h-40 overflow-auto pr-1">
                       {project.updates
@@ -529,7 +537,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                   </div>
                 )}
               </aside>
-              <section className="space-y-4">
+              <section className="media-overlay__content min-w-0 space-y-4">
                 <TabBar active={tab} onChange={setTab} />
                 {renderTabContent()}
               </section>
@@ -544,7 +552,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
         >
           <button
             type="button"
-            className="absolute top-4 right-4 text-white hover:text-gray-300 text-lg"
+            className="absolute top-4 right-4 grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-black/50 text-white hover:text-gray-300 text-lg"
             onClick={(e) => {
               e.stopPropagation();
               setPreviewImage(null);
@@ -580,12 +588,12 @@ function TabBar({ active, onChange }: { active: OverlayTab; onChange: (tab: Over
     { id: "experience", label: "EXPERIENCE" },
   ];
   return (
-    <div className="rounded-2xl bg-black/40 border border-white/10 px-3 py-2 flex flex-wrap gap-2">
+    <div className="overlay-tabs rounded-2xl bg-black/40 border border-white/10 px-3 py-2 flex gap-2 overflow-x-auto">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
-          className={`px-3 py-1.5 rounded-lg border text-[11px] tracking-[0.14em] uppercase transition ${
+          className={`overlay-tab shrink-0 px-3 py-1.5 rounded-lg border text-[11px] tracking-[0.14em] uppercase transition ${
             active === tab.id ? "bg-white text-black border-white" : "bg-white/5 text-white border-white/10 hover:bg-white/15"
           }`}
         >
@@ -597,7 +605,7 @@ function TabBar({ active, onChange }: { active: OverlayTab; onChange: (tab: Over
 }
 
 const Card = ({ children }: { children: ReactNode }) => (
-  <div className="rounded-2xl overflow-hidden bg-black/40 p-6 border border-white/10 space-y-4">{children}</div>
+  <div className="overlay-card rounded-2xl overflow-hidden bg-black/40 p-6 border border-white/10 space-y-4">{children}</div>
 );
 
 const SectionHeading = ({ label, badge }: { label: string; badge: string }) => (
@@ -625,13 +633,13 @@ const LabelOverlay = ({ text }: { text: string }) => (
   </div>
 );
 
-const BackButton = ({ onClick }: { onClick: () => void }) => (
+const BackButton = ({ onClick, label }: { onClick: () => void; label: string }) => (
   <button
     onClick={onClick}
     className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-xs md:text-sm px-3 py-1.5 tracking-[0.12em] uppercase text-white transition"
   >
     <span aria-hidden>←</span>
-    Back
+    {label}
   </button>
 );
 

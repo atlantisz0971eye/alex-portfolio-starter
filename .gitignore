@@ -1,6 +1,10 @@
 node_modules/
 .next/
 .DS_Store
+._*
+*.tsbuildinfo
+public/bloom-system/experience/Bloom_Video.mp4
+public/fitting-reality/experience/Fitting_reality_v2.mp4
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -1,3 +1,7 @@
+export type Language = "en" | "zh";
+
+export type ThemeId = "tian" | "ren" | "di";
+
 export type MediaGroup = { label: string; items: string[] };
 
 export type MediaGroups = {
@@ -27,21 +31,27 @@ export type Project = {
   media?: { images?: string[]; videos?: string[]; audios?: string[] } | MediaItem[];
   mediaItems?: MediaItem[];
   mediaGroups?: MediaGroups;
+  mediaIndex?: string;
   updates?: { date: string; text: string }[];
   updatesTxt?: string;
   docTxt?: string;
   overviewTxt?: string;
   docPdf?: string;
+  briefTxt?: string;
 };
 
 export type Theme = {
-  id: "tian" | "ren" | "di";
+  id: ThemeId;
   title: string;
   color: string;
   intro: string;
   projects: Project[];
   reading: string[];
 };
+
+export type SiteContent = { themes: Theme[] };
+
+export type LocalizedContent = Record<Language, SiteContent>;
 
 export type SearchResult = {
   kind: "theme" | "project" | "tag" | "update";

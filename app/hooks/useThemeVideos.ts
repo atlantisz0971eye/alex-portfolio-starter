@@ -168,7 +168,7 @@ export function useThemeVideos({
     ready: technologyVideoReady,
     error: technologyVideoError,
     path: TECH_VIDEO_PATH,
-    poster: "/Dys_Utopia_bg.png",
+    poster: "/bg-fitting-reality.jpg",
     show: allowTechnologyVideo,
     onLoaded: () => {
       console.debug("[video] Technology ready:", TECH_VIDEO_PATH);
@@ -190,7 +190,7 @@ export function useThemeVideos({
     ready: ruminationVideoReady,
     error: ruminationVideoError,
     path: RUM_VIDEO_PATH,
-    poster: "/Dys_Utopia_bg.png",
+    poster: "/bg-dys-utopia.jpg",
     show: allowRuminationVideo,
     onLoaded: () => {
       console.debug("[video] Rumination ready:", RUM_VIDEO_PATH);

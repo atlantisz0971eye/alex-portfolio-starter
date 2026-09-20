@@ -1,21 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Project } from "../types/project";
 import { getProjectTypeLabel } from "../lib/projectType";
+import { cancelTiltAnimation, resetTilt, type TiltElement, updateTilt } from "../lib/tilt";
 import { isTouchDevice, prefersReducedMotion } from "../utils/environment";
-
-type TiltElement = HTMLDivElement & {
-  _raf?: number;
-  _nx?: number;
-  _ny?: number;
-  _rx?: number;
-  _ry?: number;
-  _leaving?: boolean;
-};
 
 type ProjectCardProps = {
   project: Project;
@@ -39,54 +30,12 @@ export function ProjectCard({
   const cardRef = useRef<TiltElement | null>(null);
 
   useEffect(() => {
-    return () => {
-      const el = cardRef.current;
-      if (el?._raf) {
-        cancelAnimationFrame(el._raf);
-        el._raf = undefined;
-      }
-    };
+    return () => cancelTiltAnimation(cardRef.current);
   }, []);
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (isTouchDevice || prefersReducedMotion) return;
-    const el = event.currentTarget as TiltElement;
-    const rect = el.getBoundingClientRect();
-    el._nx = (event.clientX - rect.left) / rect.width - 0.5;
-    el._ny = (event.clientY - rect.top) / rect.height - 0.5;
-    el._leaving = false;
-    if (!el._raf) {
-      el._rx = el._rx ?? 0;
-      el._ry = el._ry ?? 0;
-      const step = () => {
-        const targetX = (-(el._ny ?? 0)) * 12;
-        const targetY = (el._nx ?? 0) * 12;
-        el._rx! += (targetX - el._rx!) * 0.18;
-        el._ry! += (targetY - el._ry!) * 0.18;
-        const tz = 14;
-        const persp = 800;
-        el.style.transform = `perspective(${persp}px) rotateX(${el._rx!.toFixed(2)}deg) rotateY(${el._ry!.toFixed(2)}deg) translateZ(${tz}px) scale(var(--scale, 1.015))`;
-        if (el._leaving) {
-          const nearZero = Math.abs(el._rx!) + Math.abs(el._ry!) < 0.06;
-          if (nearZero) {
-            cancelAnimationFrame(el._raf!);
-            el._raf = undefined;
-            el._rx = 0;
-            el._ry = 0;
-            el.style.transform = `perspective(${persp}px) translateZ(${tz}px) scale(var(--scale, 1.015))`;
-            return;
-          }
-        }
-        el._raf = requestAnimationFrame(step);
-      };
-      el._raf = requestAnimationFrame(step);
-    }
-    const glare = el.querySelector("[data-glare]") as HTMLDivElement | null;
-    if (glare) glare.style.opacity = "0.22";
-    const gx = ((event.clientX - rect.left) / rect.width) * 100;
-    const gy = ((event.clientY - rect.top) / rect.height) * 100;
-    el.style.setProperty("--gx", gx.toFixed(2) + "%");
-    el.style.setProperty("--gy", gy.toFixed(2) + "%");
+    updateTilt(event.currentTarget as TiltElement, event.clientX, event.clientY);
   };
 
   const updatesMarkdown = updatesTxt[project.slug];
@@ -113,12 +62,7 @@ export function ProjectCard({
     if (typeof document === "undefined" || !el.contains(document.activeElement)) {
       setHovered(false);
     }
-    el.style.setProperty("--scale", "1.015");
-    el._leaving = true;
-    el._nx = 0;
-    el._ny = 0;
-    const glare = el.querySelector("[data-glare]") as HTMLDivElement | null;
-    if (glare) glare.style.opacity = "0";
+    resetTilt(el);
   };
   const handleBlurCapture: React.FocusEventHandler<HTMLDivElement> = (e) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) setHovered(false);
@@ -152,18 +96,14 @@ export function ProjectCard({
               }`}
               aria-hidden
             >
-              <Image
-                src={project.bg!.src}
-                alt=""
-                loading="lazy"
-                width={1200}
-                height={675}
-                className="bg-cover pointer-events-none select-none h-full w-full object-cover"
+              <div
+                className="absolute inset-0 pointer-events-none select-none"
                 style={{
-                  objectFit: bgObjectFit,
-                  objectPosition: bgObjectPosition,
+                  backgroundImage: `url("${project.bg!.src}")`,
+                  backgroundPosition: bgObjectPosition,
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: bgObjectFit,
                 }}
-                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 70vw, 50vw"
               />
             </div>
             <div
@@ -266,7 +206,7 @@ export function ProjectCard({
           </>
         )}
         {project.updatesTxt && (
-          <p className="text-xs text-white/50 mt-1">
+          <p className="project-source text-xs text-white/50 mt-1">
             {lang === "en" ? "TXT source:" : "TXT 文件路径："}{" "}
             <code className="opacity-80">{project.updatesTxt}</code>
           </p>

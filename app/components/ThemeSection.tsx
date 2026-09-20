@@ -82,7 +82,7 @@ export function ThemeSection({
         <div
           className="section-bg bg-center bg-cover"
           style={{
-            backgroundImage: videoState.rumination.ready ? "none" : "url('/Dys_Utopia_bg.png')",
+            backgroundImage: videoState.rumination.ready ? "none" : "url('/bg-dys-utopia.jpg')",
           }}
           aria-hidden
         />
@@ -151,14 +151,14 @@ export function ThemeSection({
       <div className="theme-noise section-noise" aria-hidden />
 
       {videoState.technology.error && isTechnology && (
-        <div className="absolute top-6 right-6 z-30">
+        <div className="video-status absolute top-6 right-6 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-red-600/90 px-3 py-1 text-xs font-semibold text-white shadow-lg">
             {videoState.technology.error}
           </span>
         </div>
       )}
       {isTechnology && !showTechnologyVideo && !videoState.technology.error && (
-        <div className="absolute top-6 right-6 z-30">
+        <div className="video-status absolute top-6 right-6 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 shadow-lg border border-white/15">
             {prefersReducedMotion ? "Reduced‑motion: video disabled" : isTouchDevice ? "Touch device: video disabled" : "Video idle"}
           </span>
@@ -166,28 +166,28 @@ export function ThemeSection({
       )}
 
       {videoState.rumination.error && isRumination && (
-        <div className="absolute top-6 right-6 z-30">
+        <div className="video-status absolute top-6 right-6 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-red-600/90 px-3 py-1 text-xs font-semibold text-white shadow-lg">
             {videoState.rumination.error}
           </span>
         </div>
       )}
       {isRumination && !shouldRenderRuminationVideo && !videoState.rumination.error && (
-        <div className="absolute top-6 right-6 z-30">
+        <div className="video-status absolute top-6 right-6 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 shadow-lg border border-white/15">
             {prefersReducedMotion ? "Reduced‑motion: video disabled" : isTouchDevice ? "Touch device: video disabled" : "Video idle"}
           </span>
         </div>
       )}
       {videoState.connection.error && isConnection && (
-        <div className="absolute top-6 right-6 z-30">
+        <div className="video-status absolute top-6 right-6 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-red-600/90 px-3 py-1 text-xs font-semibold text-white shadow-lg">
             {videoState.connection.error}
           </span>
         </div>
       )}
       {isConnection && !showConnectionVideo && !videoState.connection.error && (
-        <div className="absolute top-6 right-6 z-30">
+        <div className="video-status absolute top-6 right-6 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 shadow-lg border border-white/15">
             {prefersReducedMotion ? "Reduced‑motion: video disabled" : isTouchDevice ? "Touch device: video disabled" : "Video idle"}
           </span>

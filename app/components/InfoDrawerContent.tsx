@@ -1,15 +1,15 @@
 "use client";
 
 import { glassCardClass } from "../lib/ui";
+import { CONTENT } from "../data/content";
 
 type InfoDrawerContentProps = {
   lang: "en" | "zh";
-  contentDump: string;
 };
 
-export default function InfoDrawerContent({ lang, contentDump }: InfoDrawerContentProps) {
+export default function InfoDrawerContent({ lang }: InfoDrawerContentProps) {
   return (
-    <div className={`absolute right-0 mt-2 w-[600px] max-w-[90vw] text-sm space-y-4 z-50 backdrop-blur ${glassCardClass}`}>
+    <div className={`info-drawer absolute right-0 mt-2 w-[600px] max-w-[90vw] text-sm space-y-4 z-50 backdrop-blur ${glassCardClass}`}>
       <div>
         <h4 className="font-semibold mb-2">{lang === "en" ? "Information Architecture (IA)" : "信息架构（IA）"}</h4>
         <pre className="whitespace-pre-wrap text-xs bg-white/5 p-3 rounded-lg border border-white/10">
@@ -22,7 +22,9 @@ export default function InfoDrawerContent({ lang, contentDump }: InfoDrawerConte
 ├── Rumination / 反刍
 │   └── Dys/Utopia (Project page)
 ├── Connection / 连接
-│   └── Roots / Hometown Series (Ongoing, phase logs/material wall)
+│   └── Bloom System (Project page)
+├── Gallery / Independent Works
+│   └── Ga1a — Poetry Leaf Archive (External work)
 ├── About (Artist statement / CV / Statement)
 └── Contact (Contact info / Social media)`
 :
@@ -34,7 +36,9 @@ export default function InfoDrawerContent({ lang, contentDump }: InfoDrawerConte
 ├── 反刍 / Rumination
 │   └── Dys/Utopia (项目页)
 ├── 连接 / Connection
-│   └── 根源/家乡系列 (进行中，阶段性日志/素材墙)
+│   └── Bloom System (项目页)
+├── 作品画廊 / Gallery
+│   └── Ga1a — 诗歌叶片档案 (外部作品)
 ├── About (艺术家自述 / CV / Statement)
 └── Contact (联系方式 / 社媒)`}
         </pre>
@@ -42,7 +46,7 @@ export default function InfoDrawerContent({ lang, contentDump }: InfoDrawerConte
       <div>
         <h4 className="font-semibold mb-2">{lang === "en" ? "Content Data Structure (Example)" : "内容数据结构（示意）"}</h4>
         <pre className="whitespace-pre-wrap text-xs bg-white/5 p-3 rounded-lg border border-white/10 overflow-auto max-h-[240px]">
-{contentDump}
+{JSON.stringify(CONTENT[lang], null, 2)}
         </pre>
       </div>
       <div className="text-white/80 text-sm leading-relaxed">

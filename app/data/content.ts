@@ -1,12 +1,9 @@
-import type { Project, Theme } from "../types/project";
+import type { LocalizedContent, Project } from "../types/project";
 
 // Helper to attach brief text path based on normalized title
 const withBrief = (title: string) => `/brief/${title.replace(/[\\/-]/g, "_").replace(/\s+/g, "_")}.txt`;
 
-type ProjectWithBrief = Project & { briefTxt?: string };
-type ThemeWithBrief = Omit<Theme, "projects"> & { projects: ProjectWithBrief[] };
-
-export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
+export const CONTENT = {
   en: {
     themes: [
       {
@@ -28,6 +25,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             mediaItems: [
               { type: "image", role: "hero", src: "/fitting-reality/hero/hero_01.jpg", title: "Installation view" },
               { type: "image", role: "hero", src: "/fitting-reality/hero/hero_02.jpg", title: "Installation detail" },
+              { type: "video", role: "experience", src: "/fitting-reality/experience/Fitting_reality_v2-web.mp4", title: "Fitting Reality V2" },
               { type: "video", role: "experience", src: "/fitting-reality/experience/experience_01.mp4", title: "Demo loop" },
               { type: "video", role: "experience", src: "/fitting-reality/experience/experience_02.mp4", title: "Demo loop 02" },
               { type: "image", role: "experience", src: "/fitting-reality/experience/experience_03.jpg", title: "Experience still" },
@@ -184,8 +182,6 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             tags: ["Body Data", "Noise System", "Image Distortion"],
             bg: { src: "/bg-roots.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
-            docTxt: "/docs/roots-and-lands.md",
-            overviewTxt: "/docs/roots-and-lands-overview.txt",
             updates: [
               { date: "2025-09-01", text: "Collected field photos and ambient recordings in hometown area." }
             ],
@@ -193,6 +189,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             mediaItems: [
               { type: "image", role: "hero", src: "/bloom-system/hero/hero_01.jpg", title: "Field still" },
               { type: "image", role: "hero", src: "/bloom-system/hero/hero_02.jpg", title: "Field still 02" },
+              { type: "video", role: "experience", src: "/bloom-system/experience/Bloom_Video-web.mp4", title: "Bloom Video" },
               { type: "video", role: "experience", src: "/bloom-system/experience/experience_01.mp4", title: "Experience loop" },
               { type: "image", role: "experience", src: "/bloom-system/experience/experience_02.jpg", title: "Experience still" },
               { type: "image", role: "doc", src: "/bloom-system/docs/doc_01.jpg" },
@@ -239,6 +236,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             mediaItems: [
               { type: "image", role: "hero", src: "/fitting-reality/hero/hero_01.jpg", title: "装置视角" },
               { type: "image", role: "hero", src: "/fitting-reality/hero/hero_02.jpg", title: "装置细节" },
+              { type: "video", role: "experience", src: "/fitting-reality/experience/Fitting_reality_v2-web.mp4", title: "拟合现实 V2" },
               { type: "video", role: "experience", src: "/fitting-reality/experience/experience_01.mp4", title: "体验片段" },
               { type: "video", role: "experience", src: "/fitting-reality/experience/experience_02.mp4", title: "体验片段 02" },
               { type: "image", role: "experience", src: "/fitting-reality/experience/experience_03.jpg", title: "体验静帧" },
@@ -393,8 +391,6 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             tags: ["身体数据", "噪声系统", "图像扰动"],
             bg: { src: "/bg-roots.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
-            docTxt: "/docs/roots-and-lands.md",
-            overviewTxt: "/docs/roots-and-lands-overview.txt",
             updates: [
               { date: "2025-09-01", text: "采集家乡田野照片与环境声。" }
             ],
@@ -402,6 +398,7 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
             mediaItems: [
               { type: "image", role: "hero", src: "/bloom-system/hero/hero_01.jpg", title: "田野照片" },
               { type: "image", role: "hero", src: "/bloom-system/hero/hero_02.jpg", title: "田野照片 02" },
+              { type: "video", role: "experience", src: "/bloom-system/experience/Bloom_Video-web.mp4", title: "Bloom 影像" },
               { type: "video", role: "experience", src: "/bloom-system/experience/experience_01.mp4", title: "体验片段" },
               { type: "image", role: "experience", src: "/bloom-system/experience/experience_02.jpg", title: "体验静帧" },
               { type: "image", role: "doc", src: "/bloom-system/docs/doc_01.jpg" },
@@ -422,4 +419,4 @@ export const CONTENT: Record<"en"|"zh", { themes: ThemeWithBrief[] }> = {
       },
     ],
   },
-};
+} satisfies LocalizedContent;
