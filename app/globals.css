@@ -515,6 +515,74 @@ a {
   text-transform: uppercase;
 }
 
+.gallery-album-card {
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 22px;
+  background: rgba(255,255,255,.035);
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(0,0,0,.22);
+  transition: transform .3s ease, border-color .3s ease;
+}
+
+.gallery-album-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255,255,255,.28);
+}
+
+.gallery-album-art {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #050505;
+}
+
+.gallery-album-art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform .65s cubic-bezier(.2,.8,.2,1), filter .3s ease;
+}
+
+.gallery-album-card:hover .gallery-album-art img {
+  transform: scale(1.025);
+  filter: saturate(1.05);
+}
+
+.gallery-album-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 280px;
+  padding: 25px 24px;
+  background: linear-gradient(145deg, rgba(17,19,17,.98), rgba(5,6,5,.98));
+}
+
+.gallery-album-copy h3 {
+  overflow-wrap: anywhere;
+}
+
+.gallery-album-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  color: rgba(255,255,255,.72);
+  font-size: 10px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
 .gallery-reserve {
   grid-column: span 6;
   display: flex;
@@ -542,6 +610,7 @@ a {
   .gallery-feature { grid-template-columns: 1fr; }
   .gallery-feature-art { min-height: 360px; }
   .gallery-video-card { grid-column: 1 / -1; }
+  .gallery-album-card { grid-column: 1 / -1; }
   .gallery-reserve { grid-column: 1 / -1; }
   .gallery-trace { max-width: 180px; text-align: right; line-height: 1.5; }
 }
@@ -915,6 +984,25 @@ a {
   .gallery-video-play {
     width: 50px;
     height: 50px;
+  }
+
+  .gallery-album-card {
+    min-height: 0;
+    border-radius: 20px;
+    transform: none !important;
+  }
+
+  .gallery-album-art {
+    aspect-ratio: 1;
+  }
+
+  .gallery-album-copy {
+    min-height: 0;
+    padding: 22px 18px;
+  }
+
+  .gallery-album-copy h3 {
+    font-size: 28px;
   }
 
   .gallery-reserve-wide {

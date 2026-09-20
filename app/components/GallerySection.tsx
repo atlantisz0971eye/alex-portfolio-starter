@@ -1,4 +1,4 @@
-import { ArrowUpRight, Leaf, Play, Plus, Youtube } from "lucide-react";
+import { ArrowUpRight, Headphones, Leaf, Play, Plus, Youtube } from "lucide-react";
 import { GALLERY_CONTENT } from "../data/gallery";
 import type { Language } from "../types/project";
 
@@ -6,6 +6,7 @@ export function GallerySection({ lang }: { lang: Language }) {
   const content = GALLERY_CONTENT[lang];
   const featuredItem = content.items.find((item) => item.kind === "archive");
   const videoItems = content.items.filter((item) => item.kind === "video");
+  const albumItems = content.items.filter((item) => item.kind === "album");
 
   return (
     <section id="gallery" className="gallery-section relative min-h-[100svh] snap-child overflow-hidden border-t border-white/10">
@@ -108,7 +109,50 @@ export function GallerySection({ lang }: { lang: Language }) {
             </a>
           ))}
 
-          {["04"].map((index) => (
+          {albumItems.map((item) => (
+            <a
+              key={item.slug}
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              className="gallery-album-card group"
+              aria-label={`${content.listenLabel}: ${item.title}`}
+            >
+              <div className="gallery-album-art">
+                {item.thumbnail && (
+                  <img
+                    src={item.thumbnail}
+                    alt={`${item.title} ${lang === "en" ? "album cover" : "专辑封面"}`}
+                    loading="lazy"
+                  />
+                )}
+              </div>
+
+              <div className="gallery-album-copy">
+                <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="gallery-kicker text-white/45">ALBUM {item.index} · {item.eyebrow}</p>
+                    <Headphones className="h-4 w-4 text-white/35" aria-hidden />
+                  </div>
+                  <h3 className="mt-4 text-2xl font-medium tracking-tight">{item.title}</h3>
+                  <p className="mt-1 text-sm text-white/50">{item.subtitle} · NetEase Cloud Music</p>
+                  <p className="mt-5 text-sm leading-6 text-white/65">{item.description}</p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {item.tags.map((tag) => (
+                      <span key={tag} className="gallery-tag">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="gallery-album-footer">
+                  <span>{content.listenLabel}</span>
+                  <ArrowUpRight className="h-4 w-4" />
+                </div>
+              </div>
+            </a>
+          ))}
+
+          {["06"].map((index) => (
             <div key={index} className="gallery-reserve gallery-reserve-wide">
               <div className="flex items-center justify-between">
                 <span className="gallery-kicker">{index}</span>

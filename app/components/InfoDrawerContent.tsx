@@ -24,7 +24,9 @@ export default function InfoDrawerContent({ lang }: InfoDrawerContentProps) {
 ├── Connection / 连接
 │   └── Bloom System (Project page)
 ├── Gallery / Independent Works
-│   └── Ga1a — Poetry Leaf Archive (External work)
+│   ├── Ga1a — Poetry Leaf Archive (External work)
+│   ├── Blur / 沦陷 (Moving image)
+│   └── METAPHYSICS / Rusty Dream (Albums)
 ├── About (Artist statement / CV / Statement)
 └── Contact (Contact info / Social media)`
 :
@@ -38,7 +40,9 @@ export default function InfoDrawerContent({ lang }: InfoDrawerContentProps) {
 ├── 连接 / Connection
 │   └── Bloom System (项目页)
 ├── 作品画廊 / Gallery
-│   └── Ga1a — 诗歌叶片档案 (外部作品)
+│   ├── Ga1a — 诗歌叶片档案 (外部作品)
+│   ├── Blur / 沦陷 (动态影像)
+│   └── METAPHYSICS / Rusty Dream (音乐专辑)
 ├── About (艺术家自述 / CV / Statement)
 └── Contact (联系方式 / 社媒)`}
         </pre>

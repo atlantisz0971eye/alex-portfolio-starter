@@ -2,7 +2,7 @@ import type { Language } from "../types/project";
 
 export type GalleryItem = {
   slug: string;
-  kind: "archive" | "video";
+  kind: "archive" | "video" | "album";
   title: string;
   subtitle: string;
   description: string;
@@ -21,6 +21,7 @@ type GalleryContent = {
   intro: string;
   visitLabel: string;
   watchLabel: string;
+  listenLabel: string;
   reserveLabel: string;
   reserveDescription: string;
   items: GalleryItem[];
@@ -35,6 +36,7 @@ export const GALLERY_CONTENT = {
     intro: "A growing index of web experiments, visual studies, sound works, and projects that live beyond the three core themes.",
     visitLabel: "Visit live work",
     watchLabel: "Watch on YouTube",
+    listenLabel: "Listen on NetEase",
     reserveLabel: "Next work",
     reserveDescription: "Reserved for the next experiment, study, or collaboration.",
     items: [
@@ -78,6 +80,30 @@ export const GALLERY_CONTENT = {
         duration: "03:47",
         thumbnail: "https://i.ytimg.com/vi/_7dHfAWTiqk/maxresdefault.jpg",
       },
+      {
+        slug: "metaphysics-album",
+        kind: "album",
+        title: "METAPHYSICS",
+        subtitle: "Album",
+        description: "A full-length music release available through the artist’s NetEase Cloud Music archive.",
+        href: "https://music.163.com/#/album?id=262508556",
+        tags: ["Album", "Music", "NetEase Cloud Music"],
+        eyebrow: "Music release",
+        index: "04",
+        thumbnail: "/gallery/albums/metaphysics.jpg",
+      },
+      {
+        slug: "rusty-dream-album",
+        kind: "album",
+        title: "Rusty Dream",
+        subtitle: "Album",
+        description: "A full-length music release available through the artist’s NetEase Cloud Music archive.",
+        href: "https://music.163.com/#/album?id=185024152",
+        tags: ["Album", "Music", "NetEase Cloud Music"],
+        eyebrow: "Music release",
+        index: "05",
+        thumbnail: "/gallery/albums/rusty-dream.jpg",
+      },
     ],
   },
   zh: {
@@ -86,6 +112,7 @@ export const GALLERY_CONTENT = {
     intro: "持续生长的作品索引，用来收录三个基本主题之外的网页实验、视觉研究、声音作品与合作项目。",
     visitLabel: "访问在线作品",
     watchLabel: "在 YouTube 观看",
+    listenLabel: "在网易云音乐收听",
     reserveLabel: "下一件作品",
     reserveDescription: "为下一项实验、研究或合作预留。",
     items: [
@@ -127,6 +154,30 @@ export const GALLERY_CONTENT = {
         year: "2025",
         duration: "03:47",
         thumbnail: "https://i.ytimg.com/vi/_7dHfAWTiqk/maxresdefault.jpg",
+      },
+      {
+        slug: "metaphysics-album",
+        kind: "album",
+        title: "METAPHYSICS",
+        subtitle: "音乐专辑",
+        description: "收录于艺术家网易云音乐档案中的完整音乐专辑作品。",
+        href: "https://music.163.com/#/album?id=262508556",
+        tags: ["专辑", "音乐", "网易云音乐"],
+        eyebrow: "音乐发行",
+        index: "04",
+        thumbnail: "/gallery/albums/metaphysics.jpg",
+      },
+      {
+        slug: "rusty-dream-album",
+        kind: "album",
+        title: "Rusty Dream",
+        subtitle: "音乐专辑",
+        description: "收录于艺术家网易云音乐档案中的完整音乐专辑作品。",
+        href: "https://music.163.com/#/album?id=185024152",
+        tags: ["专辑", "音乐", "网易云音乐"],
+        eyebrow: "音乐发行",
+        index: "05",
+        thumbnail: "/gallery/albums/rusty-dream.jpg",
       },
     ],
   },
