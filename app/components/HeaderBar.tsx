@@ -1,11 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useState, type KeyboardEvent } from "react";
-import { Info, Search } from "lucide-react";
+import { type KeyboardEvent } from "react";
+import { Search } from "lucide-react";
 import type { SearchResult } from "../types/project";
 import { glassButtonClass } from "../lib/ui";
-const InfoDrawerContent = dynamic(() => import("./InfoDrawerContent"));
 
 type HeaderBarProps = {
   lang: "en" | "zh";
@@ -31,8 +29,7 @@ export function HeaderBar({
   onResultClick,
 }: HeaderBarProps) {
   return (
-    <header className="header-glass backdrop-blur bg-black/30 border-b border-white/10 text-white" style={{ paddingTop: "var(--safe-top)" }}>
-      {/* Pad left on desktop to clear the fixed sidebar and align with main content */}
+    <header className="header-glass attention-header text-white" style={{ paddingTop: "var(--safe-top)" }}>
       <div className="header-inner w-full max-w-screen-xl mx-auto px-4 md:px-8 lg:px-10 md:pl-28 py-3 flex items-center gap-3">
         <h1 className="header-title text-lg font-bold">Alex Projects</h1>
         <div className="header-actions ml-auto flex items-center gap-2">
@@ -58,23 +55,7 @@ export function HeaderBar({
                           className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-start gap-2"
                           onClick={() => onResultClick(result)}
                         >
-                          <span className="text-xs badge shrink-0">
-                            {result.kind === "theme"
-                              ? lang === "en"
-                                ? "Theme"
-                                : "主题"
-                              : result.kind === "project"
-                              ? lang === "en"
-                                ? "Project"
-                                : "项目"
-                              : result.kind === "tag"
-                              ? lang === "en"
-                                ? "Tag"
-                                : "标签"
-                              : lang === "en"
-                              ? "Update"
-                              : "更新"}
-                          </span>
+                          <span className="text-xs badge shrink-0">{searchKindLabel(result.kind, lang)}</span>
                           <div className="min-w-0">
                             <div className="truncate font-medium">{result.title}</div>
                             {result.subtitle && <div className="text-xs text-white/70 truncate">{result.subtitle}</div>}
@@ -94,28 +75,20 @@ export function HeaderBar({
           >
             {lang === "en" ? "中文" : "EN"}
           </button>
-          <InfoSection lang={lang} />
         </div>
       </div>
     </header>
   );
 }
 
-function InfoSection({ lang }: { lang: "en" | "zh" }) {
-  const [open, setOpen] = useState(false);
-  const infoLabel = lang === "en" ? "Open information drawer" : "打开信息抽屉";
-
-  return (
-    <div className="info-control relative">
-      <button
-        onClick={() => setOpen((prev) => !prev)}
-        className="btn-ghost"
-        aria-expanded={open}
-        aria-label={infoLabel}
-      >
-        <Info className="w-4 h-4" />
-      </button>
-      {open && <InfoDrawerContent lang={lang} />}
-    </div>
-  );
+function searchKindLabel(kind: SearchResult["kind"], lang: "en" | "zh") {
+  const labels = {
+    theme: { en: "Theme", zh: "主题" },
+    project: { en: "Project", zh: "项目" },
+    tag: { en: "Tag", zh: "标签" },
+    gallery: { en: "Gallery", zh: "画廊" },
+    bio: { en: "Bio", zh: "简介" },
+    education: { en: "Education", zh: "教育" },
+  } as const;
+  return labels[kind][lang];
 }

@@ -7,31 +7,28 @@ import type { ThemeVideos } from "../hooks/useThemeVideos";
 
 type ThemeSectionProps = {
   theme: Theme;
-  nextTheme: Theme | null;
   lang: "en" | "zh";
   videoState: ThemeVideos;
   prefersReducedMotion: boolean;
   isTouchDevice: boolean;
-  updatesOpen: string | null;
-  updatesTxt: Record<string, string | null>;
-  onToggleUpdates: (slug: string) => void;
+  activeProjectSlug: string | null;
+  onToggleProject: (slug: string) => void;
   onViewProject: (slug: string) => void;
 };
 
 export function ThemeSection({
   theme,
-  nextTheme,
   lang,
   videoState,
   prefersReducedMotion,
   isTouchDevice,
-  updatesOpen,
-  updatesTxt,
-  onToggleUpdates,
+  activeProjectSlug,
+  onToggleProject,
   onViewProject,
 }: ThemeSectionProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [isSectionVisible, setIsSectionVisible] = useState(false);
+  const [introOpen, setIntroOpen] = useState(false);
   const projects = theme.projects ?? [];
   const isTechnology = theme.id === "tian";
   const isRumination = theme.id === "ren";
@@ -76,13 +73,19 @@ export function ThemeSection({
       }}
     >
       {isTechnology && (
-        <div className="section-bg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700" aria-hidden />
+        <div
+          className="section-bg bg-center bg-cover"
+          style={{
+            backgroundImage: `linear-gradient(135deg, rgba(15,23,42,.3), rgba(15,23,42,.58)), url('${videoState.technology.poster}')`,
+          }}
+          aria-hidden
+        />
       )}
       {isRumination && (
         <div
           className="section-bg bg-center bg-cover"
           style={{
-            backgroundImage: videoState.rumination.ready ? "none" : "url('/bg-dys-utopia.jpg')",
+            backgroundImage: `url('${videoState.rumination.poster}')`,
           }}
           aria-hidden
         />
@@ -106,7 +109,10 @@ export function ThemeSection({
       )}
       {isConnection && (
         <div
-          className="section-bg bg-gradient-to-b from-[#1c140b] via-[#0e0b09] to-black opacity-80"
+          className="section-bg bg-center bg-cover"
+          style={{
+            backgroundImage: `linear-gradient(to bottom, rgba(28,20,11,.32), rgba(0,0,0,.62)), url('${videoState.connection.poster}')`,
+          }}
           aria-hidden
         />
       )}
@@ -195,7 +201,20 @@ export function ThemeSection({
       )}
 
       <div className="section-content content-grid py-16 md:py-24">
-        <div className="section-head mb-8">
+        <div
+          className={`section-head mb-8 ${introOpen ? "is-open" : ""}`}
+          role="button"
+          tabIndex={0}
+          aria-expanded={introOpen}
+          aria-label={`${theme.title}: ${lang === "en" ? "show theme introduction" : "显示主题介绍"}`}
+          onClick={() => setIntroOpen((current) => !current)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setIntroOpen((current) => !current);
+            }
+          }}
+        >
           <h1 className="section-title text-4xl md:text-5xl font-semibold tracking-tight">{theme.title}</h1>
           <p className="section-subtitle text-white/85 leading-relaxed">{theme.intro}</p>
         </div>
@@ -205,23 +224,14 @@ export function ThemeSection({
               <ProjectCard
                 project={p}
                 lang={lang}
-                isUpdatesOpen={updatesOpen === p.slug}
-                onToggleUpdates={(slug) => onToggleUpdates(slug)}
+                isOpen={activeProjectSlug === p.slug}
+                onToggle={() => onToggleProject(p.slug)}
                 onViewProject={(slug) => onViewProject(slug)}
-                updatesTxt={updatesTxt}
-                compact
               />
             </div>
           ))}
         </div>
       </div>
-      {nextTheme && (
-        <div
-          aria-hidden
-          className="relative z-10 h-16 md:h-24"
-          style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.0), rgba(0,0,0,0.25))" }}
-        />
-      )}
     </section>
   );
 }

@@ -289,7 +289,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
             {conceptImages.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 {conceptImages.map((item, idx) => (
-                  <div key={`${item.src}-${idx}`} className="rounded-xl overflow-hidden border border-white/10 bg-black/30">
+                  <div key={`${item.src}-${idx}`} className="media-glass-item rounded-xl overflow-hidden border border-white/10 bg-black/30">
                     <button
                       type="button"
                       className="block focus:outline-none"
@@ -317,33 +317,13 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
         return (
           <Card>
             <SectionHeading label={lang === "en" ? "System" : "系统"} badge="SYSTEM" />
-            {project.updates && project.updates.length > 0 ? (
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-white/90 tracking-[0.08em] uppercase">{lang === "en" ? "Build Timeline" : "进展时间线"}</h4>
-                <div className="space-y-4 max-h-72 overflow-auto pr-1">
-                  {project.updates
-                    .slice()
-                    .reverse()
-                    .map((entry, idx) => (
-                      <div key={`${entry.date}-${idx}`} className="flex gap-3">
-                        <div className="pt-1">
-                          <span className="block w-2 h-2 rounded-full bg-white/70" />
-                        </div>
-                        <div>
-                          <div className="text-xs text-white/60">{entry.date}</div>
-                          <div className="text-sm text-white/85 leading-relaxed">{entry.text}</div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ) : (
+            {systemImages.length === 0 && (
               <EmptyNote message={lang === "en" ? "System notes coming soon." : "系统说明即将更新。"} />
             )}
             {systemImages.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 {systemImages.map((item, idx) => (
-                  <div key={`${item.src}-${idx}`} className="rounded-xl overflow-hidden border border-white/10 bg-black/30">
+                  <div key={`${item.src}-${idx}`} className="media-glass-item rounded-xl overflow-hidden border border-white/10 bg-black/30">
                     <button
                       type="button"
                       className="block focus:outline-none"
@@ -376,7 +356,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                 {mainHeroImage && (
                   <button
                     type="button"
-                    className="rounded-xl overflow-hidden border border-white/10 bg-black/40 block focus:outline-none"
+                    className="media-glass-item rounded-xl overflow-hidden border border-white/10 bg-black/40 block focus:outline-none"
                     onDoubleClick={() => !isTouchDevice && setPreviewImage({ type: "image", role: "experience", src: mainHeroImage })}
                     onClick={() => isTouchDevice && setPreviewImage({ type: "image", role: "experience", src: mainHeroImage })}
                   >
@@ -392,7 +372,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                   </button>
                 )}
                 {mainExperienceVideo && (
-                  <div className="rounded-xl overflow-hidden border border-white/10 bg-black/40">
+                  <div className="media-glass-item rounded-xl overflow-hidden border border-white/10 bg-black/40">
                     <video
                       key={mainExperienceVideo}
                       src={mainExperienceVideo}
@@ -411,7 +391,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
             {extraExperienceMedia.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 {extraExperienceMedia.map((item, idx) => (
-                  <div key={`${item.src}-${idx}`} className="rounded-xl overflow-hidden border border-white/10 bg-black/30">
+                  <div key={`${item.src}-${idx}`} className="media-glass-item rounded-xl overflow-hidden border border-white/10 bg-black/30">
                     {item.type === "image" ? (
                       <>
                         <button
@@ -432,6 +412,24 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                         </button>
                         {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
                       </>
+                    ) : item.type === "embed" ? (
+                      <div className="bg-black/50">
+                        <div
+                          className="aspect-video bg-black bg-cover bg-center"
+                          style={item.thumb ? { backgroundImage: `url(${item.thumb})` } : undefined}
+                        >
+                          <iframe
+                            src={item.src}
+                            title={item.title || `${project.title} Vimeo video`}
+                            className="h-full w-full border-0"
+                            allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allowFullScreen
+                            loading="lazy"
+                          />
+                        </div>
+                        {item.title && <div className="px-3 py-2 text-xs text-white/70">{item.title}</div>}
+                      </div>
                     ) : (
                       <div className="bg-black/50">
                         <video
@@ -500,7 +498,7 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                     {filmstripImages.map((item, idx) => (
                       <button
                         key={`${item.src}-${idx}`}
-                        className="overflow-hidden rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition"
+                        className="media-glass-item overflow-hidden rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition"
                         onClick={() => {
                           if (isTouchDevice) setPreviewImage(item);
                           setTab("experience");
@@ -518,22 +516,6 @@ export function MediaOverlay({ lang, themes, hub, overviewText, setOverviewText 
                         />
                       </button>
                     ))}
-                  </div>
-                )}
-                {project.updates && project.updates.length > 0 && (
-                  <div className="media-overlay__updates mt-4">
-                    <h3 className="text-sm font-semibold mb-2">{lang === "en" ? "Updates" : "更新日志"}</h3>
-                    <ul className="space-y-1 text-xs text-white/70 max-h-40 overflow-auto pr-1">
-                      {project.updates
-                        .slice()
-                        .reverse()
-                        .map((entry, index) => (
-                          <li key={index}>
-                            <span className="text-white/60 mr-2">{entry.date}</span>
-                            {entry.text}
-                          </li>
-                        ))}
-                    </ul>
                   </div>
                 )}
               </aside>

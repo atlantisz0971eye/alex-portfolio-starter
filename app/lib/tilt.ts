@@ -1,4 +1,4 @@
-export type TiltElement = HTMLDivElement & {
+export type TiltElement<T extends HTMLElement = HTMLDivElement> = T & {
   _raf?: number;
   _nx?: number;
   _ny?: number;
@@ -10,7 +10,7 @@ export type TiltElement = HTMLDivElement & {
 const PERSPECTIVE = 800;
 const TRANSLATE_Z = 14;
 
-export function updateTilt(element: TiltElement, clientX: number, clientY: number) {
+export function updateTilt(element: TiltElement<HTMLElement>, clientX: number, clientY: number) {
   const rect = element.getBoundingClientRect();
   element._nx = (clientX - rect.left) / rect.width - 0.5;
   element._ny = (clientY - rect.top) / rect.height - 0.5;
@@ -48,7 +48,7 @@ export function updateTilt(element: TiltElement, clientX: number, clientY: numbe
   if (glare) glare.style.opacity = "0.22";
 }
 
-export function resetTilt(element: TiltElement) {
+export function resetTilt(element: TiltElement<HTMLElement>) {
   element.style.setProperty("--scale", "1.015");
   element._leaving = true;
   element._nx = 0;
@@ -57,7 +57,7 @@ export function resetTilt(element: TiltElement) {
   if (glare) glare.style.opacity = "0";
 }
 
-export function cancelTiltAnimation(element: TiltElement | null) {
+export function cancelTiltAnimation(element: TiltElement<HTMLElement> | null) {
   if (!element?._raf) return;
   cancelAnimationFrame(element._raf);
   element._raf = undefined;

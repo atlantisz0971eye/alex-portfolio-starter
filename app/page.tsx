@@ -13,7 +13,6 @@ import { ThemeSection } from "./components/ThemeSection";
 import { CONTENT } from "./data/content";
 import { useIntroOverlay } from "./hooks/useIntroOverlay";
 import { useMediaHub } from "./hooks/useMediaHub";
-import { useProjectUpdates } from "./hooks/useProjectUpdates";
 import { useSearch } from "./hooks/useSearch";
 import { useThemeVideos } from "./hooks/useThemeVideos";
 import type { Language } from "./types/project";
@@ -27,18 +26,40 @@ const MediaOverlay = dynamic(
 export default function Page() {
   const [lang, setLang] = useState<Language>("en");
   const [overviewText, setOverviewText] = useState<Record<string, string | null>>({});
-  const [forceVideo, setForceVideo] = useState(false);
+  const [activeProjectSlug, setActiveProjectSlug] = useState<string | null>(null);
   const themes = CONTENT[lang].themes;
   const intro = useIntroOverlay();
   const mediaHub = useMediaHub();
-  const projectUpdates = useProjectUpdates(themes);
   const search = useSearch(themes, lang);
 
   useEffect(() => {
-    setForceVideo(new URLSearchParams(window.location.search).get("video") === "1");
+    const openProject = (event: Event) => {
+      const slug = (event as CustomEvent<{ slug?: string }>).detail?.slug;
+      if (slug) {
+        setActiveProjectSlug(slug);
+        window.dispatchEvent(new CustomEvent("glass:open", { detail: { kind: "portfolio" } }));
+      }
+    };
+    window.addEventListener("portfolio:open", openProject);
+    return () => window.removeEventListener("portfolio:open", openProject);
   }, []);
 
-  const allowThemeVideo = (!prefersReducedMotion && !isTouchDevice) || forceVideo;
+  useEffect(() => {
+    const closeForOtherContent = (event: Event) => {
+      const kind = (event as CustomEvent<{ kind?: string }>).detail?.kind;
+      if (kind && kind !== "portfolio") setActiveProjectSlug(null);
+    };
+    window.addEventListener("glass:open", closeForOtherContent);
+    return () => window.removeEventListener("glass:open", closeForOtherContent);
+  }, []);
+
+  const toggleProject = (slug: string) => {
+    const next = activeProjectSlug === slug ? null : slug;
+    setActiveProjectSlug(next);
+    if (next) window.dispatchEvent(new CustomEvent("glass:open", { detail: { kind: "portfolio" } }));
+  };
+
+  const allowThemeVideo = !prefersReducedMotion && !isTouchDevice;
   const videoState = useThemeVideos({
     allowTechnologyVideo: allowThemeVideo,
     allowRuminationVideo: allowThemeVideo,
@@ -59,7 +80,7 @@ export default function Page() {
     }
     if (event.key === "Enter" && search.searchResults[0]) {
       const result = search.searchResults[0];
-      search.jumpTo(result.themeId, result.slug);
+      search.jumpTo(result);
     }
   };
 
@@ -80,22 +101,20 @@ export default function Page() {
         }}
         onFocus={() => search.setSearchOpen(true)}
         onKeyDown={handleSearchKeyDown}
-        onResultClick={(result) => search.jumpTo(result.themeId, result.slug)}
+        onResultClick={search.jumpTo}
       />
 
       <main className="w-full snap-parent">
-        {themes.map((theme, index) => (
+        {themes.map((theme) => (
           <ThemeSection
             key={theme.id}
             theme={theme}
-            nextTheme={themes[index + 1] ?? null}
             lang={lang}
             videoState={videoState}
             prefersReducedMotion={prefersReducedMotion}
             isTouchDevice={isTouchDevice}
-            updatesOpen={projectUpdates.openSlug}
-            updatesTxt={projectUpdates.contentBySlug}
-            onToggleUpdates={projectUpdates.toggle}
+            activeProjectSlug={activeProjectSlug}
+            onToggleProject={toggleProject}
             onViewProject={(slug) => {
               mediaHub.open(slug);
               search.setSearchOpen(false);

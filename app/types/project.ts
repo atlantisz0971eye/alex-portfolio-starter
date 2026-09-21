@@ -13,7 +13,7 @@ export type MediaGroups = {
 export type MediaKind = "images" | "video" | "audio" | "doc";
 
 export type MediaItem = {
-  type: "image" | "video" | "audio";
+  type: "image" | "video" | "audio" | "embed";
   role: "hero" | "experience" | "doc" | "system" | "concept" | "process";
   src: string;
   thumb?: string;
@@ -54,7 +54,7 @@ export type SiteContent = { themes: Theme[] };
 export type LocalizedContent = Record<Language, SiteContent>;
 
 export type SearchResult = {
-  kind: "theme" | "project" | "tag" | "update";
+  kind: "theme" | "project" | "tag" | "gallery" | "bio" | "education";
   title: string;
   subtitle?: string;
   slug?: string;

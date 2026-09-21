@@ -168,7 +168,7 @@ export function useThemeVideos({
     ready: technologyVideoReady,
     error: technologyVideoError,
     path: TECH_VIDEO_PATH,
-    poster: "/bg-fitting-reality.jpg",
+    poster: "/theme-posters/technology.jpg",
     show: allowTechnologyVideo,
     onLoaded: () => {
       console.debug("[video] Technology ready:", TECH_VIDEO_PATH);
@@ -190,7 +190,7 @@ export function useThemeVideos({
     ready: ruminationVideoReady,
     error: ruminationVideoError,
     path: RUM_VIDEO_PATH,
-    poster: "/bg-dys-utopia.jpg",
+    poster: "/theme-posters/rumination.jpg",
     show: allowRuminationVideo,
     onLoaded: () => {
       console.debug("[video] Rumination ready:", RUM_VIDEO_PATH);
@@ -212,7 +212,7 @@ export function useThemeVideos({
     ready: connectionVideoReady,
     error: connectionVideoError,
     path: CONNECTION_VIDEO_PATH,
-    poster: "/bg-roots.jpg",
+    poster: "/theme-posters/connection.jpg",
     show: allowConnectionVideo,
     onLoaded: () => {
       console.debug("[video] Connection ready:", CONNECTION_VIDEO_PATH);

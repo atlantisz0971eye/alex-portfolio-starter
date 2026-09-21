@@ -16,9 +16,9 @@ export const CONTENT = {
           {
             slug: "fitting-reality",
             title: "Fitting Reality",
-            status: "in-progress",
+            status: "completed",
             summary:
-              "Using distortion, noise, and data ghosts to present how technology 'fits' reality and human perception. — [Add: project intro, media, video links]",
+              "Using distortion, noise, and data ghosts to present how technology 'fits' reality and human perception.",
             tags: ["Tech Domination", "Ontology", "Perceptual Distortion"],
             bg: { src: "/bg-fitting-reality.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
@@ -47,9 +47,9 @@ export const CONTENT = {
           {
             slug: "electromagnetic-decay",
             title: "Electromagnetic Decay",
-            status: "in-progress",
+            status: "completed",
             summary:
-              "Aesthetic translation of the electromagnetic spectrum: from interference, attenuation to the sonic-visual narrative of control desire. — [Add: project intro, installation images, demo video]",
+              "Aesthetic translation of the electromagnetic spectrum: from interference and attenuation to the sonic-visual narrative of control desire.",
             tags: ["Electromagnetic", "Control/Interference", "Nihilism"],
             bg: { src: "/bg-electromagnetic-decay.jpg", position: "center", fit: "cover" },
             media: {
@@ -100,6 +100,7 @@ export const CONTENT = {
               { type: "image", role: "hero", src: "/electromagnetic-decay/hero/hero_02.jpg", title: "Spectral view 02" },
               { type: "video", role: "experience", src: "/electromagnetic-decay/experience/experience_01.mp4", title: "Experience loop" },
               { type: "video", role: "experience", src: "/electromagnetic-decay/experience/experience_02.mp4", title: "Experience loop 02" },
+              { type: "embed", role: "experience", src: "https://player.vimeo.com/video/1150600847?app_id=122963&dnt=1", thumb: "https://i.vimeocdn.com/video/2101512754-615f82f9ce0fb91d3c8fc662d56da9248bafbd3c540fd8095464fdcccb475a1a-d_295x166?region=us", title: "Electromagnetic Decay display video" },
               { type: "image", role: "experience", src: "/electromagnetic-decay/experience/experience_03.jpg", title: "Experience still" },
               { type: "audio", role: "doc", src: "/electromagnetic-decay/docs/doc_01.wav", title: "Documentation audio" },
               { type: "image", role: "doc", src: "/electromagnetic-decay/docs/doc_01.jpg" },
@@ -131,7 +132,7 @@ export const CONTENT = {
             title: "Dys/Utopia",
             status: "completed",
             summary:
-              "Visualizing 'a thousand thoughts' and 'nihilistic invisibility' with particles/melting/mirrored heads. — [Add: tech stack, interaction logic, video]",
+              "Visualizing 'a thousand thoughts' and 'nihilistic invisibility' with particles, melting forms, and mirrored heads.",
             tags: ["Ruminative Thinking", "Perception", "Generative Visuals"],
             bg: { src: "/bg-dys-utopia.jpg", position: "50% 40%", fit: "cover" },
             media: { videos: ["/dys-utopia.mp4"] },
@@ -176,9 +177,9 @@ export const CONTENT = {
           {
             slug: "bloom-system",
             title: "Bloom System",
-            status: "planning",
+            status: "completed",
             summary:
-              "Organizing the 'geography–memory–identity' triangle through images, sounds, and textual narratives; exploring contemporary re-narratives of ethnic/regional cultures. — [Add: field materials and plans]",
+              "Organizing the 'geography–memory–identity' triangle through images, sounds, and textual narratives; exploring contemporary re-narratives of ethnic and regional cultures.",
             tags: ["Body Data", "Noise System", "Image Distortion"],
             bg: { src: "/bg-roots.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
@@ -222,9 +223,9 @@ export const CONTENT = {
           {
             slug: "fitting-reality",
             title: "拟合现实",
-            status: "in-progress",
+            status: "completed",
             summary:
-              "以失真、噪点与数据残影呈现技术如何‘拟合’现实与人的感知。——【补充：项目简介、媒体、视频链接】",
+              "以失真、噪点与数据残影呈现技术如何‘拟合’现实与人的感知。",
             tags: ["技术统治", "存在论", "感知失真"],
             bg: { src: "/bg-fitting-reality.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
@@ -253,9 +254,9 @@ export const CONTENT = {
           {
             slug: "electromagnetic-decay",
             title: "电磁腐烂",
-            status: "in-progress",
+            status: "completed",
             summary:
-              "电磁频谱的美学转译：从干扰、衰减到控制欲望的声像叙事。——【补充：项目简介、装置图、演示视频】",
+              "电磁频谱的美学转译：从干扰、衰减到控制欲望的声像叙事。",
             tags: ["电磁", "控制/干扰", "虚无主义"],
             bg: { src: "/bg-electromagnetic-decay.jpg", position: "center", fit: "cover" },
             media: {
@@ -309,6 +310,7 @@ export const CONTENT = {
               { type: "image", role: "hero", src: "/electromagnetic-decay/hero/hero_02.jpg", title: "频谱视角 02" },
               { type: "video", role: "experience", src: "/electromagnetic-decay/experience/experience_01.mp4", title: "体验片段" },
               { type: "video", role: "experience", src: "/electromagnetic-decay/experience/experience_02.mp4", title: "体验片段 02" },
+              { type: "embed", role: "experience", src: "https://player.vimeo.com/video/1150600847?app_id=122963&dnt=1", thumb: "https://i.vimeocdn.com/video/2101512754-615f82f9ce0fb91d3c8fc662d56da9248bafbd3c540fd8095464fdcccb475a1a-d_295x166?region=us", title: "Electromagnetic Decay 展示视频" },
               { type: "image", role: "experience", src: "/electromagnetic-decay/experience/experience_03.jpg", title: "体验静帧" },
               { type: "audio", role: "doc", src: "/electromagnetic-decay/docs/doc_01.wav", title: "文档音频" },
               { type: "image", role: "doc", src: "/electromagnetic-decay/docs/doc_01.jpg" },
@@ -340,7 +342,7 @@ export const CONTENT = {
             title: "Dys/Utopia",
             status: "completed",
             summary:
-              "以粒子/融化/镜像人头的机制，视觉化‘思绪万千’与‘虚无遁形’。——【补充：技术栈、交互逻辑、视频】",
+              "以粒子、融化与镜像人头的机制，视觉化‘思绪万千’与‘虚无遁形’。",
             tags: ["反刍思维", "感知", "生成视觉"],
             bg: { src: "/bg-dys-utopia.jpg", position: "50% 40%", fit: "cover" },
             media: { videos: ["/dys-utopia.mp4"] },
@@ -385,9 +387,9 @@ export const CONTENT = {
           {
             slug: "bloom-system",
             title: "Bloom System",
-            status: "planning",
+            status: "completed",
             summary:
-              "以影像、声音与文字叙事组织‘地理—记忆—身份’三角；探索民族/地域文化的当代再叙事。——【补充：田野素材与计划】",
+              "以影像、声音与文字叙事组织‘地理—记忆—身份’三角；探索民族与地域文化的当代再叙事。",
             tags: ["身体数据", "噪声系统", "图像扰动"],
             bg: { src: "/bg-roots.jpg", position: "center" },
             media: { images: [], videos: [], audios: [] },
