@@ -27,10 +27,11 @@ export default function Page() {
   const [lang, setLang] = useState<Language>("en");
   const [overviewText, setOverviewText] = useState<Record<string, string | null>>({});
   const [activeProjectSlug, setActiveProjectSlug] = useState<string | null>(null);
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const themes = CONTENT[lang].themes;
   const intro = useIntroOverlay();
   const mediaHub = useMediaHub();
-  const search = useSearch(themes, lang);
+  const search = useSearch(lang);
 
   useEffect(() => {
     const openProject = (event: Event) => {
@@ -42,6 +43,29 @@ export default function Page() {
     };
     window.addEventListener("portfolio:open", openProject);
     return () => window.removeEventListener("portfolio:open", openProject);
+  }, []);
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    const kind = focus === "bio-entanglement" ? "bio" : focus.startsWith("project-") ? "project" : focus.startsWith("gallery-") ? "gallery" : null;
+    if (!kind) return;
+    if (kind === "bio") {
+      const timer = window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("bio:open", { detail: { tab: "entanglement" } }));
+        document.getElementById("bio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 350);
+      return () => window.clearTimeout(timer);
+    }
+    const slug = focus.slice(kind.length + 1);
+    const targetId = kind === "project" ? `proj-${slug}` : `gallery-${slug}`;
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      window.dispatchEvent(new CustomEvent(kind === "project" ? "portfolio:open" : "gallery:open", { detail: { slug } }));
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -78,9 +102,18 @@ export default function Page() {
       event.currentTarget.blur();
       return;
     }
-    if (event.key === "Enter" && search.searchResults[0]) {
-      const result = search.searchResults[0];
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (search.searchResults.length) {
+        setActiveSearchIndex((current) => (current + (event.key === "ArrowDown" ? 1 : -1) + search.searchResults.length) % search.searchResults.length);
+      }
+      return;
+    }
+    if (event.key === "Enter" && search.searchResults[activeSearchIndex]) {
+      event.preventDefault();
+      const result = search.searchResults[activeSearchIndex];
       search.jumpTo(result);
+      event.currentTarget.blur();
     }
   };
 
@@ -94,10 +127,12 @@ export default function Page() {
         onToggleLang={() => setLang((current) => (current === "en" ? "zh" : "en"))}
         searchQuery={search.searchQuery}
         searchOpen={search.searchOpen}
+        activeResultIndex={activeSearchIndex}
         results={search.searchResults}
         onQueryChange={(value) => {
           search.setSearchQuery(value);
           search.setSearchOpen(true);
+          setActiveSearchIndex(0);
         }}
         onFocus={() => search.setSearchOpen(true)}
         onKeyDown={handleSearchKeyDown}

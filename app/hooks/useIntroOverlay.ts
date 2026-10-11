@@ -9,7 +9,7 @@ export function useIntroOverlay() {
 
   useEffect(() => {
     try {
-      setIsOpen(!localStorage.getItem(INTRO_STORAGE_KEY));
+      setIsOpen(!localStorage.getItem(INTRO_STORAGE_KEY) && !window.location.hash && !new URLSearchParams(window.location.search).has("focus"));
     } catch {
       setIsOpen(false);
     }

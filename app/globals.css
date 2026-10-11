@@ -1998,7 +1998,12 @@ a {
   }
 
   .attention-header .header-search-results {
-    width: calc(100vw - 28px);
+    position: fixed;
+    top: calc(56px + var(--safe-top));
+    right: 14px;
+    left: 14px;
+    width: auto;
+    margin-top: 4px;
   }
 
   .attention-header .header-search-input:focus::placeholder {

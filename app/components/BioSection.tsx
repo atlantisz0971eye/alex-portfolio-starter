@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cancelTiltAnimation, resetTilt, type TiltElement, updateTilt } from "../lib/tilt";
+import { Entanglement } from "./Entanglement";
+import type { EntanglementPoint } from "../lib/entanglement";
 import type { Language } from "../types/project";
 import { isTouchDevice, prefersReducedMotion } from "../utils/environment";
 
-type AboutTab = "statement" | "education" | "timeline" | "contact";
+type AboutTab = "statement" | "entanglement" | "education" | "timeline" | "contact";
 type BioSectionProps = { lang: Language };
 
 const INTERNSHIPS = {
@@ -41,6 +43,7 @@ const EDUCATION = {
 export function BioSection({ lang }: BioSectionProps) {
   const [activeTab, setActiveTab] = useState<AboutTab | null>(null);
   const [cardOpen, setCardOpen] = useState(false);
+  const [searchSelection, setSearchSelection] = useState<EntanglementPoint | null>(null);
   const [hovered, setHovered] = useState(false);
   const portraitRef = useRef<TiltElement | null>(null);
   const visuallyClear = hovered || cardOpen;
@@ -49,9 +52,10 @@ export function BioSection({ lang }: BioSectionProps) {
 
   useEffect(() => {
     const openBio = (event: Event) => {
-      const detail = (event as CustomEvent<{ tab?: AboutTab }>).detail;
+      const detail = (event as CustomEvent<{ tab?: AboutTab; selection?: EntanglementPoint }>).detail;
       setCardOpen(true);
       if (detail?.tab) setActiveTab(detail.tab);
+      if (detail?.selection) setSearchSelection({ ...detail.selection });
       window.dispatchEvent(new CustomEvent("glass:open", { detail: { kind: "bio" } }));
     };
     window.addEventListener("bio:open", openBio);
@@ -73,6 +77,7 @@ export function BioSection({ lang }: BioSectionProps) {
   const toggleTab = (tab: AboutTab) => {
     setCardOpen(true);
     setActiveTab((current) => (current === tab ? null : tab));
+    setSearchSelection(null);
     window.dispatchEvent(new CustomEvent("glass:open", { detail: { kind: "bio" } }));
   };
 
@@ -82,7 +87,7 @@ export function BioSection({ lang }: BioSectionProps) {
         <div className="mx-auto w-full max-w-[960px] text-center">
           <div
             ref={portraitRef}
-            className={`bio-card bio-glass-card project-tilt relative overflow-hidden ${cardOpen ? "is-open" : ""}`}
+            className={`bio-card bio-glass-card project-tilt relative overflow-hidden ${cardOpen ? "is-open" : ""} ${activeTab === "entanglement" ? "is-entanglement" : ""}`}
             onMouseDown={(event) => event.currentTarget.style.setProperty("--scale", "1.02")}
             onMouseUp={(event) => event.currentTarget.style.setProperty("--scale", "1.012")}
             onMouseLeave={(event) => {
@@ -93,7 +98,7 @@ export function BioSection({ lang }: BioSectionProps) {
               if (!isTouchDevice) setHovered(true);
             }}
             onMouseMove={(event) => {
-              if (!isTouchDevice && !prefersReducedMotion) {
+              if (!isTouchDevice && !prefersReducedMotion && activeTab !== "entanglement") {
                 updateTilt(event.currentTarget as TiltElement, event.clientX, event.clientY);
               }
             }}
@@ -138,10 +143,11 @@ export function BioSection({ lang }: BioSectionProps) {
                   )}
 
                   <div className="mt-6 flex flex-wrap justify-center gap-3">
-                    <BioButton onClick={() => toggleTab("statement")}>{lang === "en" ? "Artist Statement" : "艺术家陈述"}</BioButton>
-                    <BioButton onClick={() => toggleTab("education")}>{lang === "en" ? "Education" : "教育背景"}</BioButton>
-                    <BioButton onClick={() => toggleTab("timeline")}>{lang === "en" ? "Internships" : "实习经历"}</BioButton>
-                    <BioButton onClick={() => toggleTab("contact")}>{lang === "en" ? "Contact" : "联系"}</BioButton>
+                    <BioButton active={activeTab === "statement"} onClick={() => toggleTab("statement")}>{lang === "en" ? "Artist Statement" : "艺术家陈述"}</BioButton>
+                    <BioButton active={activeTab === "entanglement"} onClick={() => toggleTab("entanglement")}>Entanglement</BioButton>
+                    <BioButton active={activeTab === "education"} onClick={() => toggleTab("education")}>{lang === "en" ? "Education" : "教育背景"}</BioButton>
+                    <BioButton active={activeTab === "timeline"} onClick={() => toggleTab("timeline")}>{lang === "en" ? "Internships" : "实习经历"}</BioButton>
+                    <BioButton active={activeTab === "contact"} onClick={() => toggleTab("contact")}>{lang === "en" ? "Contact" : "联系"}</BioButton>
                   </div>
 
                   {activeTab && (
@@ -154,6 +160,10 @@ export function BioSection({ lang }: BioSectionProps) {
                               : "在拟合现实与电磁腐烂之间，我关注技术存在论如何改写身体与感知；在 Dys/Utopia 的观看机制里，观者被卷入多线思绪与虚无退隐的链式反应；而连接作为成长文化土壤，是一切发生的前提与引线。"}
                           </p>
                         </BioPanel>
+                      )}
+
+                      {activeTab === "entanglement" && (
+                        <div className="bio-panel bio-panel--entanglement"><Entanglement lang={lang} searchSelection={searchSelection} /></div>
                       )}
 
                       {activeTab === "education" && (
@@ -209,8 +219,8 @@ export function BioSection({ lang }: BioSectionProps) {
   );
 }
 
-function BioButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return <button className="btn-ghost bio-card__action" onClick={(event) => { event.stopPropagation(); onClick(); }}>{children}</button>;
+function BioButton({ children, onClick, active }: { children: React.ReactNode; onClick: () => void; active: boolean }) {
+  return <button className={`btn-ghost bio-card__action ${active ? "is-active" : ""}`} aria-pressed={active} onClick={(event) => { event.stopPropagation(); onClick(); }}>{children}</button>;
 }
 
 function BioPanel({ title, children }: { title: string; children: React.ReactNode }) {

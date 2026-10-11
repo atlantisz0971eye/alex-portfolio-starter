@@ -54,10 +54,12 @@ export type SiteContent = { themes: Theme[] };
 export type LocalizedContent = Record<Language, SiteContent>;
 
 export type SearchResult = {
-  kind: "theme" | "project" | "tag" | "gallery" | "bio" | "education";
+  kind: "theme" | "project" | "gallery" | "bio" | "education" | "orbit";
   title: string;
   subtitle?: string;
   slug?: string;
   themeId?: string;
+  orbitCategory?: "mine" | "others" | "outside";
+  orbitPoint?: number;
   score: number;
 };
