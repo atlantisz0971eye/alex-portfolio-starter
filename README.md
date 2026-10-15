@@ -79,3 +79,14 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 助手用工具读取数据时，界面会列出它做了什么（例如 “Searching mail: …”）。被读取的日历条目、邮件正文片段和书中段落会发送给 DeepSeek；邮件、日程标题和书中文字都被当作不可信的外部内容，其中的指令不会被执行。
 
 日历暂时没有到点提醒。
+
+## Alex Workspace · 扫描版 PDF 文字识别（OCR）
+
+上传扫描版 PDF 时，没有文字层的页面会被保留下来，资料库里该书会标注 “Scanned · needs text recognition”。打开书会弹出 **Recognize text**（阅读器顶栏也有同名按钮）：服务器把页面渲染成图片，交给 Google Cloud Vision（`DOCUMENT_TEXT_DETECTION`，中英文）识别，每次 4 页，识别出的文字写回这本书的文字文本，所以导读、问答、检索、翻译都能用。可以随时暂停，之后从上次的位置继续；识别过程中可以继续阅读。
+
+配置：
+1. 在 Google Cloud 项目里启用 **Cloud Vision API**，并开启计费（每月前 1000 页免费，之后约 1.5 美元/千页）。
+2. 创建一个 **API 密钥**，在“API 限制”里只允许 Cloud Vision API。
+3. 在 Vercel 设置 `GOOGLE_VISION_API_KEY`（Sensitive，Production）并重新部署。
+
+页面图片会发送给 Google 识别；识别后的文字保存在私有存储里，每本书只需识别一次。

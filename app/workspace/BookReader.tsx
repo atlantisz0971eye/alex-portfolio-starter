@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Highlighter, Languages, List, MessageCircle, Type } from "lucide-react";
+import { ChevronLeft, Highlighter, Languages, List, MessageCircle, ScanText, Type } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Chapter } from "../lib/workspaceOutline";
 import type { MarkColor, WorkspaceDocument, WorkspaceMark } from "../lib/workspaceStore";
@@ -21,7 +21,8 @@ export type SegmentData = {
 };
 export type OpenedBook = SegmentData & { document: WorkspaceDocument };
 type Restore = { kind: "offset"; value: number } | { kind: "first" } | { kind: "last" };
-type SelectionState = { text: string; x: number; y: number };
+/** The toolbar docks to the top or bottom edge, away from the system menu and handles that sit at the selection. */
+type SelectionState = { text: string; dock: "top" | "bottom" };
 
 const GAP = 40;
 const SWIPE_DISTANCE = 48;
@@ -34,9 +35,14 @@ type Props = {
   stream: StreamFn;
   /** A page cited by the assistant; each request has a new `seq`. */
   citation: { seq: number; page: number } | null;
+  /** Changes when recognized text was saved, so the visible part is reloaded. */
+  reloadKey: number;
+  /** Pages still without text, and how to offer recognizing them. */
+  ocrPending: number;
+  onOcr: () => void;
 };
 
-export default function BookReader({ book, onBack, onAssistant, onError, stream, citation }: Props) {
+export default function BookReader({ book, onBack, onAssistant, onError, stream, citation, reloadKey, ocrPending, onOcr }: Props) {
   const [prefs, setPrefs] = useReaderPrefs();
   const documentId = book.document.id;
   const isPdf = book.document.mimeType === "application/pdf";
@@ -274,6 +280,15 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     }
   }, [fetchSegment, onError]);
 
+  // New text arrived from OCR: drop cached segments and reload where the reader is.
+  const seenReload = useRef(reloadKey);
+  useEffect(() => {
+    if (reloadKey === seenReload.current) return;
+    seenReload.current = reloadKey;
+    cache.current.clear();
+    void loadSegment(`offset=${Math.max(0, Math.floor(offsetRef.current))}`, null, { kind: "offset", value: offsetRef.current });
+  }, [reloadKey, loadSegment]);
+
   // Warm the next segment so turning the last page feels instant.
   useEffect(() => {
     const next = segment.index + 1;
@@ -375,7 +390,8 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       }
       rangeRef.current = current.getRangeAt(0).cloneRange();
       const rect = current.getRangeAt(0).getBoundingClientRect();
-      setSelection({ text: text.slice(0, 6000), x: Math.min(Math.max(rect.left + rect.width / 2, 110), window.innerWidth - 110), y: Math.min(rect.bottom + 14, window.innerHeight - 70) });
+      // Dock opposite the selection: a selection in the lower half puts the toolbar at the top, and the reverse.
+      setSelection({ text: text.slice(0, 6000), dock: rect.top + rect.height / 2 > window.innerHeight * 0.5 ? "top" : "bottom" });
     };
     document.addEventListener("selectionchange", onChange);
     return () => document.removeEventListener("selectionchange", onChange);
@@ -479,6 +495,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       <button type="button" className="reader-icon" onClick={() => { flushProgress(true); onBack(offsetRef.current); }} aria-label="Back to library"><ChevronLeft size={22} /><span>Library</span></button>
       <h1>{book.document.name.replace(/\.[^.]+$/, "")}</h1>
       <div className="reader-bar__actions">
+        {ocrPending > 0 && <button type="button" className="reader-icon" onClick={onOcr} aria-label="Recognize text"><ScanText size={20} /></button>}
         <button type="button" className="reader-icon" onClick={() => setSheet("contents")} aria-label="Contents"><List size={20} /></button>
         <button type="button" className="reader-icon" onClick={() => setSheet("settings")} aria-label="Appearance"><Type size={20} /></button>
         <button type="button" className="reader-icon" onClick={() => onAssistant("open", undefined, offsetRef.current)} aria-label="Ask DeepSeek"><MessageCircle size={20} /></button>
@@ -508,7 +525,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
 
     {!chrome && <div className="reader-folio" aria-hidden="true"><span>{currentChapter}</span><span>{isPdf && currentPage ? currentPage : `${percent}%`}</span></div>}
 
-    {selection && <div className="reader-selection" style={{ left: selection.x, top: selection.y }} onPointerDown={(event) => event.preventDefault()}>
+    {selection && <div className={`reader-selection is-${selection.dock}`} onPointerDown={(event) => event.preventDefault()}>
       <button type="button" onClick={() => highlight()}><Highlighter size={15} /> Highlight</button>
       <button type="button" onClick={translateSelection}><Languages size={15} /> Translate</button>
       <button type="button" onClick={askAbout}><MessageCircle size={15} /> Ask</button>

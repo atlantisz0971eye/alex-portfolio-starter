@@ -601,3 +601,18 @@
 @media (prefers-reduced-transparency: reduce) {
   .ws-root :is(.ws-pill, .ws-round, .ws-sheet, .ws-card, .tabbar, .sidebar) { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* The selection toolbar never sits next to the selection, where iOS draws its own menu and handles. */
+.reader-selection { left: 50% !important; top: auto; bottom: auto; }
+.reader-selection.is-bottom { bottom: calc(var(--sab) + 18px); }
+.reader-selection.is-top { top: calc(var(--sat) + 14px); }
+
+/* OCR */
+.ocr { display: flex; flex-direction: column; gap: 14px; }
+.ocr__lead { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-size: 16px; line-height: 1.45; }
+.ocr__lead svg { flex: none; margin-top: 2px; color: var(--accent); }
+.ocr__bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.ocr__bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #5ab0ff, var(--accent)); transition: width .4s; }
+.ocr__status { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--text-2); }
+.ocr__error { margin: 0; font-size: 14px; color: #ffa59d; }
+.ocr .ws-pill { align-self: flex-start; }

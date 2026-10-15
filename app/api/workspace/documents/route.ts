@@ -108,6 +108,7 @@ export async function POST(request: Request) {
     const bytes = new Uint8Array(await new Response(original.stream).arrayBuffer());
     let extracted = "";
     let pageCount: number | null = null;
+    let ocrPending: number[] = [];
     if (extension === "pdf") {
       if (String.fromCharCode(...bytes.slice(0, 4)) !== "%PDF") return fail("invalid_pdf", 422);
       const parser = new PDFParse({ data: bytes });
@@ -115,6 +116,10 @@ export async function POST(request: Request) {
         const result = await parser.getText();
         pageCount = result.total;
         extracted = result.pages.map((page) => `[Page ${page.num}]\n${page.text}`).join("\n\n");
+        // Scanned pages have no text layer; they are kept and recognized later by OCR.
+        const empty = result.pages.filter((page) => page.text.replace(/\s+/g, "").length < 25).map((page) => page.num);
+        // A few blank or picture-only pages are normal; flag the book only when much of it has no text.
+        ocrPending = result.pages.length > 0 && empty.length / result.pages.length >= 0.3 ? empty : [];
       } catch (cause) {
         const reason = cause instanceof Error ? cause.name : "";
         return fail(reason === "PasswordException" ? "pdf_encrypted" : "pdf_unreadable", 422);
@@ -130,7 +135,7 @@ export async function POST(request: Request) {
       }
     }
     extracted = extracted.replace(/\r\n/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim();
-    if (extracted.length < 40) return fail("no_extractable_text", 422);
+    if (extracted.length < 40 && ocrPending.length === 0) return fail("no_extractable_text", 422);
     const document: WorkspaceDocument = {
       id,
       name,
@@ -140,6 +145,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       pageCount,
       characterCount: extracted.length,
+      ...(ocrPending.length ? { ocrPending } : {}),
     };
     try {
       await writeDocument(document, extracted);

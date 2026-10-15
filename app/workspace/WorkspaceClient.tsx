@@ -8,6 +8,7 @@ import { AssistantSheet, type AssistantIntent } from "./AssistantSheet";
 import BookReader, { type OpenedBook } from "./BookReader";
 import { errors, parseResponse, streamNdjson } from "./api";
 import { Library } from "./Library";
+import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
 import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
@@ -106,7 +107,12 @@ function App() {
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [error, setError] = useState("");
+  const [ocr, setOcr] = useState<OcrState>(null);
+  const [ocrOpen, setOcrOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const intentId = useRef(0);
+  const ocrStop = useRef(false);
+  const ocrPrompted = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -143,11 +149,50 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [error]);
 
+  // Recognizes scanned pages a few at a time; the server is authoritative about what is still pending.
+  async function runOcr(documentId: string, pages: number[]) {
+    if (ocr?.running) return;
+    ocrStop.current = false;
+    const total = pages.length;
+    let remaining = [...pages];
+    let batches = 0;
+    setOcr({ docId: documentId, total, done: 0, running: true });
+    const settle = (left: number[]) => {
+      const pending = left.length ? left : undefined;
+      setDocuments((items) => items.map((item) => item.id === documentId ? { ...item, ocrPending: pending } : item));
+      setBook((current) => current && current.document.id === documentId ? { ...current, document: { ...current.document, ocrPending: pending } } : current);
+    };
+    try {
+      while (remaining.length && !ocrStop.current) {
+        const data = await parseResponse<{ pending: number[] }>(await fetch(`/api/workspace/documents/${documentId}/ocr`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pages: remaining.slice(0, 4) }),
+        }));
+        remaining = data.pending;
+        batches += 1;
+        setOcr({ docId: documentId, total, done: total - remaining.length, running: true });
+        if (batches % 5 === 0) { settle(remaining); setReloadKey((value) => value + 1); }
+      }
+      settle(remaining);
+      setReloadKey((value) => value + 1);
+      setOcr({ docId: documentId, total, done: total - remaining.length, running: false, finished: remaining.length === 0 });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : errors.ocr_failed;
+      settle(remaining);
+      setOcr({ docId: documentId, total, done: total - remaining.length, running: false, error: message });
+      setError(message);
+    }
+  }
+
   async function openDocument(id: string) {
     if (opening) return;
     setOpening(true);
     try {
-      setBook(await parseResponse<OpenedBook>(await fetch(`/api/workspace/documents?id=${encodeURIComponent(id)}`, { cache: "no-store" })));
+      const opened = await parseResponse<OpenedBook>(await fetch(`/api/workspace/documents?id=${encodeURIComponent(id)}`, { cache: "no-store" }));
+      setBook(opened);
+      // Offer text recognition once per session when the book has scanned pages.
+      if (opened.document.ocrPending?.length && !ocrPrompted.current.has(id)) { ocrPrompted.current.add(id); setOcrOpen(true); }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not open the document.");
     } finally {
@@ -178,6 +223,7 @@ function App() {
       }));
       setDocuments((current) => [{ ...data.document, progress: null, progressAt: null }, ...current]);
       setBook(data);
+      if (data.document.ocrPending?.length) { ocrPrompted.current.add(data.document.id); setOcrOpen(true); }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "";
       setError(/network|fetch|failed to upload/i.test(message) ? "Upload interrupted. Check your connection and try again." : message || errors.upload_failed);
@@ -216,13 +262,14 @@ function App() {
         {tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
-          : <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
+          : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
       <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} />
     </div>
     <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => setCalendarRefresh((value) => value + 1)} onError={setError} />
     {book && <>
-      <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} />
+      <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
+      <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(page) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, page })); }} />
     </>}
     {error && <div className="ws-toast" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={16} /></button></div>}

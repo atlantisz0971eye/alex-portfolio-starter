@@ -17,6 +17,12 @@ const nextConfig = {
       // PDF.js loads its DOM geometry polyfills through a dynamic native import.
       "./node_modules/@napi-rs/canvas*/**/*",
     ],
+    // OCR renders pages to images, so it needs the same PDF worker and canvas files.
+    "/api/workspace/documents/[id]/ocr": [
+      "./node_modules/pdf-parse/dist/pdf-parse/*/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/@napi-rs/canvas*/**/*",
+    ],
   },
 };
 export default (phase) => ({

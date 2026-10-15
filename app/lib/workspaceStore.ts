@@ -9,6 +9,8 @@ export type WorkspaceDocument = {
   createdAt: string;
   pageCount: number | null;
   characterCount: number;
+  /** Pages of a scanned PDF that still have no recognized text. */
+  ocrPending?: number[];
   guide?: string;
   guideCoverage?: "full" | "excerpts";
   messages?: { role: "user" | "assistant"; content: string }[];
