@@ -31,6 +31,7 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
   const [state, setState] = useState<"loading" | "setup" | "ready">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [max, setMax] = useState(2);
+  const [missing, setMissing] = useState<string[]>([]);
   const [account, setAccount] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [inbox, setInbox] = useState<Inbox | null>(null);
@@ -41,9 +42,10 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
 
   const loadAccounts = useCallback(async () => {
     try {
-      const data = await parseResponse<{ configured: boolean; accounts: Account[]; max: number }>(await fetch("/api/workspace/mail/accounts", { cache: "no-store" }));
+      const data = await parseResponse<{ configured: boolean; missing?: string[]; accounts: Account[]; max: number }>(await fetch("/api/workspace/mail/accounts", { cache: "no-store" }));
       setAccounts(data.accounts);
       setMax(data.max);
+      setMissing(data.missing ?? []);
       setState(data.configured ? "ready" : "setup");
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Could not load mail.");
@@ -115,7 +117,7 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
     {state === "setup" && <div className="library__empty">
       <MailIcon size={28} />
       <p>Mail is not set up yet.</p>
-      <small>Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and MAIL_TOKEN_KEY in Vercel, then redeploy.</small>
+      <small>{missing.length ? `Missing in this deployment: ${missing.join(", ")}.` : "Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and MAIL_TOKEN_KEY in Vercel, then redeploy."}</small>
     </div>}
     {state === "ready" && accounts.length === 0 && <div className="library__empty">
       <MailIcon size={28} />

@@ -8,6 +8,16 @@ export const OAUTH_COOKIE = "ws_mail_oauth";
 
 export const mailConfigured = () => googleConfigured() && mailKeyConfigured();
 
+/** Names (never values) of the mail settings that are missing or unusable. */
+export function mailMissing() {
+  const missing: string[] = [];
+  if (!process.env.GOOGLE_CLIENT_ID) missing.push("GOOGLE_CLIENT_ID");
+  if (!process.env.GOOGLE_CLIENT_SECRET) missing.push("GOOGLE_CLIENT_SECRET");
+  if (!process.env.MAIL_TOKEN_KEY) missing.push("MAIL_TOKEN_KEY");
+  else if (!mailKeyConfigured()) missing.push("MAIL_TOKEN_KEY (needs at least 32 characters)");
+  return missing;
+}
+
 /** Common checks for the mail endpoints; returns a response to send when access is denied. */
 export async function mailGuard(): Promise<Response | null> {
   if (!(await workspaceAuthorized())) return Response.json({ error: "unauthorized" }, { status: 401 });

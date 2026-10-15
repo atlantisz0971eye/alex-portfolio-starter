@@ -1,6 +1,6 @@
 import { revokeToken } from "../../../../lib/gmail";
 import { decryptToken } from "../../../../lib/mailCrypto";
-import { mailConfigured, mailGuard } from "../../../../lib/mailGuard";
+import { mailConfigured, mailGuard, mailMissing } from "../../../../lib/mailGuard";
 import { MAX_ACCOUNTS, publicAccount, readAccounts, writeAccounts } from "../../../../lib/mailStore";
 import { workspaceAuthorized } from "../../../../lib/workspaceAuth";
 import { workspaceStorageConfigured } from "../../../../lib/workspaceStore";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   if (!(await workspaceAuthorized())) return Response.json({ error: "unauthorized" }, { status: 401 });
-  if (!mailConfigured()) return Response.json({ configured: false, accounts: [], max: MAX_ACCOUNTS });
+  if (!mailConfigured()) return Response.json({ configured: false, missing: mailMissing(), accounts: [], max: MAX_ACCOUNTS });
   if (!workspaceStorageConfigured()) return Response.json({ error: "storage_not_configured" }, { status: 503 });
   try {
     return Response.json({ configured: true, accounts: (await readAccounts()).map(publicAccount), max: MAX_ACCOUNTS }, { headers: { "Cache-Control": "private, no-store" } });
