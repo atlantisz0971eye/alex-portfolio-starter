@@ -749,3 +749,44 @@
 .reader-translate__text.ws-markdown p { margin: 4px 0; }
 
 .reader-translate__save { margin-top: 10px; min-height: 38px; padding: 0 16px; font-size: 14px; }
+
+
+/* ===== Today ===== */
+.badge-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ff453a; box-shadow: 0 0 0 2px rgba(0,0,0,.6); }
+.sidebar__nav button { position: relative; }
+.sidebar__nav .badge-dot { top: 15px; right: 12px; }
+.tabbar button { position: relative; }
+.tabbar .badge-dot { top: 6px; right: calc(50% - 16px); }
+.tabbar button span { font-size: 10px; }
+.today { max-width: 1100px; margin: 0 auto; }
+.today__head .pagetitle { margin-bottom: 2px; }
+.today__date { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; color: var(--text-2); font-size: 15px; }
+.today__grid { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) { .today__grid { grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 36px; } }
+.today__plan .ws-markdown { font-size: 16px; line-height: 1.65; }
+.today__plan .ws-markdown p { margin: 8px 0; }
+.today__plan .ws-markdown strong { color: #fff; }
+.today__plan .ws-markdown ul, .today__plan .ws-markdown ol { margin: 6px 0; }
+.today__plan .is-updating { opacity: .55; }
+.today__stale { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: rgba(255,159,10,.14); color: #ffd28a; font-size: 14px; }
+.today__stale button { color: #fff; text-decoration: underline; margin-left: 4px; }
+.today__based { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.today__proposals { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.today__proposals .section-label { margin: 8px 0 0; }
+.today__none { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 0; color: var(--text-2); font-size: 15px; }
+.today__events { list-style: none; margin: 0; padding: 0; }
+.today__events li { display: flex; align-items: stretch; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.today__events li.is-past { opacity: .45; }
+.today__time { flex: none; width: 76px; display: flex; flex-direction: column; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.today__time small { font-weight: 400; color: var(--text-2); font-size: 13px; }
+.today__events i { flex: none; width: 4px; border-radius: 2px; background: var(--c); }
+.today__what { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.today__what strong { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.today__what small { display: flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 13px; }
+.today__mail { list-style: none; margin: 0; padding: 0; }
+.today__mail li + li { border-top: 1px solid rgba(255,255,255,.08); }
+.today__mail button { display: flex; gap: 8px; width: 100%; padding: 12px 0; text-align: left; align-items: flex-start; }
+.today__more { margin-top: 6px; }
+.ws-markdown ul { list-style: disc; padding-left: 22px; }
+.ws-markdown ol { list-style: decimal; padding-left: 22px; }
+.ws-markdown li::marker { color: var(--text-2); }

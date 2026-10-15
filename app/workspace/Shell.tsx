@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, NotebookPen, Sparkles } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, NotebookPen, Sparkles, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type Tab = "library" | "mail" | "calendar" | "notes";
+export type Tab = "today" | "library" | "mail" | "calendar" | "notes";
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
+  { id: "today", label: "Today", icon: Sun },
   { id: "library", label: "Library", icon: BookOpen },
   { id: "mail", label: "Mail", icon: MailIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
@@ -13,11 +14,11 @@ const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
 ];
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */
-export function Sidebar({ tab, onTab, onSignOut, onAssistant }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void; onAssistant: () => void }) {
+export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void; onAssistant: () => void; badges?: Partial<Record<Tab, boolean>> }) {
   return <aside className="sidebar" aria-label="Workspace">
     <div className="sidebar__brand"><span>Alex</span> Workspace</div>
     <nav className="sidebar__nav">
-      {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={18} /> {label}</button>)}
+      {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={18} /> {label}{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
     </nav>
     <button type="button" className="sidebar__assistant" onClick={onAssistant}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
     <div className="sidebar__foot">
@@ -27,9 +28,9 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant }: { tab: Tab; onTa
   </aside>;
 }
 
-export function TabBar({ tab, onTab, onAssistant }: { tab: Tab; onTab: (tab: Tab) => void; onAssistant: () => void }) {
+export function TabBar({ tab, onTab, onAssistant, badges = {} }: { tab: Tab; onTab: (tab: Tab) => void; onAssistant: () => void; badges?: Partial<Record<Tab, boolean>> }) {
   return <nav className="tabbar" aria-label="Workspace">
-    {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={22} /><span>{label}</span></button>)}
+    {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={22} /><span>{label}</span>{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
     <button type="button" onClick={onAssistant}><Sparkles size={22} /><span>Assistant</span></button>
   </nav>;
 }

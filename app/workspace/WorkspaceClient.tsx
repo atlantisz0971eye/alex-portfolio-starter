@@ -15,6 +15,7 @@ import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Notes } from "./Notes";
 import { Sidebar, TabBar, type Tab } from "./Shell";
+import { Today } from "./Today";
 
 type Props = { authorized: boolean; configured: boolean };
 
@@ -105,10 +106,14 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
-  const [tab, setTab] = useState<Tab>("library");
+  const [tab, setTab] = useState<Tab>("today");
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [notesRefresh, setNotesRefresh] = useState(0);
+  const [todayRefresh, setTodayRefresh] = useState(0);
+  const [todayBadge, setTodayBadge] = useState(false);
+  const tabRef = useRef<Tab>("today");
+  tabRef.current = tab;
   const [error, setError] = useState("");
   const [managing, setManaging] = useState<string | null>(null);
   const [ocr, setOcr] = useState<OcrState>(null);
@@ -131,6 +136,25 @@ function App() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  // Look for new mail now and every few minutes; a new plan lights a dot on Today until it is opened.
+  useEffect(() => {
+    let stopped = false;
+    const check = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const response = await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "check", zone: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
+        if (!response.ok || stopped) return;
+        const data = await response.json() as { updated?: boolean };
+        if (data.updated) { setTodayRefresh((value) => value + 1); if (tabRef.current !== "today") setTodayBadge(true); }
+      } catch { /* the next check will try again */ }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 5 * 60_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void check(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { stopped = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, []);
+  useEffect(() => { if (tab === "today") setTodayBadge(false); }, [tab]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setGlobalOpen((value) => !value); }
@@ -297,15 +321,17 @@ function App() {
 
   return <>
     <div className="shell">
-      <Sidebar tab={tab} onTab={setTab} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} />
+      <Sidebar tab={tab} onTab={setTab} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
       <div className="shell__main">
-        {tab === "mail"
+        {tab === "today"
+          ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
+          : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
           : tab === "notes" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
-      <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} />
+      <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
     <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); }} onError={setError} />

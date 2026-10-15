@@ -1,31 +1,24 @@
 "use client";
 
-import { Check, Loader2, Send, Sparkles, Square, TriangleAlert } from "lucide-react";
+import { Check, Loader2, Send, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { parseResponse, streamNdjson } from "./api";
-import { dayFormat, timeFormat, zone } from "./calendarFormat";
+import { streamNdjson } from "./api";
+import { zone } from "./calendarFormat";
+import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { Sheet } from "./Sheet";
 
-type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat: unknown };
-type Proposal = { op: "create" | "update" | "delete" | "note_create" | "note_append"; note?: { id?: string; title: string; markdown: string; parentId?: string | null }; id?: string; scope?: "this" | "all"; occurrenceDate?: string; event?: Record<string, unknown>; before?: Summary; after?: Summary; conflicts: string[] };
-type Status = "pending" | "applying" | "done" | "failed" | "dismissed";
 type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
-export type AssistantScreen = "library" | "mail" | "calendar" | "notes";
+export type AssistantScreen = "today" | "library" | "mail" | "calendar" | "notes";
 
 const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   calendar: ["Summarize my week", "Find a free 2-hour slot this week", "Add events from my recent emails"],
   mail: ["Summarize my unread mail", "Which emails need a reply?", "Add events from this week’s emails to my calendar"],
   library: ["What am I reading, and how far along?", "What should I read next?"],
   notes: ["Summarize my recent notes", "Find my notes about…"],
+  today: ["Re-plan my day around my new mail", "Which emails need a reply today?", "Add events from my recent emails"],
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
 };
-
-function when(item: Summary) {
-  const parse = (value: string) => item.allDay ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10))) : new Date(value);
-  const start = parse(item.start);
-  return item.allDay ? `${dayFormat.format(start)} · All day` : `${dayFormat.format(start)} · ${timeFormat.format(start)} – ${timeFormat.format(parse(item.end))}`;
-}
 
 type Props = { open: boolean; onClose: () => void; screen: AssistantScreen | null; onChanged: () => void; onError: (message: string) => void };
 
@@ -75,16 +68,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     const mark = (status: Status) => setMessages((current) => current.map((item, index) => index === messageIndex ? { ...item, status: item.status?.map((value, i) => i === proposalIndex ? status : value) } : item));
     mark("applying");
     try {
-      const json = { "Content-Type": "application/json" };
-      if (proposal.op === "note_create" && proposal.note) await parseResponse(await fetch("/api/workspace/notes", { method: "POST", headers: json, body: JSON.stringify({ title: proposal.note.title, markdown: proposal.note.markdown, parentId: proposal.note.parentId ?? null }) }));
-      else if (proposal.op === "note_append" && proposal.note?.id) await parseResponse(await fetch(`/api/workspace/notes/${proposal.note.id}`, { method: "POST", headers: json, body: JSON.stringify({ action: "append", markdown: proposal.note.markdown }) }));
-      else if (proposal.op === "create") await parseResponse(await fetch("/api/workspace/calendar/events", { method: "POST", headers: json, body: JSON.stringify({ event: proposal.event, zone: zone(), by: "agent" }) }));
-      else if (proposal.op === "update") await parseResponse(await fetch("/api/workspace/calendar/events", { method: "PATCH", headers: json, body: JSON.stringify({ id: proposal.id, event: proposal.event, scope: proposal.scope, occurrenceDate: proposal.occurrenceDate, zone: zone(), by: "agent" }) }));
-      else {
-        const params = new URLSearchParams({ id: proposal.id ?? "", scope: proposal.scope ?? "all" });
-        if (proposal.occurrenceDate) params.set("occurrence", proposal.occurrenceDate);
-        await parseResponse(await fetch(`/api/workspace/calendar/events?${params}`, { method: "DELETE" }));
-      }
+      await applyProposal(proposal);
       mark("done");
       onChanged();
     } catch (cause) {
@@ -111,22 +95,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
           {message.role === "assistant" && message.tools && message.tools.length > 0 && <ul className="ca-tools">{message.tools.map((label, index) => <li key={index}>{busy && messageIndex === messages.length - 1 && index === message.tools!.length - 1 && !message.text ? <Loader2 className="ws-spin" size={12} /> : <Check size={12} />} {label}</li>)}</ul>}
           {message.role === "user" ? <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{message.text}</p></div></div> : <>
             {message.text ? <div className="ws-message ws-message--assistant"><div className="ws-markdown"><ReactMarkdown>{message.text}</ReactMarkdown></div></div> : busy && messageIndex === messages.length - 1 && !message.proposals && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Thinking…</p></div>}
-            {message.proposals?.map((proposal, proposalIndex) => {
-              const status = message.status?.[proposalIndex] ?? "pending";
-              return <div key={proposalIndex} className={`ca-card ca-card--${proposal.op.replace("note_", "")} is-${status}`}>
-                <div className="ca-card__head"><b>{proposal.op === "note_create" ? "New note" : proposal.op === "note_append" ? "Add to note" : proposal.op === "create" ? "New event" : proposal.op === "update" ? "Change event" : "Delete event"}</b>{proposal.scope === "this" && <small>This occurrence only</small>}</div>
-                {proposal.note && <p className="ca-card__after"><strong>{proposal.note.title}</strong><span className="ca-card__note">{proposal.note.markdown.slice(0, 320)}{proposal.note.markdown.length > 320 ? "…" : ""}</span></p>}
-                {proposal.op === "update" && proposal.before && <p className="ca-card__before">{proposal.before.title} · {when(proposal.before)}{proposal.before.location ? ` · ${proposal.before.location}` : ""}</p>}
-                {(proposal.after ?? proposal.before) && <p className={proposal.op === "delete" ? "ca-card__gone" : "ca-card__after"}><strong>{(proposal.after ?? proposal.before)!.title}</strong><span>{when((proposal.after ?? proposal.before)!)}{(proposal.after ?? proposal.before)!.location ? ` · ${(proposal.after ?? proposal.before)!.location}` : ""}</span></p>}
-                {proposal.conflicts.length > 0 && <p className="ca-card__warn"><TriangleAlert size={14} /> Overlaps with {proposal.conflicts.join(", ")}</p>}
-                <div className="ca-card__actions">
-                  {status === "done" ? <span className="ca-card__done"><Check size={15} /> Done</span> : status === "dismissed" ? <span className="ws-muted">Dismissed</span> : <>
-                    <button type="button" className={`ws-pill${proposal.op === "delete" ? " ws-pill--danger" : " ws-pill--solid"}`} disabled={status === "applying"} onClick={() => void apply(messageIndex, proposalIndex)}>{status === "applying" ? <Loader2 className="ws-spin" size={14} /> : status === "failed" ? "Try again" : proposal.op === "delete" ? "Delete" : "Confirm"}</button>
-                    <button type="button" className="ws-text-button" onClick={() => dismiss(messageIndex, proposalIndex)}>Dismiss</button>
-                  </>}
-                </div>
-              </div>;
-            })}
+            {message.proposals?.map((proposal, proposalIndex) => <ProposalCard key={proposalIndex} proposal={proposal} status={message.status?.[proposalIndex] ?? "pending"} onApply={() => void apply(messageIndex, proposalIndex)} onDismiss={() => dismiss(messageIndex, proposalIndex)} />)}
             {(message.proposals?.filter((_, i) => message.status?.[i] === "pending").length ?? 0) > 1 && <button type="button" className="ws-pill ca-all" onClick={() => void applyAll(messageIndex)}>Confirm all</button>}
           </>}
         </div>)}

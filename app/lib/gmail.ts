@@ -120,6 +120,8 @@ export type MailSummary = {
   snippet: string;
   date: number;
   unread: boolean;
+  /** Gmail's inbox tab: promotions, social and forums are usually noise. */
+  category: "primary" | "updates" | "promotions" | "social" | "forums";
 };
 
 const header = (message: RawMessage, name: string) => message.payload?.headers?.find((item) => item.name.toLowerCase() === name.toLowerCase())?.value ?? "";
@@ -157,6 +159,7 @@ function summarize(message: RawMessage, account: MailAccount): MailSummary {
     snippet: decodeEntities(message.snippet ?? ""),
     date: Number(message.internalDate) || Date.parse(header(message, "Date")) || 0,
     unread: !!message.labelIds?.includes("UNREAD"),
+    category: message.labelIds?.includes("CATEGORY_PROMOTIONS") ? "promotions" : message.labelIds?.includes("CATEGORY_SOCIAL") ? "social" : message.labelIds?.includes("CATEGORY_FORUMS") ? "forums" : message.labelIds?.includes("CATEGORY_UPDATES") ? "updates" : "primary",
   };
 }
 

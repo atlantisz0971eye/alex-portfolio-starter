@@ -7,10 +7,10 @@ import ReactMarkdown from "react-markdown";
 import { errors, parseResponse, streamNdjson } from "./api";
 
 type Account = { id: string; email: string; connectedAt: string };
-type Summary = { id: string; account: string; from: string; fromEmail: string; subject: string; snippet: string; date: number; unread: boolean };
-type Detail = Summary & { to: string; body: string; attachments: { name: string; size: number }[]; truncated: boolean };
+export type MailItem = { id: string; account: string; from: string; fromEmail: string; subject: string; snippet: string; date: number; unread: boolean };
+type Detail = MailItem & { to: string; body: string; attachments: { name: string; size: number }[]; truncated: boolean };
 type Failure = { account: string; email: string; reason: "reauth" | "failed" };
-type Inbox = { messages: Summary[]; next: Record<string, string> | null; failures: Failure[] };
+type Inbox = { messages: MailItem[]; next: Record<string, string> | null; failures: Failure[] };
 
 const short = (email: string) => email.split("@")[0];
 
@@ -52,7 +52,7 @@ export function Mail({ onError, onSignOut }: { onError: (message: string) => voi
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [loading, setLoading] = useState(false);
   const [more, setMore] = useState(false);
-  const [open, setOpen] = useState<Summary | null>(null);
+  const [open, setOpen] = useState<MailItem | null>(null);
   const request = useRef(0);
 
   const loadAccounts = useCallback(async () => {
@@ -191,7 +191,7 @@ function MailSkeleton() {
 
 type Turn = { question?: string; text: string };
 
-function MailMessage({ summary, onClose, onError, pane = false }: { summary: Summary; onClose: () => void; onError: (message: string) => void; pane?: boolean }) {
+export function MailMessage({ summary, onClose, onError, pane = false }: { summary: MailItem; onClose: () => void; onError: (message: string) => void; pane?: boolean }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [failed, setFailed] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
