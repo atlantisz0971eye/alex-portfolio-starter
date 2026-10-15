@@ -22,6 +22,7 @@ export const errors: Record<string, string> = {
   invalid_access_key: "Invalid access key.",
   mail_not_configured: "Mail is not set up yet. Add the Google credentials in Vercel.",
   mail_reauth: "Gmail access expired. Reconnect the account.",
+  invalid_event: "That event could not be saved.",
   calendar_failed: "The calendar could not be loaded. Try again.",
   mail_failed: "Gmail could not be reached. Try again.",
   invalid_selection: "Select a shorter passage to translate.",
@@ -34,13 +35,14 @@ export const errors: Record<string, string> = {
 };
 
 export async function parseResponse<T>(response: Response): Promise<T> {
-  let data: { error?: string } | null = null;
+  let data: { error?: string; message?: string } | null = null;
   try {
     data = await response.json();
   } catch {
     // Platform errors such as gateway timeouts are not JSON.
   }
   if (!response.ok) {
+    if (data?.error === "invalid_event" && data.message) throw new Error(data.message);
     if (data?.error && errors[data.error]) throw new Error(errors[data.error]);
     if (response.status === 504 || response.status === 408) throw new Error("This took too long to process. Large or complex files may need another try.");
     if (response.status === 413) throw new Error("The request was too large.");
@@ -52,7 +54,7 @@ export async function parseResponse<T>(response: Response): Promise<T> {
 export type StreamDone = { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
 
 /** POSTs JSON and reads the newline-delimited events the assistant routes send, reporting text as it arrives. */
-export async function streamNdjson(url: string, body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal): Promise<StreamDone> {
+export async function streamNdjson(url: string, body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal, onEvent?: (event: { t: string; [key: string]: unknown }) => void): Promise<StreamDone> {
   const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
   if (!response.ok || !response.body) return parseResponse<never>(response);
   const reader = response.body.getReader();
@@ -65,6 +67,7 @@ export async function streamNdjson(url: string, body: Record<string, unknown>, o
     if (event.t === "delta" && event.v) onDelta(event.v);
     else if (event.t === "error") throw new Error(errors[event.code ?? ""] ?? errors.assistant_failed);
     else if (event.t === "done") done = { coverage: event.coverage, messages: event.messages };
+    else if (event.t !== "start") onEvent?.(event as { t: string });
   };
   for (;;) {
     const { done: finished, value } = await reader.read();

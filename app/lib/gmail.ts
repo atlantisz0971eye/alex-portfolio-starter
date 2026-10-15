@@ -3,8 +3,7 @@ import { decryptToken } from "./mailCrypto";
 import type { MailAccount } from "./mailStore";
 
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
-export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
-const ALLOWED_SCOPES = [GMAIL_SCOPE, CALENDAR_SCOPE];
+const ALLOWED_SCOPES = [GMAIL_SCOPE];
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 

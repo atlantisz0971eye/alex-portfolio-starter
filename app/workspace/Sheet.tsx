@@ -2,10 +2,10 @@
 
 import { useEffect, type ReactNode } from "react";
 
-type SheetProps = { open: boolean; onClose: () => void; title: string; children: ReactNode; size?: "compact" | "tall"; flush?: boolean };
+type SheetProps = { open: boolean; onClose: () => void; title: string; children: ReactNode; size?: "compact" | "tall"; flush?: boolean; primary?: { label: string; onClick: () => void; disabled?: boolean } };
 
 /** Bottom sheet on phones, side panel on wide screens. */
-export function Sheet({ open, onClose, title, children, size = "compact", flush = false }: SheetProps) {
+export function Sheet({ open, onClose, title, children, size = "compact", flush = false, primary }: SheetProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -19,7 +19,10 @@ export function Sheet({ open, onClose, title, children, size = "compact", flush 
       <div className="ws-sheet__grab" aria-hidden="true" />
       <header className="ws-sheet__head">
         <h2>{title}</h2>
-        <button type="button" className="ws-text-button" onClick={onClose}>Done</button>
+        <div className="ws-sheet__actions">
+          <button type="button" className="ws-text-button" onClick={onClose}>{primary ? "Cancel" : "Done"}</button>
+          {primary && <button type="button" className="ws-text-button ws-text-button--bold" onClick={primary.onClick} disabled={primary.disabled}>{primary.label}</button>}
+        </div>
       </header>
       <div className={`ws-sheet__body${flush ? " ws-sheet__body--flush" : ""}`}>{children}</div>
     </section>

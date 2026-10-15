@@ -69,3 +69,11 @@ Workspace 顶部的 **Mail** 标签用于查看和搜索最多两个 Gmail 账�
    - `https://alex-portfolio-sepia.vercel.app/api/workspace/mail/callback`
    - 本地调试再加 `http://localhost:3000/api/workspace/mail/callback`
 4. 在 Vercel 设置环境变量（Sensitive）：`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`，以及随机的 `MAIL_TOKEN_KEY`（至少 32 个字符，丢失后需要重新连接所有账号）。重新部署后在 Mail 页点击 “Connect Gmail”。
+
+## Alex Workspace · 日历
+
+Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放在 Private Blob Store 的 `workspace/calendar/data.json`，支持新建、编辑、删除、全天事件、分类，以及按每天/每周/每月/每年重复（按事件所在时区的本地时间计算，跨夏令时也保持原时刻）。桌面端是周视图，手机端是按天的议程列表。
+
+右上角的 **Assistant** 是 DeepSeek 日程助手：可以总结一周、找空档、提议新增或修改日程。它**不会直接写入**，每一条提议都会显示为卡片（含冲突提示），需要你逐条点 Confirm 才生效；删除同样要点确认。询问时，近 60 天的事件标题、时间、地点和分类会发送给 DeepSeek。
+
+日历暂时没有到点提醒。

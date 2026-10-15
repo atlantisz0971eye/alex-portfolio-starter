@@ -6,7 +6,7 @@ export type MailAccount = {
   /** Encrypted refresh token; see mailCrypto. */
   tokenEnc: string;
   connectedAt: string;
-  /** Scopes granted at consent time; accounts connected before calendar support lack the calendar scope. */
+  /** Scopes granted at consent time. */
   scopes?: string[];
 };
 
@@ -23,5 +23,5 @@ export async function writeAccounts(accounts: MailAccount[]) {
   await put(ACCOUNTS_PATH, JSON.stringify(accounts), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
-export type PublicAccount = Pick<MailAccount, "id" | "email" | "connectedAt"> & { calendar: boolean };
-export const publicAccount = ({ id, email, connectedAt, scopes }: MailAccount): PublicAccount => ({ id, email, connectedAt, calendar: !!scopes?.includes("https://www.googleapis.com/auth/calendar.readonly") });
+export type PublicAccount = Pick<MailAccount, "id" | "email" | "connectedAt">;
+export const publicAccount = ({ id, email, connectedAt }: MailAccount): PublicAccount => ({ id, email, connectedAt });
