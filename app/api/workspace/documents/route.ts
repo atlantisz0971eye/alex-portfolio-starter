@@ -1,11 +1,13 @@
 import { PDFParse } from "pdf-parse";
 import { get } from "@vercel/blob";
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
+import { buildSegments, detectChapters, segmentIndexFor } from "../../../lib/workspaceOutline";
 import {
   discardUpload,
   listDocuments,
   readDocument,
   readDocumentText,
+  readProgress,
   validDocumentId,
   workspaceStorageConfigured,
   writeDocument,
@@ -15,12 +17,16 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-// Keep the full source in storage, but bound each reader response for books.
-function readerSection(text: string, requested = 0) {
-  const size = 30_000;
-  const sectionCount = Math.max(1, Math.ceil(text.length / size));
-  const section = Math.max(0, Math.min(sectionCount - 1, Math.floor(requested)));
-  return { text: text.slice(section * size, (section + 1) * size), section, sectionCount };
+// Keep the full source in storage; the reader loads one segment at a time.
+function readerWindow(text: string, target: { segment?: number; offset?: number }) {
+  const chapters = detectChapters(text);
+  const starts = buildSegments(text, chapters);
+  const index = target.segment !== undefined
+    ? Math.max(0, Math.min(starts.length - 1, target.segment))
+    : segmentIndexFor(starts, Math.min(target.offset ?? 0, Math.max(0, text.length - 1)));
+  const start = starts[index];
+  const end = starts[index + 1] ?? text.length;
+  return { text: text.slice(start, end), start, end, index, starts, chapters, totalLength: text.length };
 }
 
 async function guard() {
@@ -38,14 +44,22 @@ export async function GET(request: Request) {
   if (denied) return denied;
   const params = new URL(request.url).searchParams;
   const id = params.get("id");
-  const section = Number(params.get("section") ?? 0);
-  if (!Number.isSafeInteger(section) || section < 0) return Response.json({ error: "invalid_request" }, { status: 400 });
+  const segmentParam = params.get("segment");
+  const offsetParam = params.get("offset");
+  const segment = segmentParam === null ? undefined : Number(segmentParam);
+  const offset = offsetParam === null ? undefined : Number(offsetParam);
+  if ((segment !== undefined && (!Number.isSafeInteger(segment) || segment < 0)) || (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0))) {
+    return Response.json({ error: "invalid_request" }, { status: 400 });
+  }
   try {
     if (!id) return Response.json({ documents: await listDocuments() }, { headers: { "Cache-Control": "private, no-store" } });
     const document = await readDocument(id);
     if (!document) return Response.json({ error: "not_found" }, { status: 404 });
     const text = await readDocumentText(id);
-    return Response.json({ document, ...readerSection(text ?? "", section) }, { headers: { "Cache-Control": "private, no-store" } });
+    // Without an explicit target, reopen where the reader left off.
+    const saved = segment === undefined && offset === undefined ? await readProgress(id).catch(() => null) : null;
+    const window = readerWindow(text ?? "", { segment, offset: offset ?? saved ?? 0 });
+    return Response.json({ document, ...window, target: offset ?? saved ?? window.start }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return Response.json({ error: "storage_failed" }, { status: 502 });
   }
@@ -123,7 +137,7 @@ export async function POST(request: Request) {
     } catch {
       return fail("storage_failed", 502);
     }
-    return Response.json({ document, ...readerSection(extracted) }, { status: 201 });
+    return Response.json({ document, ...readerWindow(extracted, { segment: 0 }), target: 0 }, { status: 201 });
   } catch {
     return fail("processing_failed", 502);
   }

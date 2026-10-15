@@ -21,6 +21,9 @@ const metaPath = (id: string) => `workspace/docs/${id}.json`;
 // Guides and chats grow with use, so they live apart from the small metadata
 // record that the library list reads for every document.
 const statePath = (id: string) => `workspace/state/${id}.json`;
+const progressPath = (id: string) => `workspace/progress/${id}.json`;
+
+export type WorkspaceLibraryItem = WorkspaceDocumentSummary & { progress: number | null };
 const textPath = (id: string) => `workspace/text/${id}.txt`;
 
 export function validDocumentId(id: string) {
@@ -81,7 +84,23 @@ export async function writeDocument(document: WorkspaceDocument, text?: string) 
   });
 }
 
-export async function listDocuments(): Promise<WorkspaceDocumentSummary[]> {
+export async function readProgress(id: string): Promise<number | null> {
+  if (!validDocumentId(id)) return null;
+  const raw = await readText(progressPath(id));
+  if (!raw) return null;
+  const offset = (JSON.parse(raw) as { offset?: unknown }).offset;
+  return typeof offset === "number" && Number.isFinite(offset) && offset >= 0 ? offset : null;
+}
+
+export async function writeProgress(id: string, offset: number) {
+  await put(progressPath(id), JSON.stringify({ offset, updatedAt: new Date().toISOString() }), {
+    access: "private",
+    allowOverwrite: true,
+    contentType: "application/json",
+  });
+}
+
+export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
   const blobs: { pathname: string }[] = [];
   let cursor: string | undefined;
   do {
@@ -95,21 +114,22 @@ export async function listDocuments(): Promise<WorkspaceDocumentSummary[]> {
       const meta = await readMeta(id);
       if (!meta) return null;
       const { guide, guideCoverage, messages, ...summary } = meta;
-      return summary;
+      const progress = await readProgress(id).catch(() => null);
+      return { ...summary, progress };
     } catch { return null; }
   }));
-  return documents.filter((item): item is WorkspaceDocumentSummary => !!item)
+  return documents.filter((item): item is WorkspaceLibraryItem => !!item)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function deleteDocument(document: WorkspaceDocument) {
-  await del([metaPath(document.id), statePath(document.id), textPath(document.id), document.filePath]);
+  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), textPath(document.id), document.filePath]);
 }
 
 /** Best-effort removal of everything an interrupted upload may have left behind. */
 export async function discardUpload(id: string, filePath: string) {
   try {
-    await del([filePath, textPath(id), statePath(id), metaPath(id)]);
+    await del([filePath, textPath(id), statePath(id), progressPath(id), metaPath(id)]);
   } catch {
     // Nothing more can be done here; the original error is what the caller reports.
   }
