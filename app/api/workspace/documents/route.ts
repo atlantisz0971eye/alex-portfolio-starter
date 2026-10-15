@@ -1,7 +1,8 @@
 import { PDFParse } from "pdf-parse";
-import { del, get } from "@vercel/blob";
+import { get } from "@vercel/blob";
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
 import {
+  discardUpload,
   listDocuments,
   readDocument,
   readDocumentText,
@@ -66,30 +67,36 @@ export async function POST(request: Request) {
   if (!validDocumentId(id) || !pathname.startsWith(`workspace/files/${id}/`) || !name) {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
+  // From here the upload exists in storage, so every failure must remove it.
+  const fail = async (error: string, status: number) => {
+    await discardUpload(id, pathname);
+    return Response.json({ error }, { status });
+  };
   const extension = name.split(".").pop()?.toLowerCase();
   if (!extension || !["pdf", "txt", "md", "html", "htm"].includes(extension)) {
-    return Response.json({ error: "unsupported_format" }, { status: 415 });
+    return fail("unsupported_format", 415);
   }
   try {
+    // An existing record owns this path, so leave its files alone.
     if (await readDocument(id)) return Response.json({ error: "already_exists" }, { status: 409 });
     const original = await get(pathname, { access: "private", useCache: false });
-    if (!original || original.statusCode !== 200 || original.blob.size > 25 * 1024 * 1024) {
-      return Response.json({ error: "file_not_found" }, { status: 404 });
-    }
+    if (!original || original.statusCode !== 200) return fail("file_not_found", 404);
+    if (original.blob.size > 25 * 1024 * 1024) return fail("file_too_large", 413);
     const bytes = new Uint8Array(await new Response(original.stream).arrayBuffer());
     let extracted = "";
     let pageCount: number | null = null;
     if (extension === "pdf") {
-      if (String.fromCharCode(...bytes.slice(0, 4)) !== "%PDF") {
-        return Response.json({ error: "invalid_pdf" }, { status: 422 });
-      }
+      if (String.fromCharCode(...bytes.slice(0, 4)) !== "%PDF") return fail("invalid_pdf", 422);
       const parser = new PDFParse({ data: bytes });
       try {
         const result = await parser.getText();
         pageCount = result.total;
         extracted = result.pages.map((page) => `[Page ${page.num}]\n${page.text}`).join("\n\n");
+      } catch (cause) {
+        const reason = cause instanceof Error ? cause.name : "";
+        return fail(reason === "PasswordException" ? "pdf_encrypted" : "pdf_unreadable", 422);
       } finally {
-        await parser.destroy();
+        await parser.destroy().catch(() => undefined);
       }
     } else {
       extracted = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
@@ -100,10 +107,7 @@ export async function POST(request: Request) {
       }
     }
     extracted = extracted.replace(/\r\n/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim();
-    if (extracted.length < 40) {
-      await del(pathname);
-      return Response.json({ error: "no_extractable_text" }, { status: 422 });
-    }
+    if (extracted.length < 40) return fail("no_extractable_text", 422);
     const document: WorkspaceDocument = {
       id,
       name,
@@ -114,9 +118,13 @@ export async function POST(request: Request) {
       pageCount,
       characterCount: extracted.length,
     };
-    await writeDocument(document, extracted);
+    try {
+      await writeDocument(document, extracted);
+    } catch {
+      return fail("storage_failed", 502);
+    }
     return Response.json({ document, ...readerSection(extracted) }, { status: 201 });
   } catch {
-    return Response.json({ error: "processing_failed" }, { status: 502 });
+    return fail("processing_failed", 502);
   }
 }

@@ -14,7 +14,13 @@ export type WorkspaceDocument = {
   messages?: { role: "user" | "assistant"; content: string }[];
 };
 
+type DocumentState = Pick<WorkspaceDocument, "guide" | "guideCoverage" | "messages">;
+export type WorkspaceDocumentSummary = Omit<WorkspaceDocument, keyof DocumentState>;
+
 const metaPath = (id: string) => `workspace/docs/${id}.json`;
+// Guides and chats grow with use, so they live apart from the small metadata
+// record that the library list reads for every document.
+const statePath = (id: string) => `workspace/state/${id}.json`;
 const textPath = (id: string) => `workspace/text/${id}.txt`;
 
 export function validDocumentId(id: string) {
@@ -31,12 +37,20 @@ async function readText(path: string) {
   return new Response(result.stream).text();
 }
 
-export async function readDocument(id: string): Promise<WorkspaceDocument | null> {
+async function readMeta(id: string): Promise<WorkspaceDocument | null> {
   if (!validDocumentId(id)) return null;
   const raw = await readText(metaPath(id));
   if (!raw) return null;
   const value = JSON.parse(raw) as WorkspaceDocument;
   return value.id === id ? value : null;
+}
+
+export async function readDocument(id: string): Promise<WorkspaceDocument | null> {
+  const meta = await readMeta(id);
+  if (!meta) return null;
+  const raw = await readText(statePath(id));
+  // Documents saved before the split still carry guide/messages in the metadata.
+  return raw ? { ...meta, ...(JSON.parse(raw) as DocumentState) } : meta;
 }
 
 export async function readDocumentText(id: string) {
@@ -45,6 +59,7 @@ export async function readDocumentText(id: string) {
 }
 
 export async function writeDocument(document: WorkspaceDocument, text?: string) {
+  const { guide, guideCoverage, messages, ...meta } = document;
   if (text !== undefined) {
     await put(textPath(document.id), text, {
       access: "private",
@@ -52,14 +67,21 @@ export async function writeDocument(document: WorkspaceDocument, text?: string) 
       contentType: "text/plain; charset=utf-8",
     });
   }
-  await put(metaPath(document.id), JSON.stringify(document), {
+  if (guide !== undefined || guideCoverage !== undefined || messages !== undefined) {
+    await put(statePath(document.id), JSON.stringify({ guide, guideCoverage, messages }), {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/json",
+    });
+  }
+  await put(metaPath(document.id), JSON.stringify(meta), {
     access: "private",
     allowOverwrite: true,
     contentType: "application/json",
   });
 }
 
-export async function listDocuments() {
+export async function listDocuments(): Promise<WorkspaceDocumentSummary[]> {
   const blobs: { pathname: string }[] = [];
   let cursor: string | undefined;
   do {
@@ -69,14 +91,28 @@ export async function listDocuments() {
   } while (cursor);
   const documents = await Promise.all(blobs.map(async (blob) => {
     const id = blob.pathname.slice("workspace/docs/".length).replace(/\.json$/, "");
-    try { return await readDocument(id); } catch { return null; }
+    try {
+      const meta = await readMeta(id);
+      if (!meta) return null;
+      const { guide, guideCoverage, messages, ...summary } = meta;
+      return summary;
+    } catch { return null; }
   }));
-  return documents.filter((item): item is WorkspaceDocument => !!item)
+  return documents.filter((item): item is WorkspaceDocumentSummary => !!item)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function deleteDocument(document: WorkspaceDocument) {
-  await del([metaPath(document.id), textPath(document.id), document.filePath]);
+  await del([metaPath(document.id), statePath(document.id), textPath(document.id), document.filePath]);
+}
+
+/** Best-effort removal of everything an interrupted upload may have left behind. */
+export async function discardUpload(id: string, filePath: string) {
+  try {
+    await del([filePath, textPath(id), statePath(id), metaPath(id)]);
+  } catch {
+    // Nothing more can be done here; the original error is what the caller reports.
+  }
 }
 
 export async function readOriginalFile(document: WorkspaceDocument) {

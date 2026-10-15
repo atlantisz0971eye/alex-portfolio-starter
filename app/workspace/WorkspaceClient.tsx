@@ -19,7 +19,15 @@ const errors: Record<string, string> = {
   ai_not_configured: "DeepSeek is not configured yet.",
   no_extractable_text: "No readable text found. Scanned PDFs need OCR support.",
   unsupported_format: "Supported formats: PDF, TXT, Markdown and HTML.",
-  invalid_pdf: "This PDF could not be read.",
+  invalid_pdf: "This file is not a valid PDF.",
+  pdf_encrypted: "This PDF is password-protected. Remove the password and upload it again.",
+  pdf_unreadable: "This PDF is damaged or uses an unsupported structure, so its text could not be read.",
+  file_too_large: "Maximum file size: 25 MB.",
+  file_not_found: "The upload did not reach storage. Try again.",
+  already_exists: "This upload was already processed.",
+  storage_failed: "Private storage failed while saving. Nothing was kept; try again.",
+  not_found: "That document no longer exists.",
+  invalid_request: "The request was not valid. Reload the page and try again.",
   rate_limited: "Too many requests. Try again shortly.",
   processing_failed: "Could not process this document. Check the file and try again.",
   assistant_failed: "The assistant could not complete this request. Try again.",
@@ -28,8 +36,18 @@ const errors: Record<string, string> = {
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
-  const data = await response.json();
-  if (!response.ok) throw new Error(errors[data.error] ?? "Something went wrong. Try again.");
+  let data: { error?: string } | null = null;
+  try {
+    data = await response.json();
+  } catch {
+    // Platform errors such as gateway timeouts are not JSON.
+  }
+  if (!response.ok) {
+    if (data?.error && errors[data.error]) throw new Error(errors[data.error]);
+    if (response.status === 504 || response.status === 408) throw new Error("This took too long to process. Large or complex files may need another try.");
+    if (response.status === 413) throw new Error("The request was too large.");
+    throw new Error(`Something went wrong (${response.status}). Try again.`);
+  }
   return data as T;
 }
 
@@ -189,7 +207,8 @@ function Reader() {
       setDocuments((current) => [data.document, ...current]);
       setMobileSection("reader");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : errors.upload_failed);
+      const message = cause instanceof Error ? cause.message : "";
+      setError(/network|fetch|failed to upload/i.test(message) ? "Upload interrupted. Check your connection and try again." : message || errors.upload_failed);
     } finally {
       setBusy(null);
       if (inputRef.current) inputRef.current.value = "";
