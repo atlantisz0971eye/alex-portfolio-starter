@@ -37,7 +37,7 @@ export type WorkspaceMark = {
   createdAt: string;
 };
 
-export type WorkspaceLibraryItem = WorkspaceDocumentSummary & { progress: number | null };
+export type WorkspaceLibraryItem = WorkspaceDocumentSummary & { progress: number | null; progressAt: string | null };
 const textPath = (id: string) => `workspace/text/${id}.txt`;
 
 export function validDocumentId(id: string) {
@@ -98,12 +98,17 @@ export async function writeDocument(document: WorkspaceDocument, text?: string) 
   });
 }
 
-export async function readProgress(id: string): Promise<number | null> {
+export async function readProgressRecord(id: string): Promise<{ offset: number; updatedAt: string | null } | null> {
   if (!validDocumentId(id)) return null;
   const raw = await readText(progressPath(id));
   if (!raw) return null;
-  const offset = (JSON.parse(raw) as { offset?: unknown }).offset;
-  return typeof offset === "number" && Number.isFinite(offset) && offset >= 0 ? offset : null;
+  const value = JSON.parse(raw) as { offset?: unknown; updatedAt?: unknown };
+  if (typeof value.offset !== "number" || !Number.isFinite(value.offset) || value.offset < 0) return null;
+  return { offset: value.offset, updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null };
+}
+
+export async function readProgress(id: string): Promise<number | null> {
+  return (await readProgressRecord(id))?.offset ?? null;
 }
 
 export async function readMarks(id: string): Promise<WorkspaceMark[]> {
@@ -138,8 +143,8 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
       const meta = await readMeta(id);
       if (!meta) return null;
       const { guide, guideCoverage, messages, ...summary } = meta;
-      const progress = await readProgress(id).catch(() => null);
-      return { ...summary, progress };
+      const record = await readProgressRecord(id).catch(() => null);
+      return { ...summary, progress: record?.offset ?? null, progressAt: record?.updatedAt ?? null };
     } catch { return null; }
   }));
   return documents.filter((item): item is WorkspaceLibraryItem => !!item)

@@ -1,8 +1,9 @@
 "use client";
 
-import { FileText, Loader2, LogOut, Plus } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { Loader2, Plus } from "lucide-react";
+import { useMemo, useRef } from "react";
 import type { WorkspaceLibraryItem } from "../lib/workspaceStore";
+import { PageTitle, TopRow } from "./Shell";
 
 type Props = {
   documents: WorkspaceLibraryItem[];
@@ -11,43 +12,64 @@ type Props = {
   onOpen: (id: string) => void;
   onAdd: (file: File) => void;
   onSignOut: () => void;
-  tabs: ReactNode;
 };
 
 const title = (name: string) => name.replace(/\.[^.]+$/, "");
+const percentOf = (item: WorkspaceLibraryItem) => item.progress ? Math.min(100, Math.round((item.progress / Math.max(1, item.characterCount)) * 100)) : 0;
 
-export function Library({ documents, loading, uploading, onOpen, onAdd, onSignOut, tabs }: Props) {
+/** A quiet typographic cover; the hue comes from the title so each book is recognisable. */
+function Cover({ item }: { item: WorkspaceLibraryItem }) {
+  let hash = 0;
+  for (const char of item.name) hash = (hash * 31 + char.charCodeAt(0)) % 360;
+  return <span className="cover" style={{ background: `linear-gradient(160deg, hsl(${hash} 14% 26%), hsl(${hash} 12% 9%))` }}>
+    <span className="cover__title">{title(item.name)}</span>
+    <span className="cover__badge">{item.mimeType === "application/pdf" ? "PDF" : "TXT"}</span>
+  </span>;
+}
+
+export function Library({ documents, loading, uploading, onOpen, onAdd, onSignOut }: Props) {
   const input = useRef<HTMLInputElement>(null);
-  return <main className="library">
-    <header className="library__head">
-      <a href="/" className="ws-text-button">Portfolio</a>
-      <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
-    </header>
-    {tabs}
-    <div className="library__title">
-      <h1>Library</h1>
-      <button type="button" className="ws-round" onClick={() => input.current?.click()} disabled={uploading} aria-label="Add document">{uploading ? <Loader2 className="ws-spin" size={20} /> : <Plus size={22} />}</button>
+  const current = useMemo(() => documents
+    .filter((item) => percentOf(item) > 0 && percentOf(item) < 99)
+    .sort((a, b) => (b.progressAt ?? "").localeCompare(a.progressAt ?? ""))[0], [documents]);
+
+  return <main className="page">
+    <TopRow onSignOut={onSignOut} />
+    <div className="page__inner">
+      <PageTitle actions={<button type="button" className="ws-round" onClick={() => input.current?.click()} disabled={uploading} aria-label="Add document">{uploading ? <Loader2 className="ws-spin" size={20} /> : <Plus size={22} />}</button>}>Library</PageTitle>
       <input ref={input} type="file" accept=".pdf,.txt,.md,.html,.htm" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) onAdd(file); event.target.value = ""; }} />
+      {uploading && <p className="library__status" role="status"><Loader2 className="ws-spin" size={14} /> Importing and reading the text…</p>}
+
+      {loading ? <div className="grid" aria-busy="true">{Array.from({ length: 4 }, (_, index) => <div key={index} className="tile"><span className="cover skeleton" /><span className="skeleton skeleton--line" /></div>)}</div>
+        : documents.length === 0 ? <div className="empty">
+          <p>Your library is empty.</p>
+          <button type="button" className="ws-pill" onClick={() => input.current?.click()}><Plus size={16} /> Add a book</button>
+          <small>PDF · TXT · Markdown · HTML, up to 25 MB</small>
+        </div> : <>
+          {current && <section aria-labelledby="continue-heading">
+            <h2 id="continue-heading" className="section-label">Continue reading</h2>
+            <button type="button" className="continue" onClick={() => onOpen(current.id)}>
+              <Cover item={current} />
+              <span className="continue__meta">
+                <strong>{title(current.name)}</strong>
+                <small>{percentOf(current)}% read{current.pageCount ? ` · ${current.pageCount} pages` : ""}</small>
+                <i><b style={{ width: `${percentOf(current)}%` }} /></i>
+              </span>
+            </button>
+          </section>}
+          <section aria-labelledby="books-heading">
+            <h2 id="books-heading" className="section-label">All books <span>{documents.length}</span></h2>
+            <ul className="grid">
+              {documents.map((item) => <li key={item.id}>
+                <button type="button" className="tile" onClick={() => onOpen(item.id)}>
+                  <Cover item={item} />
+                  <span className="tile__title">{title(item.name)}</span>
+                  <small>{percentOf(item) ? `${percentOf(item)}% read` : "New"}{item.pageCount ? ` · ${item.pageCount} pages` : ""}</small>
+                </button>
+              </li>)}
+            </ul>
+          </section>
+        </>}
     </div>
-    {uploading && <p className="library__status"><Loader2 className="ws-spin" size={14} /> Importing and reading the text…</p>}
-    {loading ? <p className="library__empty"><Loader2 className="ws-spin" size={18} /></p> : documents.length === 0 ? <div className="library__empty">
-      <p>Your library is empty.</p>
-      <button type="button" className="ws-pill" onClick={() => input.current?.click()}><Plus size={16} /> Add a book</button>
-      <small>PDF · TXT · Markdown · HTML, up to 25 MB</small>
-    </div> : <ul className="library__list">
-      {documents.map((document) => {
-        const percent = document.progress ? Math.min(100, Math.round((document.progress / Math.max(1, document.characterCount)) * 100)) : 0;
-        return <li key={document.id}>
-          <button type="button" onClick={() => onOpen(document.id)}>
-            <span className="library__icon"><FileText size={22} /></span>
-            <span className="library__meta">
-              <strong>{title(document.name)}</strong>
-              <small>{document.mimeType === "application/pdf" ? "PDF" : "Text"}{document.pageCount ? ` · ${document.pageCount} pages` : ""}{percent ? ` · ${percent}% read` : " · New"}</small>
-              {percent > 0 && <i style={{ width: `${percent}%` }} />}
-            </span>
-          </button>
-        </li>;
-      })}
-    </ul>}
   </main>;
 }

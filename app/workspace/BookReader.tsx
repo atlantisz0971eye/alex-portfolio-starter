@@ -57,6 +57,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   const marksLoaded = useRef(false);
   const marksTimer = useRef<number | undefined>(undefined);
   const rangeRef = useRef<Range | null>(null);
+  const hoverChrome = useRef(false);
 
   const viewRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
@@ -360,7 +361,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     const ratio = (event.clientX - rect.left) / rect.width;
     if (paged && ratio < 0.25) turn(-1);
     else if (paged && ratio > 0.75) turn(1);
-    else setChrome((value) => !value);
+    else { hoverChrome.current = false; setChrome((value) => !value); }
   };
 
   // Selection toolbar: appears under the native selection handles.
@@ -465,7 +466,15 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
 
   blockEls.current = [];
 
-  return <div className="reader" data-theme={prefs.theme} data-font={prefs.font} data-mode={prefs.mode} data-chrome={chrome ? "on" : "off"} style={style}>
+  // With a mouse there is no tap, so the bars appear when the pointer nears the top or bottom edge.
+  const onHover = (event: React.PointerEvent) => {
+    if (event.pointerType !== "mouse" || sheet || event.buttons) return;
+    const near = event.clientY < 72 || event.clientY > window.innerHeight - 112;
+    if (near && !chrome) { hoverChrome.current = true; setChrome(true); }
+    else if (!near && chrome && hoverChrome.current) { hoverChrome.current = false; setChrome(false); }
+  };
+
+  return <div className="reader" onPointerMove={onHover} data-theme={prefs.theme} data-font={prefs.font} data-mode={prefs.mode} data-chrome={chrome ? "on" : "off"} style={style}>
     <header className="reader-bar reader-bar--top">
       <button type="button" className="reader-icon" onClick={() => { flushProgress(true); onBack(offsetRef.current); }} aria-label="Back to library"><ChevronLeft size={22} /><span>Library</span></button>
       <h1>{book.document.name.replace(/\.[^.]+$/, "")}</h1>

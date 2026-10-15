@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
+import { PageTitle, TopRow } from "./Shell";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { errors, parseResponse, streamNdjson } from "./api";
@@ -27,7 +28,21 @@ function linkify(text: string): ReactNode[] {
     : <Fragment key={index}>{part}</Fragment>);
 }
 
-export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: string) => void }) {
+/** True on screens wide enough for the list and the message side by side. */
+function useWide() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1000px)");
+    const sync = () => setWide(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  return wide;
+}
+
+export function Mail({ onError, onSignOut }: { onError: (message: string) => void; onSignOut: () => void }) {
+  const wide = useWide();
   const [state, setState] = useState<"loading" | "setup" | "ready">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [max, setMax] = useState(2);
@@ -106,20 +121,16 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
     }
   }
 
-  return <main className="library mail">
-    {tabs}
-    <div className="library__title">
-      <h1>Mail</h1>
-      {accounts.length > 0 && <button type="button" className="ws-round" aria-label="Refresh" onClick={() => void load(query.trim(), account)} disabled={loading}>{loading ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button>}
-    </div>
+  const list = <>
+    <PageTitle actions={accounts.length > 0 ? <button type="button" className="ws-round" aria-label="Refresh" onClick={() => void load(query.trim(), account)} disabled={loading}>{loading ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button> : undefined}>Mail</PageTitle>
 
-    {state === "loading" && <p className="library__empty"><Loader2 className="ws-spin" size={18} /></p>}
-    {state === "setup" && <div className="library__empty">
+    {state === "loading" && <MailSkeleton />}
+    {state === "setup" && <div className="empty">
       <MailIcon size={28} />
       <p>Mail is not set up yet.</p>
       <small>{missing.length ? `Missing in this deployment: ${missing.join(", ")}.` : "Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and MAIL_TOKEN_KEY in Vercel, then redeploy."}</small>
     </div>}
-    {state === "ready" && accounts.length === 0 && <div className="library__empty">
+    {state === "ready" && accounts.length === 0 && <div className="empty">
       <MailIcon size={28} />
       <p>Connect a Gmail account to read your mail here.</p>
       <a className="ws-pill ws-pill--solid" href="/api/workspace/mail/connect">Connect Gmail</a>
@@ -129,10 +140,10 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
     {state === "ready" && accounts.length > 0 && <>
       <label className="mail-search">
         <Search size={16} />
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search mail" enterKeyHint="search" autoCapitalize="none" autoCorrect="off" />
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search mail" enterKeyHint="search" autoCapitalize="none" autoCorrect="off" aria-label="Search mail" />
         {query && <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={16} /></button>}
       </label>
-      <div className="mail-chips">
+      <div className="mail-chips" role="group" aria-label="Accounts">
         <button type="button" className={account === null ? "is-on" : ""} onClick={() => setAccount(null)}>All</button>
         {accounts.map((item) => <button key={item.id} type="button" className={account === item.id ? "is-on" : ""} onClick={() => setAccount(item.id)}>{short(item.email)}</button>)}
         {accounts.length < max && <a href="/api/workspace/mail/connect" className="mail-chips__add">+ Add</a>}
@@ -140,9 +151,9 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
       {inbox?.failures.map((failure) => <p key={failure.account} className="mail-banner">
         {failure.reason === "reauth" ? <>Access to {failure.email} expired. <a href={`/api/workspace/mail/connect?hint=${encodeURIComponent(failure.email)}`}>Reconnect</a></> : <>Could not load {failure.email}.</>}
       </p>)}
-      {inbox === null ? <p className="library__empty"><Loader2 className="ws-spin" size={18} /></p> : inbox.messages.length === 0 ? <p className="library__empty">{query ? "No messages match your search." : "Nothing in the inbox."}</p> : <ul className="mail-list">
+      {inbox === null ? <MailSkeleton /> : inbox.messages.length === 0 ? <p className="empty">{query ? "No messages match your search." : "Nothing in the inbox."}</p> : <ul className="mail-list">
         {inbox.messages.map((message) => <li key={`${message.account}-${message.id}`}>
-          <button type="button" onClick={() => setOpen(message)}>
+          <button type="button" className={open?.id === message.id && open.account === message.account ? "is-open" : ""} onClick={() => setOpen(message)}>
             <span className={`mail-dot${message.unread ? " is-unread" : ""}`} aria-label={message.unread ? "Unread" : undefined} />
             <span className="mail-row">
               <span className="mail-row__top"><strong>{message.from}</strong><time>{when(message.date)}</time></span>
@@ -158,14 +169,29 @@ export function Mail({ tabs, onError }: { tabs: ReactNode; onError: (message: st
         {accounts.map((item) => <li key={item.id}><span>{item.email}</span><button type="button" className="ws-text-button" onClick={() => void disconnect(item)}>Disconnect</button></li>)}
       </ul>
     </>}
+  </>;
 
-    {open && <MailMessage summary={open} onClose={() => setOpen(null)} onError={onError} />}
-  </main>;
+  return <>
+    <main className="page page--split">
+    <TopRow onSignOut={onSignOut} />
+    <div className="split">
+      <section className="split__list" aria-label="Messages">{list}</section>
+      {wide && <section className="split__detail" aria-label="Message">
+        {open ? <MailMessage key={`${open.account}-${open.id}`} summary={open} pane onClose={() => setOpen(null)} onError={onError} /> : <div className="empty"><MailIcon size={28} /><p>Select a message to read it.</p></div>}
+      </section>}
+    </div>
+    </main>
+    {!wide && open && <MailMessage key={`${open.account}-${open.id}`} summary={open} onClose={() => setOpen(null)} onError={onError} />}
+  </>;
+}
+
+function MailSkeleton() {
+  return <div className="mail-skeleton" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div key={index}><span className="skeleton skeleton--line" /><span className="skeleton skeleton--line skeleton--short" /></div>)}</div>;
 }
 
 type Turn = { question?: string; text: string };
 
-function MailMessage({ summary, onClose, onError }: { summary: Summary; onClose: () => void; onError: (message: string) => void }) {
+function MailMessage({ summary, onClose, onError, pane = false }: { summary: Summary; onClose: () => void; onError: (message: string) => void; pane?: boolean }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [failed, setFailed] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -202,10 +228,10 @@ function MailMessage({ summary, onClose, onError }: { summary: Summary; onClose:
   }
 
   const shown = detail ?? summary;
-  return <div className="mail-view">
-    <header className="mail-view__bar">
+  return <div className={`mail-view${pane ? " mail-view--pane" : ""}`}>
+    {!pane && <header className="mail-view__bar">
       <button type="button" className="ws-text-button" onClick={onClose}><ChevronLeft size={22} /> Mail</button>
-    </header>
+    </header>}
     <div className="mail-view__scroll">
       <h2>{shown.subject}</h2>
       <div className="mail-view__meta">

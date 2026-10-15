@@ -9,6 +9,7 @@ import BookReader, { type OpenedBook } from "./BookReader";
 import { errors, parseResponse, streamNdjson } from "./api";
 import { Library } from "./Library";
 import { Mail } from "./Mail";
+import { Sidebar, TabBar, type Tab } from "./Shell";
 
 type Props = { authorized: boolean; configured: boolean };
 
@@ -19,13 +20,6 @@ const MAIL_NOTES: Record<string, string> = {
   not_configured: "Mail is not set up yet.",
   failed: "Could not connect Gmail. Try again.",
 };
-
-function HomeTabs({ tab, onTab }: { tab: "library" | "mail"; onTab: (tab: "library" | "mail") => void }) {
-  return <div className="home-tabs ws-segment" role="tablist">
-    <button type="button" role="tab" aria-selected={tab === "library"} className={tab === "library" ? "is-on" : ""} onClick={() => onTab("library")}>Library</button>
-    <button type="button" role="tab" aria-selected={tab === "mail"} className={tab === "mail" ? "is-on" : ""} onClick={() => onTab("mail")}>Mail</button>
-  </div>;
-}
 
 function Login({ configured }: { configured: boolean }) {
   const [accessKey, setAccessKey] = useState("");
@@ -95,7 +89,7 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
-  const [tab, setTab] = useState<"library" | "mail">("library");
+  const [tab, setTab] = useState<Tab>("library");
   const [error, setError] = useState("");
   const intentId = useRef(0);
 
@@ -160,7 +154,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, pathname: blob.pathname, name: file.name }),
       }));
-      setDocuments((current) => [{ ...data.document, progress: null }, ...current]);
+      setDocuments((current) => [{ ...data.document, progress: null, progressAt: null }, ...current]);
       setBook(data);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "";
@@ -181,7 +175,7 @@ function App() {
   const closeBook = useCallback((offset: number) => {
     setAssistantOpen(false);
     setBook((current) => {
-      if (current) setDocuments((items) => items.map((item) => item.id === current.document.id ? { ...item, progress: offset } : item));
+      if (current) setDocuments((items) => items.map((item) => item.id === current.document.id ? { ...item, progress: offset, progressAt: new Date().toISOString() } : item));
       return null;
     });
   }, []);
@@ -193,10 +187,16 @@ function App() {
 
   const updateDocument = (document: WorkspaceDocument) => setBook((current) => current && { ...current, document });
 
-  const tabs = <HomeTabs tab={tab} onTab={setTab} />;
-
   return <>
-    {tab === "mail" ? <Mail tabs={tabs} onError={setError} /> : <Library tabs={tabs} documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
+    <div className="shell">
+      <Sidebar tab={tab} onTab={setTab} onSignOut={() => void signOut()} />
+      <div className="shell__main">
+        {tab === "mail"
+          ? <Mail onError={setError} onSignOut={() => void signOut()} />
+          : <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
+      </div>
+      <TabBar tab={tab} onTab={setTab} />
+    </div>
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} />
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(page) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, page })); }} />
