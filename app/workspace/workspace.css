@@ -18,8 +18,8 @@
   -webkit-text-size-adjust: 100%;
 }
 .ws-root *, .ws-root *::before, .ws-root *::after { box-sizing: border-box; }
-.ws-root button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
-.ws-root button:disabled { opacity: .4; cursor: default; }
+:where(.ws-root) button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+:where(.ws-root) button:disabled { opacity: .4; cursor: default; }
 .ws-root :is(input, textarea) { font: inherit; font-size: 16px; color: inherit; }
 .ws-spin { animation: ws-spin 1s linear infinite; }
 @keyframes ws-spin { to { transform: rotate(360deg); } }
@@ -29,7 +29,7 @@
 .ws-pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 999px; background: var(--panel-2) !important; font-size: 16px; font-weight: 500; }
 .ws-pill--solid { background: #fff !important; color: #000 !important; }
 .ws-round { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--panel-2) !important; }
-.ws-root button:active:not(:disabled) { opacity: .6; }
+
 
 /* Library */
 
@@ -486,3 +486,118 @@
 .ca-tools { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ca-tools li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
 .ca-tools svg { flex: none; }
+
+
+/* =====================================================================
+   Glass. Every control is a translucent pane: a blurred, lightly tinted
+   fill, a bright rim that fades along a diagonal, a soft highlight that
+   follows the pointer, and a shadow that lifts it off the background.
+   ===================================================================== */
+.ws-root {
+  --glass-fill: linear-gradient(145deg, rgba(255,255,255,.20) 0%, rgba(255,255,255,.07) 46%, rgba(255,255,255,.12) 100%);
+  --glass-fill-hover: linear-gradient(145deg, rgba(255,255,255,.30) 0%, rgba(255,255,255,.11) 46%, rgba(255,255,255,.18) 100%);
+  --glass-blur: blur(18px) saturate(180%);
+  --glass-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.38), 0 1px 3px rgba(0,0,0,.45);
+  --glass-rim: linear-gradient(135deg, rgba(255,255,255,.8) 0%, rgba(255,255,255,.14) 30%, rgba(255,255,255,.02) 58%, rgba(255,255,255,.38) 100%);
+}
+
+/* Ambient light behind everything, so the blur has something to refract. */
+.ws-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 12% 0%, rgba(150,170,200,.16), transparent 70%),
+    radial-gradient(55% 45% at 100% 100%, rgba(110,130,220,.14), transparent 70%),
+    radial-gradient(40% 40% at 70% 20%, rgba(190,150,220,.07), transparent 70%);
+}
+.shell, .login { z-index: 1; }
+
+/* Controls built from buttons and blocks (they can carry the rim and the light). */
+.ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .sidebar__nav button.is-on, .ws-segment, .mail-search, .ws-card, .continue, .ws-stepper, .ef__group, .ws-message--assistant, .reader-selection, .reader-popover, .reader-translate, .ws-toast, .ws-sheet, .tabbar, .ws-segment button.is-on) {
+  isolation: isolate;
+  background: var(--glass-fill) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  border: 0 !important;
+  transition: background .25s, box-shadow .25s, transform .18s cubic-bezier(.2,.8,.2,1), filter .2s;
+}
+.ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .sidebar__nav button.is-on, .ws-segment, .mail-search, .ws-card, .continue, .ws-stepper, .ef__group, .ws-message--assistant, .reader-selection, .reader-popover, .reader-translate, .ws-toast, .ws-sheet, .tabbar, .ws-segment button.is-on)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle 110px at var(--mx, 24%) var(--my, -10%), rgba(255,255,255,.42), rgba(255,255,255,0) 70%);
+  opacity: .55;
+  transition: opacity .3s;
+}
+.ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .sidebar__nav button.is-on, .ws-segment, .mail-search, .ws-card, .continue, .ws-stepper, .ef__group, .ws-message--assistant, .reader-selection, .reader-popover, .reader-translate, .ws-toast, .ws-sheet, .tabbar, .ws-segment button.is-on)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: var(--glass-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* Controls laid out in the flow need a containing block for the light and the rim.
+   Panes that are already absolutely positioned (sheets, tab bar, toasts, popovers) keep their own position. */
+.ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .sidebar__nav button, .ws-segment, .ws-segment button, .mail-search, .ws-card, .continue, .ws-stepper, .ef__group, .ws-message--assistant, .ws-compose button, .mail-ai__form button) { position: relative; }
+
+/* Inputs cannot carry pseudo-elements; they get the fill, the blur and the edge light only. */
+.ws-root :is(.ef__title, .ef__notes, .ws-compose textarea, .mail-ai__form input, .ws-note-input, .login input) {
+  background: linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.04)) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -1px 1px rgba(0,0,0,.35);
+}
+
+/* Large surfaces are calmer: more blur, less fill, a softer highlight. */
+.ws-root :is(.ws-sheet, .ws-card, .continue, .reader-translate, .ws-toast, .reader-popover, .reader-selection, .tabbar) { --glass-blur: blur(30px) saturate(190%); }
+.ws-root .ws-sheet { background: linear-gradient(160deg, rgba(70,72,82,.62), rgba(22,22,26,.78)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 -12px 50px rgba(0,0,0,.55); }
+.ws-root :is(.ws-card, .continue, .ws-message--assistant) { background: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.035)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 10px 30px rgba(0,0,0,.35); }
+.ws-root .tabbar { background: linear-gradient(180deg, rgba(60,62,70,.55), rgba(18,18,22,.7)) !important; border-radius: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+.ws-root .tabbar::after { border-radius: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); -webkit-mask: none; mask: none; height: 1px; bottom: auto; padding: 0; }
+.ws-root .sidebar { background: linear-gradient(180deg, rgba(40,42,50,.45), rgba(8,8,10,.55)); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); box-shadow: inset -1px 0 0 rgba(255,255,255,.1); border-right: 0; }
+
+/* Variants */
+.ws-root .ws-pill--solid { background: linear-gradient(160deg, rgba(255,255,255,.98), rgba(222,226,236,.86)) !important; color: #0b0b0d !important; box-shadow: inset 0 1px 0 #fff, inset 0 -1px 1px rgba(0,0,0,.18), 0 8px 24px rgba(0,0,0,.4), 0 0 22px rgba(255,255,255,.12); }
+.ws-root .ws-pill--solid::before { background: radial-gradient(circle 110px at var(--mx, 24%) var(--my, -10%), rgba(255,255,255,.95), rgba(255,255,255,0) 70%); opacity: .7; }
+.ws-root .ws-pill--solid::after { background: linear-gradient(135deg, rgba(255,255,255,1), rgba(255,255,255,.3) 40%, rgba(0,0,0,.08) 70%, rgba(255,255,255,.7)); }
+.ws-root :is(.ws-compose button, .mail-ai__form button, .ef__days button.is-on, .mail-chips .is-on) { position: relative; isolation: isolate; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 1px rgba(0,0,0,.25), 0 6px 18px rgba(10,100,235,.45); }
+.ws-root :is(.ws-compose button, .mail-ai__form button, .ef__days button.is-on) { background: linear-gradient(150deg, rgba(90,175,255,.96), rgba(10,110,235,.88)) !important; color: #fff !important; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.ws-root .mail-chips .is-on { background: linear-gradient(160deg, rgba(255,255,255,.95), rgba(220,224,234,.8)) !important; color: #0b0b0d !important; box-shadow: inset 0 1px 0 #fff, 0 6px 18px rgba(0,0,0,.4); }
+.ws-root .ws-pill--danger { background: linear-gradient(145deg, rgba(255,90,80,.34), rgba(255,69,58,.12)) !important; color: #ffa59d !important; }
+.ws-root .ws-segment { padding: 3px; }
+.ws-root .ws-segment button { border-radius: 999px; }
+.ws-root .ws-segment button.is-on { background: linear-gradient(145deg, rgba(255,255,255,.34), rgba(255,255,255,.14)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 4px 12px rgba(0,0,0,.4); }
+.ws-root .ws-segment { border-radius: 999px; }
+.ws-root .sidebar__nav button.is-on { background: linear-gradient(145deg, rgba(255,255,255,.2), rgba(255,255,255,.07)) !important; }
+.ws-root .sidebar__assistant { background: linear-gradient(145deg, rgba(90,170,255,.34), rgba(10,132,255,.12)) !important; color: #b7dcff; }
+.ws-root .cal-chip.is-off { opacity: .5; }
+.ws-root .ef__cats button.is-on { box-shadow: inset 0 1px 0 rgba(255,255,255,.4), inset 0 0 0 1.5px var(--c), 0 6px 16px rgba(0,0,0,.35); }
+
+/* Hover brightens the pane and raises the light; pressing sinks it. */
+@media (hover: hover) {
+  .ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant):hover { background: var(--glass-fill-hover) !important; box-shadow: var(--glass-shadow), 0 0 26px rgba(255,255,255,.08); }
+  .ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .ws-segment button, .sidebar__nav button):hover::before { opacity: 1; }
+  .ws-root :is(.ws-compose button, .mail-ai__form button, .ef__days button.is-on):hover { background: linear-gradient(150deg, rgba(120,190,255,1), rgba(30,125,245,.95)) !important; }
+  .ws-root .ws-pill--solid:hover, .ws-root .mail-chips .is-on:hover { background: linear-gradient(160deg, #fff, rgba(235,238,246,.92)) !important; }
+  .ws-root .ws-pill--danger:hover { background: linear-gradient(145deg, rgba(255,90,80,.46), rgba(255,69,58,.2)) !important; }
+  .ws-root .sidebar__nav button:not(.is-on):hover { background: rgba(255,255,255,.07); }
+}
+.ws-root :where(.ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .ws-compose button, .mail-ai__form button):active { transform: scale(.965); filter: brightness(.92); box-shadow: inset 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.2); }
+.ws-root .ws-segment button:not(.is-on) { transition: color .2s; }
+@media (prefers-reduced-transparency: reduce) {
+  .ws-root :is(.ws-pill, .ws-round, .ws-sheet, .ws-card, .tabbar, .sidebar) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

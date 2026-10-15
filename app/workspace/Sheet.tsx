@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type SheetProps = { open: boolean; onClose: () => void; title: string; children: ReactNode; size?: "compact" | "tall"; flush?: boolean; primary?: { label: string; onClick: () => void; disabled?: boolean } };
 
@@ -13,7 +14,9 @@ export function Sheet({ open, onClose, title, children, size = "compact", flush 
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
   if (!open) return null;
-  return <div className="ws-sheet-layer">
+  // Sheets render at the app root so a scrolled page can never carry them out of place.
+  const host = typeof document !== "undefined" ? document.querySelector<HTMLElement>(".ws-root") : null;
+  const layer = <div className="ws-sheet-layer">
     <div className="ws-sheet-backdrop" onClick={onClose} />
     <section className={`ws-sheet ws-sheet--${size}`} role="dialog" aria-modal="true" aria-label={title}>
       <div className="ws-sheet__grab" aria-hidden="true" />
@@ -27,4 +30,5 @@ export function Sheet({ open, onClose, title, children, size = "compact", flush 
       <div className={`ws-sheet__body${flush ? " ws-sheet__body--flush" : ""}`}>{children}</div>
     </section>
   </div>;
+  return host ? createPortal(layer, host) : layer;
 }

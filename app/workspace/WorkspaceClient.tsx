@@ -15,6 +15,8 @@ import { Sidebar, TabBar, type Tab } from "./Shell";
 
 type Props = { authorized: boolean; configured: boolean };
 
+const GLASS_LIGHT = ".ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .sidebar__nav button, .ws-segment button, .mail-search, .ws-card, .continue";
+
 const MAIL_NOTES: Record<string, string> = {
   too_many_accounts: "Two Gmail accounts are already connected. Disconnect one first.",
   denied: "Gmail access was not granted.",
@@ -79,7 +81,16 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
       root.style.removeProperty("--ws-vh");
     };
   }, []);
-  return <div className="ws-root">{authorized ? <App /> : <Login configured={configured} />}</div>;
+  // The highlight on glass controls follows the pointer, like light moving across a pane.
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse") return;
+    const target = (event.target as Element).closest<HTMLElement>(GLASS_LIGHT);
+    if (!target) return;
+    const box = target.getBoundingClientRect();
+    target.style.setProperty("--mx", `${((event.clientX - box.left) / Math.max(1, box.width)) * 100}%`);
+    target.style.setProperty("--my", `${((event.clientY - box.top) / Math.max(1, box.height)) * 100}%`);
+  };
+  return <div className="ws-root" onPointerMove={onPointerMove}>{authorized ? <App /> : <Login configured={configured} />}</div>;
 }
 
 function App() {
