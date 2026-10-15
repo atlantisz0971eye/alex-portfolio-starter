@@ -8,6 +8,7 @@ import { AssistantSheet, type AssistantIntent } from "./AssistantSheet";
 import BookReader, { type OpenedBook } from "./BookReader";
 import { errors, parseResponse, streamNdjson } from "./api";
 import { Library } from "./Library";
+import { Calendar } from "./Calendar";
 import { Mail } from "./Mail";
 import { Sidebar, TabBar, type Tab } from "./Shell";
 
@@ -193,6 +194,7 @@ function App() {
       <div className="shell__main">
         {tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
+          : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
       <TabBar tab={tab} onTab={setTab} />

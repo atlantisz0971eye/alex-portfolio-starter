@@ -3,6 +3,8 @@ import { decryptToken } from "./mailCrypto";
 import type { MailAccount } from "./mailStore";
 
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const ALLOWED_SCOPES = [GMAIL_SCOPE, CALENDAR_SCOPE];
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -27,7 +29,7 @@ export function authUrl(params: { state: string; challenge: string; redirectUri:
     client_id: process.env.GOOGLE_CLIENT_ID ?? "",
     redirect_uri: params.redirectUri,
     response_type: "code",
-    scope: GMAIL_SCOPE,
+    scope: ALLOWED_SCOPES.join(" "),
     access_type: "offline",
     // "consent" makes Google return a refresh token every time, not only on the first grant.
     prompt: "consent select_account",
@@ -60,9 +62,11 @@ async function tokenRequest(body: Record<string, string>): Promise<TokenResponse
 export async function exchangeCode(code: string, verifier: string, redirectUri: string) {
   const data = await tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri });
   if (!data.access_token || !data.refresh_token) throw new Error("Google did not return a refresh token");
-  // Only the read-only scope is acceptable; refuse anything broader.
-  if (data.scope && data.scope.split(" ").some((scope) => scope.startsWith("https://") && scope !== GMAIL_SCOPE)) throw new Error("Unexpected scope granted");
-  return { accessToken: data.access_token, refreshToken: data.refresh_token };
+  // Only the read-only scopes are acceptable; refuse anything broader.
+  const granted = (data.scope ?? "").split(" ").filter((scope) => scope.startsWith("https://"));
+  if (granted.some((scope) => !ALLOWED_SCOPES.includes(scope))) throw new Error("Unexpected scope granted");
+  if (!granted.includes(GMAIL_SCOPE)) throw new Error("Gmail access was not granted");
+  return { accessToken: data.access_token, refreshToken: data.refresh_token, scopes: granted };
 }
 
 export async function revokeToken(token: string) {

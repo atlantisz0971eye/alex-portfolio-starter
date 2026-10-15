@@ -22,6 +22,7 @@ export const errors: Record<string, string> = {
   invalid_access_key: "Invalid access key.",
   mail_not_configured: "Mail is not set up yet. Add the Google credentials in Vercel.",
   mail_reauth: "Gmail access expired. Reconnect the account.",
+  calendar_failed: "The calendar could not be loaded. Try again.",
   mail_failed: "Gmail could not be reached. Try again.",
   invalid_selection: "Select a shorter passage to translate.",
   ai_timeout: "DeepSeek is responding slowly right now. Try again.",

@@ -1,13 +1,14 @@
 "use client";
 
-import { BookOpen, LogOut, Mail as MailIcon } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type Tab = "library" | "mail";
+export type Tab = "library" | "mail" | "calendar";
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "library", label: "Library", icon: BookOpen },
   { id: "mail", label: "Mail", icon: MailIcon },
+  { id: "calendar", label: "Calendar", icon: CalendarIcon },
 ];
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */

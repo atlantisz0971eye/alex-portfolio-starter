@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     const accounts = await readAccounts();
     const existing = accounts.find((account) => account.email.toLowerCase() === email.toLowerCase());
     if (!existing && accounts.length >= MAX_ACCOUNTS) return finish(url.origin, "mail=error&reason=too_many_accounts");
-    const record = { id: existing?.id ?? randomUUID(), email, tokenEnc: encryptToken(tokens.refreshToken), connectedAt: new Date().toISOString() };
+    const record = { id: existing?.id ?? randomUUID(), email, tokenEnc: encryptToken(tokens.refreshToken), connectedAt: new Date().toISOString(), scopes: tokens.scopes };
     await writeAccounts(existing ? accounts.map((account) => account.id === existing.id ? record : account) : [...accounts, record]);
     return finish(url.origin, "mail=connected");
   } catch {

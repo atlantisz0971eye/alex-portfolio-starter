@@ -344,3 +344,76 @@
   .split__list { overflow-y: auto; overscroll-behavior: contain; padding: 40px 24px 40px 32px; border-right: 1px solid rgba(255,255,255,.08); }
   .split__detail { display: block; position: relative; overflow: hidden; }
 }
+
+
+/* ===== Calendar ===== */
+.cal { max-width: 1200px; margin: 0 auto; }
+.cal-nav { display: flex; align-items: center; gap: 8px; }
+.cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.cal-range { display: inline-flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; }
+.cal-bar__right { display: flex; align-items: center; gap: 10px; }
+.cal-views { width: 170px; }
+.cal-views button { height: 34px; }
+.cal-chip { display: inline-flex; align-items: center; gap: 8px; }
+.cal-chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.cal-chip.is-off { opacity: .45; }
+.cal-chip.is-off i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+.cal-brief { margin: 4px 0 14px; }
+.cal-brief .ws-card__head button { display: grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px 0 0; color: var(--text-2); }
+
+.agenda section + section { margin-top: 18px; }
+.agenda h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); }
+.agenda h2.is-today { color: var(--accent); }
+.agenda ul { list-style: none; margin: 0; padding: 0; }
+.agenda li + li { border-top: 1px solid rgba(255,255,255,.06); }
+.agenda__none { margin: 0; padding: 8px 0; font-size: 14px; color: var(--text-2); }
+.agenda button { display: flex; align-items: stretch; gap: 12px; width: 100%; padding: 12px 0; text-align: left; }
+.agenda button.is-declined { opacity: .45; }
+.agenda button.is-declined strong { text-decoration: line-through; }
+.agenda__time { flex: none; width: 76px; white-space: nowrap; display: flex; flex-direction: column; font-size: 14px; font-weight: 600; }
+.agenda__time small { font-weight: 400; color: var(--text-2); font-size: 13px; }
+.agenda button > i { flex: none; width: 4px; border-radius: 2px; background: var(--c); }
+.agenda__main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.agenda__main strong { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.agenda__main small { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-2); }
+
+.wk { border: 1px solid rgba(255,255,255,.08); border-radius: 14px; overflow: hidden; background: #050505; display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.wk__head, .wk__allday { display: grid; grid-template-columns: 56px repeat(7, minmax(0, 1fr)); }
+.wk__head { border-bottom: 1px solid rgba(255,255,255,.08); }
+.wk__head > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; border-left: 1px solid rgba(255,255,255,.06); }
+.wk__head small { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.wk__head b { display: grid; place-items: center; min-width: 30px; height: 30px; border-radius: 15px; font-size: 18px; font-weight: 500; }
+.wk__head .is-today b { background: var(--accent); }
+.wk__head .is-today small { color: var(--accent); }
+.wk__allday { border-bottom: 1px solid rgba(255,255,255,.08); }
+.wk__allday > span { display: grid; place-items: center; font-size: 10px; color: var(--text-2); }
+.wk__allday > div { display: flex; flex-direction: column; gap: 2px; padding: 4px 3px; min-height: 28px; border-left: 1px solid rgba(255,255,255,.06); }
+.ws-root .wk__chip { display: block; width: 100%; padding: 2px 6px; border-radius: 5px; font-size: 12px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: color-mix(in srgb, var(--c) 40%, #000); border-left: 3px solid var(--c); }
+.wk__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.wk__body { position: relative; display: grid; grid-template-columns: 56px repeat(7, minmax(0, 1fr)); }
+.wk__hours { position: relative; }
+.wk__hours span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 11px; color: var(--text-2); white-space: nowrap; }
+.wk__col { position: relative; border-left: 1px solid rgba(255,255,255,.06); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 51px, rgba(255,255,255,.06) 51px, rgba(255,255,255,.06) 52px); }
+.wk__col.is-today { background-color: rgba(10,132,255,.04); }
+.ws-root .wk__event { position: absolute; padding: 3px 6px; border-radius: 6px; overflow: hidden; text-align: left; font-size: 12px; line-height: 1.25; background: color-mix(in srgb, var(--c) 38%, #000); border-left: 3px solid var(--c); }
+.wk__event strong { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.wk__event span { color: rgba(255,255,255,.7); font-size: 11px; }
+.wk__event.is-declined, .wk__chip.is-declined { opacity: .45; text-decoration: line-through; }
+.wk__now { position: absolute; left: 0; right: 0; height: 2px; background: #ff453a; z-index: 2; pointer-events: none; }
+.wk__now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ff453a; }
+@media (hover: hover) { .wk__event:hover { filter: brightness(1.25); } .agenda button:hover strong { color: var(--accent); } }
+@media (min-width: 900px) {
+  .page--cal.is-grid { overflow: hidden; display: flex; flex-direction: column; padding-bottom: 24px; }
+  .page--cal.is-grid .cal { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; }
+}
+
+.ev h2 { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 8px; font-size: 22px; line-height: 1.25; }
+.ev h2 i { flex: none; width: 12px; height: 12px; margin-top: 8px; border-radius: 50%; background: var(--c); }
+.ev p { margin: 0; }
+.ev__when { font-size: 16px; }
+.ev__cal { color: var(--text-2); font-size: 14px; margin-bottom: 14px !important; }
+.ev__row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.ev__row svg { flex: none; margin-top: 2px; color: var(--text-2); }
+.ev__row a { color: var(--accent); }
+.ev__desc { margin-top: 10px !important; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: rgba(255,255,255,.85); }
+.ev__open { margin-top: 16px; align-self: flex-start; }
