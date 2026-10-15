@@ -803,6 +803,10 @@
 @media (max-width: 600px) { .board__minimap { display: none; } .board .react-flow__handle { width: 18px; height: 18px; } }
 .bnode { width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 1px 2px var(--shade); }
 .bnode.is-selected { border-color: var(--accent); }
+.bnode__grip { display: grid; place-items: center; height: 22px; cursor: grab; touch-action: none; }
+.bnode__grip i { width: 28px; height: 4px; border-radius: 2px; background: var(--f3); }
+.bnode.bnode--text textarea { height: calc(100% - 22px); padding-top: 2px; }
+.board__tools.is-hidden { display: none; }
 .bnode textarea { width: 100%; height: 100%; padding: 12px 14px; border: 0; outline: 0; resize: none; background: transparent; color: var(--text); font-family: var(--serif); font-size: 16px; line-height: 1.5; }
 .bnode--image { overflow: hidden; padding: 0; background: #fff; }
 .bnode--image img { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; pointer-events: none; }

@@ -74,6 +74,15 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
       if (viewport && viewport.offsetTop > 0) window.scrollTo(0, 0);
     };
     sync();
+    // iOS reports the keyboard height late and scrolls clipped containers to reveal the caret, so re-check and undo both.
+    const settle = () => { [60, 250, 600].forEach((delay) => window.setTimeout(sync, delay)); };
+    const unscroll = (event: Event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest(".ws-root") && (target.scrollTop || target.scrollLeft) && target.matches(".ws-root, .board, .board__canvas, .react-flow, .react-flow__renderer, .react-flow__pane")) { target.scrollTop = 0; target.scrollLeft = 0; }
+    };
+    window.addEventListener("focusin", settle);
+    window.addEventListener("focusout", settle);
+    document.addEventListener("scroll", unscroll, true);
     viewport?.addEventListener("resize", sync);
     viewport?.addEventListener("scroll", sync);
     window.addEventListener("resize", sync);
@@ -81,6 +90,9 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
       viewport?.removeEventListener("resize", sync);
       viewport?.removeEventListener("scroll", sync);
       window.removeEventListener("resize", sync);
+      window.removeEventListener("focusin", settle);
+      window.removeEventListener("focusout", settle);
+      document.removeEventListener("scroll", unscroll, true);
       root.style.removeProperty("--ws-vh");
     };
   }, []);

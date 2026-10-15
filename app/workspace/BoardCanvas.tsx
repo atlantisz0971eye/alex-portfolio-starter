@@ -24,6 +24,7 @@ function TextCard({ id, data, selected }: NodeProps<Node<TextData, "text">>) {
   return <div className={`bnode bnode--text bnode--${data.tone}${selected ? " is-selected" : ""}`}>
     <NodeResizer isVisible={selected} minWidth={120} minHeight={64} />
     <Handle type="target" position={Position.Left} /><Handle type="source" position={Position.Right} />
+    <div className="bnode__grip" aria-hidden="true"><i /></div>
     <textarea className="nodrag nowheel" value={data.text} placeholder="Write something" onChange={(event) => update(id, { text: event.target.value })} />
     {selected && <div className="bnode__tones nodrag">{TONES.map((tone) => <button key={tone} type="button" aria-label={`${tone} card`} className={`bnode__tone bnode--${tone}${tone === data.tone ? " is-on" : ""}`} onClick={() => update(id, { tone })} />)}</div>}
   </div>;
@@ -74,11 +75,15 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [busy, setBusy] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const loaded = useRef(false);
   const timer = useRef<number | undefined>(undefined);
   const latest = useRef({ nodes, edges, title });
+  const callbacks = useRef({ onError, onChanged });
+  const dirty = useRef(false);
   const file = useRef<HTMLInputElement>(null);
   latest.current = { nodes, edges, title };
+  callbacks.current = { onError, onChanged };
 
   useEffect(() => {
     let cancelled = false;
@@ -99,18 +104,22 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
     return () => { cancelled = true; };
   }, [boardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Saves only when something changed. The callbacks live in a ref so a parent re-render never retriggers a save.
   const save = useCallback(async () => {
+    if (!dirty.current) return;
     const { nodes: n, edges: e, title: t } = latest.current;
+    dirty.current = false;
     setSaveState("saving");
     try {
       await parseResponse(await fetch(endpoint(boardId), { method: "PATCH", headers, body: JSON.stringify({ title: t, content: { nodes: persist(n), edges: persistEdges(e) } }) }));
-      setSaveState("saved");
-      onChanged();
+      setSaveState(dirty.current ? "saving" : "saved");
+      callbacks.current.onChanged();
     } catch (cause) {
+      dirty.current = true;
       setSaveState("error");
-      onError(cause instanceof Error ? cause.message : "Could not save the board.");
+      callbacks.current.onError(cause instanceof Error ? cause.message : "Could not save the board.");
     }
-  }, [boardId, onChanged, onError]);
+  }, [boardId]);
 
   // Autosave after a pause. Selection and measuring also change the node list, so only meaningful edits count.
   const signature = useMemo(() => JSON.stringify([persist(nodes), persistEdges(edges), title]), [nodes, edges, title]);
@@ -120,11 +129,12 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
     if (lastSaved.current === null) { lastSaved.current = signature; return; }
     if (signature === lastSaved.current) return;
     lastSaved.current = signature;
+    dirty.current = true;
     setSaveState("saving");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => void save(), 1000);
   }, [signature, save]);
-  useEffect(() => () => { window.clearTimeout(timer.current); if (lastSaved.current !== null && loaded.current) void save(); }, [save]);
+  useEffect(() => () => { window.clearTimeout(timer.current); void save(); }, [save]);
 
   const center = () => {
     const box = document.querySelector(".board__canvas")?.getBoundingClientRect();
@@ -175,7 +185,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
   };
 
   return <BoardContext.Provider value={{ boardId, update }}>
-    <div className="board">
+    <div className="board" onFocus={(event) => setEditing(event.target instanceof HTMLTextAreaElement)} onBlur={() => setEditing(false)}>
       <header className="board__bar">
         <button type="button" className="ws-text-button" onClick={onBack}><ChevronLeft size={18} /> Boards</button>
         <input className="board__title" value={title} placeholder="Untitled board" aria-label="Board title" onChange={(event) => setTitle(event.target.value)} />
@@ -189,7 +199,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
         </ReactFlow>
         {meta && nodes.length === 0 && <p className="board__empty">An empty board. Add a card, a photo of your notes, or pages from a PDF.</p>}
       </div>
-      <div className="board__tools" role="toolbar" aria-label="Add to board">
+      <div className={`board__tools${editing ? " is-hidden" : ""}`} role="toolbar" aria-label="Add to board">
         <button type="button" onClick={addText}><StickyNote size={18} /> Card</button>
         <button type="button" onClick={() => file.current?.click()} disabled={busy}>{busy ? <Loader2 size={18} className="ws-spin" /> : <ImageIcon size={18} />} Photo</button>
         <button type="button" onClick={() => setPdfOpen(true)}><FileText size={18} /> PDF</button>
