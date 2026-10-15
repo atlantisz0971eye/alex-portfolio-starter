@@ -64,7 +64,7 @@ async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["
     { role: "system", content: await agentSystem(zone, "today", PLAN_TASK) },
     { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。\n\n新邮件：\n${list || "（没有新邮件，请根据已有日程和最近的邮件给出建议）"}` },
   ];
-  const text = await runAgentLoop(messages, { zone, proposals }, {}, 6);
+  const text = await runAgentLoop(messages, { zone, proposals }, {}, 6, true);
   return {
     generatedAt: new Date().toISOString(),
     date: wallDate(Date.now(), zone),

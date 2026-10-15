@@ -14,12 +14,10 @@ import { Calendar } from "./Calendar";
 import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Notes } from "./Notes";
-import { Sidebar, TabBar, type Tab } from "./Shell";
+import { Sidebar, TabBar, ThemeContext, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
 
 type Props = { authorized: boolean; configured: boolean };
-
-const GLASS_LIGHT = ".ws-pill, .ws-round, .mail-chips button, .mail-chips a, .ef__cats button, .ef__days button, .sidebar__assistant, .sidebar__nav button, .ws-segment button, .mail-search, .ws-card, .continue";
 
 const MAIL_NOTES: Record<string, string> = {
   too_many_accounts: "Two Gmail accounts are already connected. Disconnect one first.",
@@ -85,16 +83,12 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
       root.style.removeProperty("--ws-vh");
     };
   }, []);
-  // The highlight on glass controls follows the pointer, like light moving across a pane.
-  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse") return;
-    const target = (event.target as Element).closest<HTMLElement>(GLASS_LIGHT);
-    if (!target) return;
-    const box = target.getBoundingClientRect();
-    target.style.setProperty("--mx", `${((event.clientX - box.left) / Math.max(1, box.width)) * 100}%`);
-    target.style.setProperty("--my", `${((event.clientY - box.top) / Math.max(1, box.height)) * 100}%`);
-  };
-  return <div className="ws-root" onPointerMove={onPointerMove}>{authorized ? <App /> : <Login configured={configured} />}</div>;
+  const [theme, setTheme] = useState<Theme>("light");
+  useEffect(() => {
+    try { const saved = localStorage.getItem("ws-theme"); if (saved === "dark" || saved === "light") setTheme(saved); else if (window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("dark"); } catch { /* storage unavailable */ }
+  }, []);
+  const toggle = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; try { localStorage.setItem("ws-theme", next); } catch { /* storage unavailable */ } return next; });
+  return <ThemeContext.Provider value={{ theme, toggle }}><div className="ws-root" data-theme={theme}>{authorized ? <App /> : <Login configured={configured} />}</div></ThemeContext.Provider>;
 }
 
 function App() {

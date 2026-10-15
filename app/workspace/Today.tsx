@@ -13,7 +13,7 @@ type Plan = { generatedAt: string; date: string; text: string; proposals: (Propo
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
 type View = { configured: boolean; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[] };
 
-const COLORS: Record<string, string> = { personal: "#0a84ff", study: "#30d158", work: "#ff9f0a", other: "#bf5af2" };
+const COLORS: Record<string, string> = { personal: "#4a6fb8", study: "#4f8a5b", work: "#b9822e", other: "#8a5aa8" };
 const today = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" });
 const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
@@ -31,6 +31,7 @@ type Props = { onError: (message: string) => void; onSignOut: () => void; onTab:
 export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }: Props) {
   const [view, setView] = useState<View | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [local, setLocal] = useState<Record<number, Status>>({});
   const [open, setOpen] = useState<MailItem | null>(null);
 
@@ -86,6 +87,10 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   const dismiss = (index: number) => { setLocal((current) => ({ ...current, [index]: "dismissed" })); record(index, "dismissed"); };
 
   const now = Date.now();
+  const mail = useMemo(() => {
+    const seen = new Set<string>();
+    return (view?.mail ?? []).filter((message) => { const key = `${message.from}|${message.subject}|${message.date}`; if (seen.has(key)) return false; seen.add(key); return true; });
+  }, [view]);
   return <>
     <main className="page page--today">
       <TopRow onSignOut={onSignOut} />
@@ -119,7 +124,9 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
               <h2 className="section-label">From your mail</h2>
               {plan.proposals.map((proposal, index) => <ProposalCard key={index} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(index)} onDismiss={() => dismiss(index)} />)}
             </section>}
+          </div>
 
+          <aside className="today__side">
             <section aria-label="Today’s schedule">
               <h2 className="section-label">Schedule</h2>
               {(view.events ?? []).length === 0 ? <p className="today__none">Nothing scheduled today.</p> : <ul className="today__events">
@@ -130,12 +137,10 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
                 </li>)}
               </ul>}
             </section>
-          </div>
-
-          <aside className="today__side" aria-label="New mail">
-            <h2 className="section-label">New mail {(view.mail ?? []).length > 0 && <span>{view.mail!.length}</span>}</h2>
-            {(view.mail ?? []).length === 0 ? <p className="today__none"><Check size={14} /> You’re all caught up.</p> : <ul className="today__mail">
-              {view.mail!.map((message) => <li key={`${message.account}-${message.id}`}>
+            <section aria-label="New mail">
+            <h2 className="section-label">New mail {mail.length > 0 && <span>{mail.length}</span>}</h2>
+            {mail.length === 0 ? <p className="today__none"><Check size={14} /> You’re all caught up.</p> : <ul className="today__mail">
+              {mail.slice(0, showAll ? 40 : 5).map((message) => <li key={`${message.account}-${message.id}`}>
                 <button type="button" onClick={() => setOpen(message)}>
                   <span className="mail-dot is-unread" />
                   <span className="mail-row">
@@ -146,7 +151,9 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
                 </button>
               </li>)}
             </ul>}
+            {mail.length > 5 && !showAll && <button type="button" className="ws-text-button today__more" onClick={() => setShowAll(true)}>Show all {mail.length}</button>}
             <button type="button" className="ws-text-button today__more" onClick={() => onTab("mail")}>Open Mail <ArrowRight size={15} /></button>
+            </section>
           </aside>
         </div>}
       </div>

@@ -1,7 +1,16 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, NotebookPen, Sparkles, Sun } from "lucide-react";
-import type { ReactNode } from "react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, NotebookPen, Sparkles, Sun } from "lucide-react";
+import { createContext, useContext, type ReactNode } from "react";
+
+export type Theme = "light" | "dark";
+export const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({ theme: "light", toggle: () => undefined });
+
+/** Paper by day, charcoal by night. */
+export function ThemeToggle({ className = "" }: { className?: string }) {
+  const { theme, toggle } = useContext(ThemeContext);
+  return <button type="button" className={className} onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}{className.includes("sidebar-theme") ? (theme === "dark" ? " Light mode" : " Dark mode") : ""}</button>;
+}
 
 export type Tab = "today" | "library" | "mail" | "calendar" | "notes";
 
@@ -23,6 +32,7 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
     <button type="button" className="sidebar__assistant" onClick={onAssistant}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
     <div className="sidebar__foot">
       <a href="/">Portfolio</a>
+      <ThemeToggle className="sidebar-theme" />
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </div>
   </aside>;
@@ -39,6 +49,7 @@ export function TabBar({ tab, onTab, onAssistant, badges = {} }: { tab: Tab; onT
 export function TopRow({ onSignOut }: { onSignOut: () => void }) {
   return <div className="toprow">
     <a href="/" className="ws-text-button">Portfolio</a>
+    <ThemeToggle className="ws-text-button" />
     <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
   </div>;
 }
