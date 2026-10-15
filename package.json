@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
-    "clean": "rimraf .next",
-    "dev:clean": "rimraf .next && next dev",
+    "clean": "rimraf .next .next-dev",
+    "dev:clean": "rimraf .next-dev && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -13,15 +13,18 @@
   "dependencies": {
     "@fontsource/satoshi": "file:packages/fontsource-satoshi",
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/blob": "^2.8.2",
     "lucide-react": "0.446.0",
-    "next": "14.2.5",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
+    "next": "^15.5.24",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "20.14.10",
-    "@types/react": "18.2.66",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "autoprefixer": "10.4.20",
     "postcss": "8.4.41",
     "rimraf": "^5.0.5",

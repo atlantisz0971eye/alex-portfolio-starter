@@ -44,3 +44,15 @@ app/
 - 发布前在 Project → Firewall 为 Request Path 等于 `/api/entanglement/narrative` 添加 Rate Limit 规则，建议先从每个来源每分钟 8 次、超出返回 429 开始，观察正常访问后调整。该规则需在 Vercel 控制台发布，不能仅靠仓库代码生效。
 - 叙述接口还设有每访客每分钟 6 次、每天 30 次，以及每函数实例每分钟 24 次、每天 120 次的生成限额。缓存命中和正在生成的相同组合不占新生成次数。这些内存计数与缓存仅在单个函数实例内有效，不能替代 Vercel Firewall 的跨实例限流。DeepSeek 用量需在其平台另行监控；Vercel 的费用设置不覆盖 DeepSeek 账单。
 - 或者 Netlify 等平台。
+
+## Alex Workspace · 阅读室（第一版）
+
+私人阅读室位于 `/workspace`。它提供跨设备资料库、PDF/文本阅读、DeepSeek 中文导读、段落翻译和基于当前资料的问答。当前支持 PDF、TXT、Markdown、HTML，单文件最多 25 MB；扫描版 PDF 暂无 OCR。对超过 3 万字符的资料，导读和问答会使用开头、中段、结尾的节选，界面会明确标记范围。Google、Notion 和多 AI 账号接入留待后续模块。
+
+在 Vercel 项目中创建 **Private Blob Store** 并连接项目，使 `BLOB_READ_WRITE_TOKEN` 自动注入到环境变量。然后设置：
+
+- `WORKSPACE_ACCESS_KEY`：仅你知道的随机长密钥，至少 20 个字符。
+- `WORKSPACE_SESSION_SECRET`：独立的随机密钥，至少 32 个字符，用于签署登录会话。
+- `DEEPSEEK_API_KEY`：沿用公开站点叙述功能已有的服务端密钥。
+
+本地开发时把这些值放在未提交的 `.env.local`。访问密钥和 Blob 令牌都不得以 `NEXT_PUBLIC_` 开头。配置缺失时，Workspace 会保持锁定或提示资料库尚未连接。私人文档只存入 Private Blob Store，并由已登录的服务端接口读取；会话使用 HttpOnly Cookie。第一版登录限流是函数实例内的兜底措施，发布前还应在 Vercel Firewall 为 `/api/workspace/session` 和 `/api/workspace/assistant` 配置跨实例限流。

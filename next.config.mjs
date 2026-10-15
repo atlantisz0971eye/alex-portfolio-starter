@@ -1,3 +1,5 @@
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -6,8 +8,11 @@ const nextConfig = {
     // fragile runtime optimization for large and mixed-format artwork files.
     unoptimized: true,
   },
-  experimental: {
-    typedRoutes: true,
-  },
+  typedRoutes: true,
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
 };
-export default nextConfig;
+export default (phase) => ({
+  ...nextConfig,
+  // A production build must not overwrite the running preview's manifests.
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+});
