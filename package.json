@@ -11,8 +11,16 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "@fontsource/satoshi": "file:packages/fontsource-satoshi",
     "@tailwindcss/typography": "^0.5.19",
+    "@tiptap/extension-highlight": "^3.32.0",
+    "@tiptap/extension-list": "^3.32.0",
+    "@tiptap/extensions": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
+    "@tiptap/suggestion": "^3.32.0",
     "@vercel/blob": "^2.8.2",
     "lucide-react": "0.446.0",
     "next": "^15.5.24",

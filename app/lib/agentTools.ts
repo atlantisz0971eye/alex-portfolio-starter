@@ -4,6 +4,8 @@ import { getMessage, listMessages, MailAuthError } from "./gmail";
 import { mailConfigured } from "./mailGuard";
 import { readAccounts } from "./mailStore";
 import type { ToolSpec } from "./workspaceDeepSeek";
+import { listNotes, readNote, searchNotes, validNoteId } from "./notesStore";
+import { jsonToText } from "./notesText";
 import { queryTerms, retrieveContext } from "./workspaceRetrieval";
 import { listDocuments, readDocument, readDocumentText } from "./workspaceStore";
 
@@ -32,13 +34,18 @@ export const TOOLS: ToolSpec[] = [
   fn("calendar_delete", "Propose deleting an event. Nothing is deleted until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string" } }, ["id"]),
   fn("mail_search", "Search the user's Gmail (read-only). Supports Gmail search syntax such as from:, subject:, newer_than:7d, is:unread. Returns sender, subject, date and a snippet.", { query: { type: "string" }, account: { type: "string", description: "Optional account id to limit the search" }, max: { type: "number" } }, ["query"]),
   fn("mail_read", "Read one email in full (text only, read-only). Use ids returned by mail_search.", { account: { type: "string" }, id: { type: "string" } }, ["account", "id"]),
+  fn("notes_search", "Search the user's notes by words in the title or text. Returns note ids, titles and snippets.", { query: { type: "string" } }, ["query"]),
+  fn("notes_list", "List the most recently edited notes (titles and ids).", {}),
+  fn("notes_read", "Read one note in full as plain text. Use ids returned by notes_search or notes_list.", { id: { type: "string" } }, ["id"]),
+  fn("notes_create", "Propose a new note. The body is Markdown (headings, bullets, - [ ] tasks, quotes). Nothing is saved until the user confirms.", { title: { type: "string" }, markdown: { type: "string" }, parentId: { type: "string", description: "Optional id of a note to nest it under" } }, ["title", "markdown"]),
+  fn("notes_append", "Propose adding Markdown text to the end of an existing note. Nothing is saved until the user confirms.", { id: { type: "string" }, markdown: { type: "string" } }, ["id", "markdown"]),
   fn("library_list", "List the documents in the user's reading library with reading progress.", {}),
   fn("library_search", "Find the passages of one library document that are most relevant to a query. Write the query in the document's language.", { documentId: { type: "string" }, query: { type: "string" } }, ["documentId", "query"]),
 ];
 
 export type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat?: unknown };
 export type Proposal = {
-  op: "create" | "update" | "delete";
+  op: "create" | "update" | "delete" | "note_create" | "note_append";
   id?: string;
   scope?: "this" | "all";
   occurrenceDate?: string;
@@ -47,6 +54,8 @@ export type Proposal = {
   before?: Summary;
   after?: Summary;
   conflicts: string[];
+  /** For note proposals: what will be written. */
+  note?: { id?: string; title: string; markdown: string; parentId?: string | null };
 };
 
 const summary = (event: Summary): Summary => ({ title: event.title, start: event.start, end: event.end, allDay: event.allDay, location: event.location, category: event.category, repeat: event.repeat ?? null });
@@ -57,6 +66,9 @@ export function describeCall(name: string, rawArgs: string) {
     case "calendar_list": return "Checking your calendar";
     case "mail_search": return `Searching mail: ${String(args.query ?? "").slice(0, 60)}`;
     case "mail_read": return "Reading an email";
+    case "notes_search": return `Searching notes: ${String(args.query ?? "").slice(0, 60)}`;
+    case "notes_list": case "notes_read": return "Reading your notes";
+    case "notes_create": case "notes_append": return "Preparing a note";
     case "library_list": return "Looking through your library";
     case "library_search": return `Searching a book: ${String(args.query ?? "").slice(0, 60)}`;
     default: return "Preparing a calendar change";
@@ -148,6 +160,35 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (!account || typeof args.id !== "string" || !/^[0-9a-f]{8,32}$/i.test(args.id)) return "Error: unknown account or message id.";
         const message = await getMessage(account, args.id);
         return cut(`From: ${message.from} <${message.fromEmail}>\nTo: ${message.to}\nDate: ${new Date(message.date).toISOString()}\nSubject: ${message.subject}\nAttachments: ${message.attachments.map((item) => item.name).join(", ") || "none"}\n\n${message.body.slice(0, 5000)}`);
+      }
+      case "notes_search": {
+        const results = await searchNotes(String(args.query ?? "").slice(0, 200));
+        return cut(results.length ? results.map((item) => `- [${item.meta.id}] ${item.meta.title || "Untitled"} | ${item.snippet}`).join("\n") : "No matching notes.");
+      }
+      case "notes_list": {
+        const notes = (await listNotes()).filter((note) => !note.deletedAt).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 30);
+        return cut(notes.length ? notes.map((note) => `- [${note.id}] ${note.title || "Untitled"} | updated ${note.updatedAt.slice(0, 10)} | ${note.preview.slice(0, 80)}`).join("\n") : "There are no notes yet.");
+      }
+      case "notes_read": {
+        const found = typeof args.id === "string" && validNoteId(args.id) ? await readNote(args.id) : null;
+        if (!found || found.note.deletedAt) return "Error: no note has that id.";
+        return cut(`${found.note.title || "Untitled"}\n\n${jsonToText(found.content)}`);
+      }
+      case "notes_create": {
+        const title = String(args.title ?? "").trim().slice(0, 200);
+        const markdown = String(args.markdown ?? "").slice(0, 20_000);
+        if (!title) return "Error: give the note a title.";
+        const parentId = typeof args.parentId === "string" && validNoteId(args.parentId) ? args.parentId : null;
+        ctx.proposals.push({ op: "note_create", note: { title, markdown, parentId }, conflicts: [] });
+        return `Proposed creating the note "${title}". Awaiting the user's confirmation.`;
+      }
+      case "notes_append": {
+        const found = typeof args.id === "string" && validNoteId(args.id) ? await readNote(args.id) : null;
+        if (!found || found.note.deletedAt) return "Error: no note has that id.";
+        const markdown = String(args.markdown ?? "").slice(0, 20_000);
+        if (!markdown.trim()) return "Error: there is nothing to add.";
+        ctx.proposals.push({ op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
+        return `Proposed adding text to "${found.note.title || "Untitled"}". Awaiting the user's confirmation.`;
       }
       case "library_list": {
         const documents = await listDocuments();

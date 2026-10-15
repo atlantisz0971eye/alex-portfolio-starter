@@ -13,6 +13,7 @@ import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
 import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
+import { Notes } from "./Notes";
 import { Sidebar, TabBar, type Tab } from "./Shell";
 
 type Props = { authorized: boolean; configured: boolean };
@@ -107,6 +108,7 @@ function App() {
   const [tab, setTab] = useState<Tab>("library");
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
+  const [notesRefresh, setNotesRefresh] = useState(0);
   const [error, setError] = useState("");
   const [managing, setManaging] = useState<string | null>(null);
   const [ocr, setOcr] = useState<OcrState>(null);
@@ -299,13 +301,14 @@ function App() {
       <div className="shell__main">
         {tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
+          : tab === "notes" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
       <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
-    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => setCalendarRefresh((value) => value + 1)} onError={setError} />
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); }} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />

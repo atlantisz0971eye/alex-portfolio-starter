@@ -8,15 +8,16 @@ import { dayFormat, timeFormat, zone } from "./calendarFormat";
 import { Sheet } from "./Sheet";
 
 type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat: unknown };
-type Proposal = { op: "create" | "update" | "delete"; id?: string; scope?: "this" | "all"; occurrenceDate?: string; event?: Record<string, unknown>; before?: Summary; after?: Summary; conflicts: string[] };
+type Proposal = { op: "create" | "update" | "delete" | "note_create" | "note_append"; note?: { id?: string; title: string; markdown: string; parentId?: string | null }; id?: string; scope?: "this" | "all"; occurrenceDate?: string; event?: Record<string, unknown>; before?: Summary; after?: Summary; conflicts: string[] };
 type Status = "pending" | "applying" | "done" | "failed" | "dismissed";
 type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
-export type AssistantScreen = "library" | "mail" | "calendar";
+export type AssistantScreen = "library" | "mail" | "calendar" | "notes";
 
 const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   calendar: ["Summarize my week", "Find a free 2-hour slot this week", "Add events from my recent emails"],
   mail: ["Summarize my unread mail", "Which emails need a reply?", "Add events from this week’s emails to my calendar"],
   library: ["What am I reading, and how far along?", "What should I read next?"],
+  notes: ["Summarize my recent notes", "Find my notes about…"],
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
 };
 
@@ -75,7 +76,9 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     mark("applying");
     try {
       const json = { "Content-Type": "application/json" };
-      if (proposal.op === "create") await parseResponse(await fetch("/api/workspace/calendar/events", { method: "POST", headers: json, body: JSON.stringify({ event: proposal.event, zone: zone(), by: "agent" }) }));
+      if (proposal.op === "note_create" && proposal.note) await parseResponse(await fetch("/api/workspace/notes", { method: "POST", headers: json, body: JSON.stringify({ title: proposal.note.title, markdown: proposal.note.markdown, parentId: proposal.note.parentId ?? null }) }));
+      else if (proposal.op === "note_append" && proposal.note?.id) await parseResponse(await fetch(`/api/workspace/notes/${proposal.note.id}`, { method: "POST", headers: json, body: JSON.stringify({ action: "append", markdown: proposal.note.markdown }) }));
+      else if (proposal.op === "create") await parseResponse(await fetch("/api/workspace/calendar/events", { method: "POST", headers: json, body: JSON.stringify({ event: proposal.event, zone: zone(), by: "agent" }) }));
       else if (proposal.op === "update") await parseResponse(await fetch("/api/workspace/calendar/events", { method: "PATCH", headers: json, body: JSON.stringify({ id: proposal.id, event: proposal.event, scope: proposal.scope, occurrenceDate: proposal.occurrenceDate, zone: zone(), by: "agent" }) }));
       else {
         const params = new URLSearchParams({ id: proposal.id ?? "", scope: proposal.scope ?? "all" });
@@ -110,8 +113,9 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
             {message.text ? <div className="ws-message ws-message--assistant"><div className="ws-markdown"><ReactMarkdown>{message.text}</ReactMarkdown></div></div> : busy && messageIndex === messages.length - 1 && !message.proposals && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Thinking…</p></div>}
             {message.proposals?.map((proposal, proposalIndex) => {
               const status = message.status?.[proposalIndex] ?? "pending";
-              return <div key={proposalIndex} className={`ca-card ca-card--${proposal.op} is-${status}`}>
-                <div className="ca-card__head"><b>{proposal.op === "create" ? "New event" : proposal.op === "update" ? "Change event" : "Delete event"}</b>{proposal.scope === "this" && <small>This occurrence only</small>}</div>
+              return <div key={proposalIndex} className={`ca-card ca-card--${proposal.op.replace("note_", "")} is-${status}`}>
+                <div className="ca-card__head"><b>{proposal.op === "note_create" ? "New note" : proposal.op === "note_append" ? "Add to note" : proposal.op === "create" ? "New event" : proposal.op === "update" ? "Change event" : "Delete event"}</b>{proposal.scope === "this" && <small>This occurrence only</small>}</div>
+                {proposal.note && <p className="ca-card__after"><strong>{proposal.note.title}</strong><span className="ca-card__note">{proposal.note.markdown.slice(0, 320)}{proposal.note.markdown.length > 320 ? "…" : ""}</span></p>}
                 {proposal.op === "update" && proposal.before && <p className="ca-card__before">{proposal.before.title} · {when(proposal.before)}{proposal.before.location ? ` · ${proposal.before.location}` : ""}</p>}
                 {(proposal.after ?? proposal.before) && <p className={proposal.op === "delete" ? "ca-card__gone" : "ca-card__after"}><strong>{(proposal.after ?? proposal.before)!.title}</strong><span>{when((proposal.after ?? proposal.before)!)}{(proposal.after ?? proposal.before)!.location ? ` · ${(proposal.after ?? proposal.before)!.location}` : ""}</span></p>}
                 {proposal.conflicts.length > 0 && <p className="ca-card__warn"><TriangleAlert size={14} /> Overlaps with {proposal.conflicts.join(", ")}</p>}
