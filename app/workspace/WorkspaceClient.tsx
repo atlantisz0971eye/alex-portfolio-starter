@@ -11,14 +11,13 @@ import ReactMarkdown from "react-markdown";
 import type { WorkspaceDocument } from "../lib/workspaceStore";
 
 type Props = { authorized: boolean; configured: boolean };
-type LoadedDocument = { document: WorkspaceDocument; text: string };
+type LoadedDocument = { document: WorkspaceDocument; text: string; section: number; sectionCount: number };
 
 const errors: Record<string, string> = {
   unauthorized: "Session expired. Sign in again.",
   storage_not_configured: "Private storage is not connected yet.",
   ai_not_configured: "DeepSeek is not configured yet.",
   no_extractable_text: "No readable text found. Scanned PDFs need OCR support.",
-  text_too_long: "This document exceeds the current text limit.",
   unsupported_format: "Supported formats: PDF, TXT, Markdown and HTML.",
   invalid_pdf: "This PDF could not be read.",
   rate_limited: "Too many requests. Try again shortly.",
@@ -109,6 +108,7 @@ function Reader() {
   const [documents, setDocuments] = useState<WorkspaceDocument[]>([]);
   const [active, setActive] = useState<LoadedDocument | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(true);
+  const [loadingSection, setLoadingSection] = useState(false);
   const [busy, setBusy] = useState<"upload" | "guide" | "ask" | "translate" | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<"text" | "original">("text");
@@ -136,18 +136,22 @@ function Reader() {
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [active?.document.messages?.length]);
 
-  async function openDocument(id: string) {
+  async function openDocument(id: string, section = 0) {
+    setLoadingSection(true);
     setError("");
     setSelection("");
     setTranslation("");
     setView("text");
     try {
-      const data = await parseResponse<LoadedDocument>(await fetch(`/api/workspace/documents?id=${encodeURIComponent(id)}`, { cache: "no-store" }));
+      const data = await parseResponse<LoadedDocument>(await fetch(`/api/workspace/documents?id=${encodeURIComponent(id)}&section=${section}`, { cache: "no-store" }));
       setActive(data);
       setPanelOpen(true);
       setMobileSection("reader");
+      document.querySelector(".workspace-reader__scroll")?.scrollTo({ top: 0 });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not open the document.");
+    } finally {
+      setLoadingSection(false);
     }
   }
 
@@ -278,6 +282,11 @@ function Reader() {
           </div>
         </div>
         {view === "original" ? <iframe className="workspace-pdf" title={active.document.name} src={`/api/workspace/documents/${active.document.id}/file`} /> : <div className="workspace-reader__scroll"><div className="workspace-paper"><p className="workspace-paper__label">SOURCE TEXT <span>·</span> SELECT A PARAGRAPH TO TRANSLATE</p>{paragraphs.map((paragraph, index) => <button type="button" key={`${active.document.id}-${index}`} className={`workspace-paragraph ${selection === paragraph ? "is-selected" : ""}`} onClick={() => { setSelection(paragraph); setTranslation(""); }}>{paragraph}</button>)}</div></div>}
+        {view === "text" && active.sectionCount > 1 && <nav className="workspace-sections" aria-label="Reading sections">
+          <button type="button" className="workspace-dot-action" aria-label="Previous section" title="Previous section" disabled={loadingSection || !!busy || active.section === 0} onClick={() => void openDocument(active.document.id, active.section - 1)}><span className="workspace-dot-action__content"><ArrowLeft size={15} /> Previous</span></button>
+          <span aria-live="polite">{loadingSection ? "Loading…" : `Section ${active.section + 1} / ${active.sectionCount}`}</span>
+          <button type="button" className="workspace-dot-action" aria-label="Next section" title="Next section" disabled={loadingSection || !!busy || active.section + 1 >= active.sectionCount} onClick={() => void openDocument(active.document.id, active.section + 1)}><span className="workspace-dot-action__content"><ArrowRight size={15} /> Next</span></button>
+        </nav>}
         {selection && view === "text" && <div className="workspace-selection">
           <span><Check size={14} /> PARAGRAPH SELECTED</span>
           <button type="button" className="workspace-dot-action" aria-label="Translate paragraph" title="Translate paragraph" onClick={() => void assistant("translate")} disabled={busy === "translate"}><span className="workspace-dot-action__content">{busy === "translate" ? <Loader2 className="workspace-spin" size={16} /> : <Languages size={16} />} Translate</span></button>

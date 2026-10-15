@@ -47,7 +47,7 @@ app/
 
 ## Alex Workspace · 阅读室（第一版）
 
-私人阅读室位于 `/workspace`。它提供跨设备资料库、PDF/文本阅读、DeepSeek 中文导读、段落翻译和基于当前资料的问答。当前支持 PDF、TXT、Markdown、HTML，单文件最多 25 MB；扫描版 PDF 暂无 OCR。对超过 3 万字符的资料，导读和问答会使用开头、中段、结尾的节选，界面会明确标记范围。Google、Notion 和多 AI 账号接入留待后续模块。
+私人阅读室位于 `/workspace`。它提供跨设备资料库、PDF/文本阅读、DeepSeek 中文导读、段落翻译和基于当前资料的问答。当前支持 PDF、TXT、Markdown、HTML，单文件最多 25 MB；整本书的可提取文本完整保存，阅读界面每段加载 3 万字符，并可前后翻阅；扫描版 PDF 暂无 OCR。对超过 3 万字符的资料，导读和问答会使用开头、中段、结尾的节选，界面会明确标记范围。Google、Notion 和多 AI 账号接入留待后续模块。
 
 在 Vercel 项目中创建 **Private Blob Store** 并连接项目，使 `BLOB_READ_WRITE_TOKEN` 自动注入到环境变量。然后设置：
 

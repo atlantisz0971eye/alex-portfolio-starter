@@ -12,7 +12,15 @@ import {
 } from "../../../lib/workspaceStore";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+// Keep the full source in storage, but bound each reader response for books.
+function readerSection(text: string, requested = 0) {
+  const size = 30_000;
+  const sectionCount = Math.max(1, Math.ceil(text.length / size));
+  const section = Math.max(0, Math.min(sectionCount - 1, Math.floor(requested)));
+  return { text: text.slice(section * size, (section + 1) * size), section, sectionCount };
+}
 
 async function guard() {
   if (!(await workspaceAuthorized())) return Response.json({ error: "unauthorized" }, { status: 401 });
@@ -27,13 +35,16 @@ function asText(value: unknown) {
 export async function GET(request: Request) {
   const denied = await guard();
   if (denied) return denied;
-  const id = new URL(request.url).searchParams.get("id");
+  const params = new URL(request.url).searchParams;
+  const id = params.get("id");
+  const section = Number(params.get("section") ?? 0);
+  if (!Number.isSafeInteger(section) || section < 0) return Response.json({ error: "invalid_request" }, { status: 400 });
   try {
     if (!id) return Response.json({ documents: await listDocuments() }, { headers: { "Cache-Control": "private, no-store" } });
     const document = await readDocument(id);
     if (!document) return Response.json({ error: "not_found" }, { status: 404 });
     const text = await readDocumentText(id);
-    return Response.json({ document, text }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ document, ...readerSection(text ?? "", section) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return Response.json({ error: "storage_failed" }, { status: 502 });
   }
@@ -93,10 +104,6 @@ export async function POST(request: Request) {
       await del(pathname);
       return Response.json({ error: "no_extractable_text" }, { status: 422 });
     }
-    if (extracted.length > 500_000) {
-      await del(pathname);
-      return Response.json({ error: "text_too_long" }, { status: 413 });
-    }
     const document: WorkspaceDocument = {
       id,
       name,
@@ -108,7 +115,7 @@ export async function POST(request: Request) {
       characterCount: extracted.length,
     };
     await writeDocument(document, extracted);
-    return Response.json({ document, text: extracted }, { status: 201 });
+    return Response.json({ document, ...readerSection(extracted) }, { status: 201 });
   } catch {
     return Response.json({ error: "processing_failed" }, { status: 502 });
   }
