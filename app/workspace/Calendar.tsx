@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { parseResponse } from "./api";
 import { dayFormat, timeFormat } from "./calendarFormat";
 import { EventEditor, type EditorValue } from "./CalendarEditor";
-import { ScheduleAssistant } from "./ScheduleAssistant";
 import { Sheet } from "./Sheet";
 import { PageTitle, TopRow } from "./Shell";
 import type { Category, Occ } from "./calendarTypes";
@@ -90,7 +89,7 @@ function layoutDay(events: Occ[], day: Date): Placed[] {
   return placed;
 }
 
-export function Calendar({ onError, onSignOut }: { onError: (message: string) => void; onSignOut: () => void }) {
+export function Calendar({ onError, onSignOut, onAssistant, refresh }: { onError: (message: string) => void; onSignOut: () => void; onAssistant: () => void; refresh: number }) {
   const wide = useWide();
   const [monday, setMonday] = useState(() => mondayOf(new Date()));
   const [events, setEvents] = useState<Occ[] | null>(null);
@@ -100,7 +99,6 @@ export function Calendar({ onError, onSignOut }: { onError: (message: string) =>
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Occ | null>(null);
   const [editor, setEditor] = useState<EditorValue | null>(null);
-  const [assistant, setAssistant] = useState(false);
   const requestId = useRef(0);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -126,7 +124,8 @@ export function Calendar({ onError, onSignOut }: { onError: (message: string) =>
     }
   }, [onError]);
 
-  useEffect(() => { void load(monday); }, [monday, load]);
+  // `refresh` changes when the assistant applies a change elsewhere in the app.
+  useEffect(() => { void load(monday); }, [monday, load, refresh]);
 
   const effectiveView = wide ? view : "agenda";
   const colors = useMemo(() => new Map(categories.map((category) => [category.id, category.color])), [categories]);
@@ -188,7 +187,7 @@ export function Calendar({ onError, onSignOut }: { onError: (message: string) =>
             <button type="button" role="tab" aria-selected={view === "week"} className={view === "week" ? "is-on" : ""} onClick={() => setViewSaved("week")}>Week</button>
             <button type="button" role="tab" aria-selected={view === "agenda"} className={view === "agenda" ? "is-on" : ""} onClick={() => setViewSaved("agenda")}>Agenda</button>
           </div>}
-          <button type="button" className="ws-pill" onClick={() => setAssistant(true)}><Sparkles size={15} /> Assistant</button>
+          <button type="button" className="ws-pill" onClick={onAssistant}><Sparkles size={15} /> Assistant</button>
           <button type="button" className="ws-pill ws-pill--solid" onClick={() => startNew()}><Plus size={16} /> New</button>
         </div>
       </div>
@@ -201,7 +200,6 @@ export function Calendar({ onError, onSignOut }: { onError: (message: string) =>
     </div>
     <EventSheet event={selected} color={selected ? color(selected) : "#8e8e93"} categoryName={categories.find((category) => category.id === selected?.category)?.name ?? ""} onClose={() => setSelected(null)} onEdit={edit} onDelete={remove} />
     <EventEditor value={editor} categories={categories} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); changed(); }} onError={onError} />
-    <ScheduleAssistant open={assistant} onClose={() => setAssistant(false)} onChanged={changed} onError={onError} />
   </main>;
 }
 

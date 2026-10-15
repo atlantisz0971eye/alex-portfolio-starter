@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type Tab = "library" | "mail" | "calendar";
@@ -12,12 +12,13 @@ const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
 ];
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */
-export function Sidebar({ tab, onTab, onSignOut }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void }) {
+export function Sidebar({ tab, onTab, onSignOut, onAssistant }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void; onAssistant: () => void }) {
   return <aside className="sidebar" aria-label="Workspace">
     <div className="sidebar__brand"><span>Alex</span> Workspace</div>
     <nav className="sidebar__nav">
       {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={18} /> {label}</button>)}
     </nav>
+    <button type="button" className="sidebar__assistant" onClick={onAssistant}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
     <div className="sidebar__foot">
       <a href="/">Portfolio</a>
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
@@ -25,9 +26,10 @@ export function Sidebar({ tab, onTab, onSignOut }: { tab: Tab; onTab: (tab: Tab)
   </aside>;
 }
 
-export function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) {
+export function TabBar({ tab, onTab, onAssistant }: { tab: Tab; onTab: (tab: Tab) => void; onAssistant: () => void }) {
   return <nav className="tabbar" aria-label="Workspace">
     {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={22} /><span>{label}</span></button>)}
+    <button type="button" onClick={onAssistant}><Sparkles size={22} /><span>Assistant</span></button>
   </nav>;
 }
 

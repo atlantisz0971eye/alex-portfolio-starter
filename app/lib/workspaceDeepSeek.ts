@@ -137,3 +137,83 @@ export function guideExcerpt(text: string) {
     coverage: "excerpts" as const,
   };
 }
+
+export type ChatMessage =
+  | { role: "system" | "user"; content: string }
+  | { role: "assistant"; content: string | null; tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[] }
+  | { role: "tool"; tool_call_id: string; content: string };
+
+export type ToolSpec = { type: "function"; function: { name: string; description: string; parameters: Record<string, unknown> } };
+export type ToolCall = { id: string; name: string; args: string };
+export type ChatPart = { kind: "text"; text: string } | { kind: "tool_calls"; calls: ToolCall[] };
+
+type ToolChunk = { choices?: { delta?: { content?: string | null; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] } }[] };
+
+/**
+ * One streamed model turn with tool support: yields text as it arrives, then any tool calls the model asked for.
+ * Uses the same stall rules as streamDeepSeek so a queued request fails fast.
+ */
+export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], maxTokens: number, signal?: AbortSignal): AsyncGenerator<ChatPart> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) throw new DeepSeekError(0);
+  const controller = new AbortController();
+  let stalled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (ms: number) => { clearTimeout(timer); timer = setTimeout(() => { stalled = true; controller.abort(); }, ms); };
+  const total = setTimeout(() => { stalled = true; controller.abort(); }, TOTAL_MS);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort);
+  arm(FIRST_TOKEN_MS);
+  const calls = new Map<number, ToolCall>();
+  try {
+    const response = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MODEL, thinking: { type: "disabled" }, messages, tools, temperature: 0.2, max_tokens: maxTokens, stream: true }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!response.ok || !response.body) {
+      console.error("DeepSeek request failed", response.status, MODEL, (await response.text().catch(() => "")).slice(0, 300));
+      throw new DeepSeekError(response.status || 502);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    outer: for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") break outer;
+        arm(IDLE_MS);
+        try {
+          const delta = (JSON.parse(data) as ToolChunk).choices?.[0]?.delta;
+          if (delta?.content) yield { kind: "text", text: delta.content };
+          for (const part of delta?.tool_calls ?? []) {
+            const current = calls.get(part.index) ?? { id: "", name: "", args: "" };
+            if (part.id) current.id = part.id;
+            if (part.function?.name) current.name += part.function.name;
+            if (part.function?.arguments) current.args += part.function.arguments;
+            calls.set(part.index, current);
+          }
+        } catch {
+          // Ignore keep-alive or partial frames.
+        }
+      }
+    }
+    if (calls.size) yield { kind: "tool_calls", calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, call], index) => ({ ...call, id: call.id || `call_${index}` })) };
+  } catch (error) {
+    if (error instanceof DeepSeekError) throw error;
+    throw new DeepSeekError(stalled ? 504 : 502);
+  } finally {
+    clearTimeout(timer);
+    clearTimeout(total);
+    signal?.removeEventListener("abort", onAbort);
+    controller.abort();
+  }
+}

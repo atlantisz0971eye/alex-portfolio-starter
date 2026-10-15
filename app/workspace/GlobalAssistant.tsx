@@ -10,9 +10,15 @@ import { Sheet } from "./Sheet";
 type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat: unknown };
 type Proposal = { op: "create" | "update" | "delete"; id?: string; scope?: "this" | "all"; occurrenceDate?: string; event?: Record<string, unknown>; before?: Summary; after?: Summary; conflicts: string[] };
 type Status = "pending" | "applying" | "done" | "failed" | "dismissed";
-type Message = { role: "user" | "assistant"; text: string; proposals?: Proposal[]; status?: Status[] };
+type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
+export type AssistantScreen = "library" | "mail" | "calendar";
 
-const SUGGESTIONS = ["Summarize my week", "Find a free 2-hour slot this week", "Add a meeting next Wednesday at 3pm"];
+const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
+  calendar: ["Summarize my week", "Find a free 2-hour slot this week", "Add events from my recent emails"],
+  mail: ["Summarize my unread mail", "Which emails need a reply?", "Add events from this week’s emails to my calendar"],
+  library: ["What am I reading, and how far along?", "What should I read next?"],
+  home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
+};
 
 function when(item: Summary) {
   const parse = (value: string) => item.allDay ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10))) : new Date(value);
@@ -20,10 +26,10 @@ function when(item: Summary) {
   return item.allDay ? `${dayFormat.format(start)} · All day` : `${dayFormat.format(start)} · ${timeFormat.format(start)} – ${timeFormat.format(parse(item.end))}`;
 }
 
-type Props = { open: boolean; onClose: () => void; onChanged: () => void; onError: (message: string) => void };
+type Props = { open: boolean; onClose: () => void; screen: AssistantScreen | null; onChanged: () => void; onError: (message: string) => void };
 
-/** Chat with DeepSeek about the schedule. It proposes changes; nothing is written until you confirm each one. */
-export function ScheduleAssistant({ open, onClose, onChanged, onError }: Props) {
+/** Chat with DeepSeek across the library, mail and calendar. It proposes calendar changes; nothing is written until you confirm each one. */
+export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,8 +53,9 @@ export function ScheduleAssistant({ open, onClose, onChanged, onError }: Props) 
     setMessages((current) => [...current, { role: "user", text: message }, { role: "assistant", text: "" }]);
     const patchLast = (change: (item: Message) => Message) => setMessages((current) => current.map((item, index) => index === current.length - 1 ? change(item) : item));
     try {
-      await streamNdjson("/api/workspace/calendar/agent", { message, history, zone: zone() }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
-        if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
+      await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
+        if (event.t === "tool" && typeof event.label === "string") patchLast((item) => ({ ...item, tools: [...(item.tools ?? []), event.label as string] }));
+        else if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
       });
     } catch (cause) {
       if (controller.signal.aborted) return;
@@ -59,7 +66,7 @@ export function ScheduleAssistant({ open, onClose, onChanged, onError }: Props) 
     } finally {
       setBusy(false);
     }
-  }, [busy, messages, onError]);
+  }, [busy, messages, onError, screen]);
 
   async function apply(messageIndex: number, proposalIndex: number) {
     const proposal = messages[messageIndex]?.proposals?.[proposalIndex];
@@ -89,17 +96,18 @@ export function ScheduleAssistant({ open, onClose, onChanged, onError }: Props) 
   };
   const dismiss = (messageIndex: number, proposalIndex: number) => setMessages((current) => current.map((item, index) => index === messageIndex ? { ...item, status: item.status?.map((value, i) => i === proposalIndex ? "dismissed" : value) } : item));
 
-  return <Sheet open={open} onClose={onClose} title="Schedule assistant" size="tall" flush>
+  return <Sheet open={open} onClose={onClose} title="Assistant" size="tall" flush>
     <div className="ws-chat">
       <div className="ws-chat__scroll">
         {messages.length === 0 && <div className="ca-intro">
-          <p><Sparkles size={16} /> Ask about your week or tell me what to schedule. I’ll show each change for you to confirm before anything is saved.</p>
-          <div className="ca-suggest">{SUGGESTIONS.map((text) => <button key={text} type="button" className="ws-pill" onClick={() => void send(text)}>{text}</button>)}</div>
-          <small className="ws-note">Event titles and times are sent to DeepSeek when you ask.</small>
+          <p><Sparkles size={16} /> Ask across your library, mail and calendar. I can read them to find and summarize things, and propose calendar changes — nothing is saved until you confirm it.</p>
+          <div className="ca-suggest">{SUGGESTIONS[screen ?? "home"].map((text) => <button key={text} type="button" className="ws-pill" onClick={() => void send(text)}>{text}</button>)}</div>
+          <small className="ws-note">When you ask, the calendar entries, emails or book passages I look up are sent to DeepSeek. Mail and the library stay read-only.</small>
         </div>}
         {messages.map((message, messageIndex) => <div key={messageIndex} className={`ca-turn ca-turn--${message.role}`}>
+          {message.role === "assistant" && message.tools && message.tools.length > 0 && <ul className="ca-tools">{message.tools.map((label, index) => <li key={index}>{busy && messageIndex === messages.length - 1 && index === message.tools!.length - 1 && !message.text ? <Loader2 className="ws-spin" size={12} /> : <Check size={12} />} {label}</li>)}</ul>}
           {message.role === "user" ? <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{message.text}</p></div></div> : <>
-            {message.text ? <div className="ws-message ws-message--assistant"><div className="ws-markdown"><ReactMarkdown>{message.text}</ReactMarkdown></div></div> : busy && messageIndex === messages.length - 1 && !message.proposals && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Looking at your calendar…</p></div>}
+            {message.text ? <div className="ws-message ws-message--assistant"><div className="ws-markdown"><ReactMarkdown>{message.text}</ReactMarkdown></div></div> : busy && messageIndex === messages.length - 1 && !message.proposals && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Thinking…</p></div>}
             {message.proposals?.map((proposal, proposalIndex) => {
               const status = message.status?.[proposalIndex] ?? "pending";
               return <div key={proposalIndex} className={`ca-card ca-card--${proposal.op} is-${status}`}>

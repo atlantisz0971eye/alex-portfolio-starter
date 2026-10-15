@@ -9,6 +9,7 @@ import BookReader, { type OpenedBook } from "./BookReader";
 import { errors, parseResponse, streamNdjson } from "./api";
 import { Library } from "./Library";
 import { Calendar } from "./Calendar";
+import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Sidebar, TabBar, type Tab } from "./Shell";
 
@@ -91,6 +92,8 @@ function App() {
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
   const [tab, setTab] = useState<Tab>("library");
+  const [globalOpen, setGlobalOpen] = useState(false);
+  const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [error, setError] = useState("");
   const intentId = useRef(0);
 
@@ -107,6 +110,13 @@ function App() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setGlobalOpen((value) => !value); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   // Back from Google's consent screen: show the outcome and drop the query string.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -190,15 +200,16 @@ function App() {
 
   return <>
     <div className="shell">
-      <Sidebar tab={tab} onTab={setTab} onSignOut={() => void signOut()} />
+      <Sidebar tab={tab} onTab={setTab} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} />
       <div className="shell__main">
         {tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
-          : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} />
+          : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
-      <TabBar tab={tab} onTab={setTab} />
+      <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} />
     </div>
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => setCalendarRefresh((value) => value + 1)} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} />
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(page) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, page })); }} />
