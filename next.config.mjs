@@ -10,6 +10,12 @@ const nextConfig = {
   },
   typedRoutes: true,
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  outputFileTracingIncludes: {
+    "/api/workspace/documents": [
+      "./node_modules/pdf-parse/dist/pdf-parse/*/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    ],
+  },
 };
 export default (phase) => ({
   ...nextConfig,
