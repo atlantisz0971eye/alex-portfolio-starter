@@ -1,13 +1,14 @@
 "use client";
 
 import { ChevronLeft, Highlighter, Languages, List, MessageCircle, ScanText, Type } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Chapter } from "../lib/workspaceOutline";
 import type { MarkColor, WorkspaceDocument, WorkspaceMark } from "../lib/workspaceStore";
 import { MarkPopover, NoteSheet, renderMarked, TranslateCard, type StreamFn } from "./ReaderExtras";
 import { ContentsSheet, SettingsSheet } from "./ReaderSheets";
-import { toBlocks } from "./readerText";
+import { isTranslatable, toBlocks } from "./readerText";
 import { useReaderPrefs } from "./readerPrefs";
+import { useTranslations } from "./useTranslations";
 
 export type SegmentData = {
   text: string;
@@ -59,7 +60,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   const [marks, setMarks] = useState<WorkspaceMark[]>([]);
   const [activeMark, setActiveMark] = useState<{ id: string; x: number; y: number } | null>(null);
   const [noteMark, setNoteMark] = useState<string | null>(null);
-  const [translating, setTranslating] = useState<string | null>(null);
+  const [translating, setTranslating] = useState<{ text: string; context: string } | null>(null);
   const marksLoaded = useRef(false);
   const marksTimer = useRef<number | undefined>(undefined);
   const rangeRef = useRef<Range | null>(null);
@@ -81,6 +82,15 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   const chapterMap = useMemo(() => new Map(segment.chapters.map((chapter) => [chapter.offset, chapter.title])), [segment.chapters]);
   const blocks = useMemo(() => toBlocks(segment.text, segment.start, isPdf, chapterMap), [segment.text, segment.start, isPdf, chapterMap]);
   const paged = prefs.mode === "page";
+  const bilingual = prefs.bilingual === "below";
+
+  // The first paragraphs of the next section, if it is loaded, so translation can run ahead across the boundary.
+  const nextBlocks = useCallback(() => {
+    const next = cache.current.get(segment.index + 1);
+    return next ? toBlocks(next.text, next.start, isPdf, new Map(next.chapters.map((chapter) => [chapter.offset, chapter.title]))) : [];
+  }, [segment.index, isPdf]);
+  const translation = useTranslations({ enabled: bilingual, documentId, blocks, offsetRef, nextBlocks });
+  const [translationMenu, setTranslationMenu] = useState<{ offset: number; x: number; y: number } | null>(null);
 
   // ---- progress -----------------------------------------------------------
   const flushProgress = useCallback((keepalive = false) => {
@@ -236,7 +246,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     }
     pending.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks, size.w, size.h, paged, prefs.fontSize, prefs.font, prefs.lineHeight]);
+  }, [blocks, size.w, size.h, paged, prefs.fontSize, prefs.font, prefs.lineHeight, bilingual, translation.version]);
 
   // Scroll mode tracks the first block in view.
   useEffect(() => {
@@ -367,6 +377,12 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     if (Math.abs(event.clientX - g.x) > 10 || Math.abs(event.clientY - g.y) > 10 || hasSelection()) return;
     const rect = viewRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const translated = (event.target as HTMLElement).closest?.("[data-tr-offset]") as HTMLElement | null;
+    if (translated?.dataset.trOffset) {
+      const box = translated.getBoundingClientRect();
+      setTranslationMenu({ offset: Number(translated.dataset.trOffset), x: Math.min(Math.max(box.left + box.width / 2, 120), window.innerWidth - 120), y: Math.min(box.bottom + 8, window.innerHeight - 70) });
+      return;
+    }
     const hit = (event.target as HTMLElement).closest?.("mark[data-mark]") as HTMLElement | null;
     if (hit?.dataset.mark) {
       const box = hit.getBoundingClientRect();
@@ -407,7 +423,11 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
 
   const translateSelection = () => {
     if (!selection) return;
-    setTranslating(selection.text);
+    // The paragraph the selection starts in gives a word its meaning in context.
+    const start = rangeRef.current?.startContainer;
+    const element = start instanceof Element ? start : start?.parentElement;
+    const index = blockEls.current.findIndex((el) => !!el && !!element && el.contains(element));
+    setTranslating({ text: selection.text, context: index >= 0 ? blocks[index]?.text ?? "" : "" });
     clearSelection();
   };
 
@@ -506,7 +526,11 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       <article className="reader-pages" ref={pagesRef} lang={/[㐀-鿿]/.test(segment.text.slice(0, 400)) ? "zh" : "en"}>
         {blocks.map((block, index) => block.heading !== undefined
           ? <h2 key={block.offset} className="reader-chapter" ref={(el) => { blockEls.current[index] = el; }}>{block.heading.split(" · ").map((part, i) => i === 0 ? <small key={i}>{part}</small> : <span key={i}>{part}</span>)}</h2>
-          : <p key={block.offset} ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{renderMarked(block.text, marksByBlock.get(block.offset) ?? [])}</p>)}
+          : <Fragment key={block.offset}>
+            <p ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{renderMarked(block.text, marksByBlock.get(block.offset) ?? [])}</p>
+            {bilingual && translation.translations[block.offset] && <p className="reader-tr" lang="zh-Hans" data-tr-offset={block.offset}>{translation.translations[block.offset]}</p>}
+            {bilingual && !translation.translations[block.offset] && translation.queued.has(block.offset) && <p className="reader-tr reader-tr--wait" aria-hidden="true" />}
+          </Fragment>)}
         {!paged && <div className="reader-scroll-end">
           {segment.index > 0 && <button type="button" className="ws-text-button" onClick={() => void loadSegment(`segment=${segment.index - 1}`, segment.index - 1, { kind: "first" })}>Previous section</button>}
           {segment.index < segment.starts.length - 1 && <button type="button" className="ws-text-button" onClick={() => void loadSegment(`segment=${segment.index + 1}`, segment.index + 1, { kind: "first" })}>Next section</button>}
@@ -520,7 +544,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
         onChange={(event) => setScrub(Number(event.target.value))}
         onPointerUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }}
         onKeyUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }} />
-      <div className="reader-bar__meta"><span>{currentChapter || book.document.name}</span><span>{isPdf && currentPage ? `p. ${currentPage} · ` : ""}{percent}%</span></div>
+      <div className="reader-bar__meta"><span>{currentChapter || book.document.name}</span><span>{bilingual && translation.total > 0 && (translation.status === "error" ? <button type="button" className="reader-tr-status is-error" onClick={translation.retry}>Translation paused · Retry</button> : <span className="reader-tr-status">{translation.done < translation.total ? `译 ${translation.done}/${translation.total} · ` : ""}</span>)}{isPdf && currentPage ? `p. ${currentPage} · ` : ""}{percent}%</span></div>
     </footer>
 
     {!chrome && <div className="reader-folio" aria-hidden="true"><span>{currentChapter}</span><span>{isPdf && currentPage ? currentPage : `${percent}%`}</span></div>}
@@ -531,7 +555,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       <button type="button" onClick={askAbout}><MessageCircle size={15} /> Ask</button>
     </div>}
 
-    {translating && <TranslateCard source={translating} documentId={documentId} stream={stream} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating, offsetRef.current); setTranslating(null); }} />}
+    {translating && <TranslateCard source={translating.text} context={translating.context} documentId={documentId} stream={stream} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating.text, offsetRef.current); setTranslating(null); }} />}
 
     {activeMark && popoverMark && <MarkPopover mark={popoverMark} x={activeMark.x} y={activeMark.y}
       onColor={(color) => { updateMarks((current) => current.map((mark) => mark.id === popoverMark.id ? { ...mark, color } : mark)); setActiveMark(null); }}
@@ -539,6 +563,14 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       onDelete={() => { updateMarks((current) => current.filter((mark) => mark.id !== popoverMark.id)); setActiveMark(null); }}
       onClose={() => setActiveMark(null)} />}
     <NoteSheet mark={marks.find((mark) => mark.id === noteMark) ?? null} onSave={(note) => { updateMarks((current) => current.map((mark) => mark.id === noteMark ? { ...mark, note: note.trim() || undefined } : mark)); setNoteMark(null); }} />
+
+    {translationMenu && <>
+      <div className="reader-popover-scrim" onPointerDown={() => setTranslationMenu(null)} />
+      <div className="reader-popover" style={{ left: translationMenu.x, top: translationMenu.y }}>
+        <button type="button" onClick={() => { const target = blocks.find((item) => item.offset === translationMenu.offset); setTranslationMenu(null); if (target) void translation.redo(target).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not translate again.")); }}>Translate again</button>
+        <button type="button" onClick={() => { void navigator.clipboard?.writeText(translation.translations[translationMenu.offset] ?? ""); setTranslationMenu(null); }}>Copy</button>
+      </div>
+    </>}
 
     <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} prefs={prefs} update={setPrefs} />
     <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} marks={marks} onJump={jumpTo} />

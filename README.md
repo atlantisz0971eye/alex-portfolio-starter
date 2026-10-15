@@ -102,3 +102,11 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 页面内容存放在 Private Blob Store（`workspace/notes/`），索引含标题、预览和用于搜索的纯文本。全局助手可以搜索和阅读笔记，也可以**提议**新建笔记或在已有笔记末尾追加内容（Markdown），同样需要你逐条确认；助手不会删除或改写已有笔记的原文。
 
 编辑器基于 Tiptap（ProseMirror）。
+
+## Alex Workspace · 双语阅读
+
+阅读器的 **Aa → Chinese translation → Chinese under text** 会在每个英文段落下面显示一段中文译文（更淡的颜色、左侧细线）。已经是中文的段落、纯数字或标题不会被翻译。
+
+译文按需生成并缓存：打开一本书时，先读取已保存的译文，没有的从你读到的位置开始往后、再往前，每批约 5 段交给 DeepSeek 翻译，并提前翻译下一节的开头几段。译文保存在私有存储（`workspace/translations/<书>/`），每段只翻译一次；原文改了（比如重新识别文字）会自动失效重翻。底栏会显示 “译 12/48”，DeepSeek 排队或出错时显示 “Translation paused · Retry”。轻点某段译文可以 **Translate again** 或复制。
+
+选中一个单词或短语再点 **Translate**，会得到词典式解释：词性、在当前句子里的含义和常见义项；选中长段落则是整段翻译。

@@ -2,6 +2,7 @@
 
 import { Check, Loader2, MessageCircle, NotebookPen, Trash2, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
 import type { MarkColor, WorkspaceMark } from "../lib/workspaceStore";
 import { Sheet } from "./Sheet";
 
@@ -50,10 +51,10 @@ export function NoteSheet({ mark, onSave }: { mark: WorkspaceMark | null; onSave
   </Sheet>;
 }
 
-type TranslateProps = { source: string; documentId: string; stream: StreamFn; onClose: () => void; onAsk: () => void };
+type TranslateProps = { source: string; context?: string; documentId: string; stream: StreamFn; onClose: () => void; onAsk: () => void };
 
 /** A small non-modal card that translates the selected passage without leaving the page. */
-export function TranslateCard({ source, documentId, stream, onClose, onAsk }: TranslateProps) {
+export function TranslateCard({ source, context, documentId, stream, onClose, onAsk }: TranslateProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -65,7 +66,7 @@ export function TranslateCard({ source, documentId, stream, onClose, onAsk }: Tr
     setText("");
     setError("");
     setDone(false);
-    stream({ action: "translate", documentId, selection: source }, (delta) => {
+    stream({ action: "translate", documentId, selection: source, context }, (delta) => {
       if (controller.signal.aborted) return;
       received += delta;
       setText(received);
@@ -73,11 +74,11 @@ export function TranslateCard({ source, documentId, stream, onClose, onAsk }: Tr
       .then(() => { if (!controller.signal.aborted) setDone(true); })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not translate."); });
     return () => controller.abort();
-  }, [source, documentId, stream, attempt]);
+  }, [source, context, documentId, stream, attempt]);
 
   return <aside className="reader-translate" aria-live="polite">
     <header>
-      <span>Translation</span>
+      <span>{source.trim().split(/\s+/).length <= 4 && source.length <= 60 ? "Dictionary" : "Translation"}</span>
       <div>
         <button type="button" onClick={onAsk} aria-label="Ask about this passage"><MessageCircle size={17} /></button>
         <button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button>
@@ -86,7 +87,7 @@ export function TranslateCard({ source, documentId, stream, onClose, onAsk }: Tr
     <p className="reader-translate__source">{source.slice(0, 160)}{source.length > 160 ? "…" : ""}</p>
     {error
       ? <p className="reader-translate__error">{error} <button type="button" onClick={() => setAttempt((value) => value + 1)}>Try again</button></p>
-      : text ? <p className="reader-translate__text">{text}</p> : <p className="reader-translate__wait"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
+      : text ? <div className="reader-translate__text ws-markdown"><ReactMarkdown>{text}</ReactMarkdown></div> : <p className="reader-translate__wait"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
     {done && <span className="reader-translate__done" />}
   </aside>;
 }

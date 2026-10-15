@@ -102,3 +102,11 @@ export function toBlocks(text: string, base: number, reflow: boolean, chapters: 
   }
   return blocks;
 }
+
+/** True for paragraphs worth translating: real words, and not already mostly Chinese. */
+export function isTranslatable(block: Block) {
+  if (block.heading !== undefined || !block.text) return false;
+  const letters = block.text.match(/[A-Za-z]/g)?.length ?? 0;
+  const cjk = block.text.match(/[㐀-鿿]/g)?.length ?? 0;
+  return letters >= 3 && cjk / Math.max(1, block.text.length) < 0.2;
+}

@@ -1,4 +1,5 @@
 import { del, get, list, put } from "@vercel/blob";
+import { deleteTranslations } from "./translationStore";
 
 export type WorkspaceDocument = {
   id: string;
@@ -154,6 +155,7 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
 }
 
 export async function deleteDocument(document: WorkspaceDocument) {
+  await deleteTranslations(document.id).catch(() => undefined);
   await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), textPath(document.id), document.filePath]);
 }
 

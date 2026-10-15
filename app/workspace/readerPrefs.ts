@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 export type ReaderTheme = "black" | "dark" | "sepia" | "white";
 export type ReaderFont = "serif" | "sans" | "mono";
 export type ReaderMode = "page" | "scroll";
+export type ReaderBilingual = "off" | "below";
 
 export type ReaderPrefs = {
   theme: ReaderTheme;
@@ -12,9 +13,11 @@ export type ReaderPrefs = {
   fontSize: number;
   lineHeight: number;
   mode: ReaderMode;
+  /** Show a Chinese translation under each paragraph. */
+  bilingual: ReaderBilingual;
 };
 
-export const DEFAULT_PREFS: ReaderPrefs = { theme: "black", font: "serif", fontSize: 19, lineHeight: 1.65, mode: "page" };
+export const DEFAULT_PREFS: ReaderPrefs = { theme: "black", font: "serif", fontSize: 19, lineHeight: 1.65, mode: "page", bilingual: "off" };
 export const FONT_RANGE = { min: 14, max: 32 };
 const KEY = "ws-reader-prefs";
 
@@ -26,6 +29,7 @@ function sanitize(value: Partial<ReaderPrefs> | null): ReaderPrefs {
     fontSize: Math.min(FONT_RANGE.max, Math.max(FONT_RANGE.min, Math.round(Number(next.fontSize)) || DEFAULT_PREFS.fontSize)),
     lineHeight: [1.4, 1.65, 1.9].includes(next.lineHeight) ? next.lineHeight : DEFAULT_PREFS.lineHeight,
     mode: next.mode === "scroll" ? "scroll" : "page",
+    bilingual: next.bilingual === "below" ? "below" : "off",
   };
 }
 

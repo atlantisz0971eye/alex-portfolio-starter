@@ -40,6 +40,10 @@ export function SettingsSheet({ open, onClose, prefs, update }: SettingsProps) {
     <div className="ws-segment" role="radiogroup" aria-label="Line spacing">
       {LEADING.map((item) => <button key={item.value} type="button" role="radio" aria-checked={prefs.lineHeight === item.value} className={prefs.lineHeight === item.value ? "is-on" : ""} onClick={() => update({ lineHeight: item.value })}>{item.label}</button>)}
     </div>
+    <div className="ws-segment" role="radiogroup" aria-label="Chinese translation">
+      <button type="button" role="radio" aria-checked={prefs.bilingual === "off"} className={prefs.bilingual === "off" ? "is-on" : ""} onClick={() => update({ bilingual: "off" })}>No translation</button>
+      <button type="button" role="radio" aria-checked={prefs.bilingual === "below"} className={prefs.bilingual === "below" ? "is-on" : ""} onClick={() => update({ bilingual: "below" })}>Chinese under text</button>
+    </div>
     <div className="ws-segment" role="radiogroup" aria-label="Reading mode">
       <button type="button" role="radio" aria-checked={prefs.mode === "page"} className={prefs.mode === "page" ? "is-on" : ""} onClick={() => update({ mode: "page" })}>Paged</button>
       <button type="button" role="radio" aria-checked={prefs.mode === "scroll"} className={prefs.mode === "scroll" ? "is-on" : ""} onClick={() => update({ mode: "scroll" })}>Scrolling</button>

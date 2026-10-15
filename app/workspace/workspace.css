@@ -736,3 +736,14 @@
 .ws-root .note-prose:focus-visible, .ws-root .nview__title:focus-visible, .ws-root .nview__icon:focus-visible { outline: none; }
 
 .ca-card__note { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: hidden; }
+
+
+/* Bilingual reading: the translation sits under each paragraph in a quieter voice. */
+.reader-pages p.reader-tr { margin: -.35em 0 1em; padding-left: .9em; border-left: 2px solid color-mix(in srgb, var(--fg) 22%, transparent); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif; font-size: .86em; line-height: 1.7; text-align: left; color: color-mix(in srgb, var(--fg) 68%, transparent); break-before: avoid-column; cursor: pointer; }
+.reader-pages p.reader-tr--wait { height: 1.1em; border-left-color: transparent; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--fg) 14%, transparent) 50%, transparent 70%) 0 0 / 220% 100%; border-radius: 4px; animation: ws-shimmer 1.4s ease-in-out infinite; cursor: default; }
+.reader[data-mode="scroll"] .reader-pages p.reader-tr { break-before: auto; }
+.reader-tr-status { font-size: inherit; color: inherit; }
+.reader-tr-status.is-error { color: #ff9f0a; text-decoration: underline; padding: 0 4px 0 0; }
+
+.reader-translate__text.ws-markdown { font-size: 16px; }
+.reader-translate__text.ws-markdown p { margin: 4px 0; }
