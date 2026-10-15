@@ -1,5 +1,5 @@
-import { PDFParse } from "pdf-parse";
 import { get } from "@vercel/blob";
+import { ExtractError, extractDocument } from "../../../lib/workspaceExtract";
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
 import { buildSegments, detectChapters, segmentIndexFor } from "../../../lib/workspaceOutline";
 import {
@@ -106,36 +106,15 @@ export async function POST(request: Request) {
     if (!original || original.statusCode !== 200) return fail("file_not_found", 404);
     if (original.blob.size > 25 * 1024 * 1024) return fail("file_too_large", 413);
     const bytes = new Uint8Array(await new Response(original.stream).arrayBuffer());
-    let extracted = "";
-    let pageCount: number | null = null;
-    let ocrPending: number[] = [];
-    if (extension === "pdf") {
-      if (String.fromCharCode(...bytes.slice(0, 4)) !== "%PDF") return fail("invalid_pdf", 422);
-      const parser = new PDFParse({ data: bytes });
-      try {
-        const result = await parser.getText();
-        pageCount = result.total;
-        extracted = result.pages.map((page) => `[Page ${page.num}]\n${page.text}`).join("\n\n");
-        // Scanned pages have no text layer; they are kept and recognized later by OCR.
-        const empty = result.pages.filter((page) => page.text.replace(/\s+/g, "").length < 25).map((page) => page.num);
-        // A few blank or picture-only pages are normal; flag the book only when much of it has no text.
-        ocrPending = result.pages.length > 0 && empty.length / result.pages.length >= 0.3 ? empty : [];
-      } catch (cause) {
-        const reason = cause instanceof Error ? cause.name : "";
-        return fail(reason === "PasswordException" ? "pdf_encrypted" : "pdf_unreadable", 422);
-      } finally {
-        await parser.destroy().catch(() => undefined);
-      }
-    } else {
-      extracted = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-      if (extension === "html" || extension === "htm") {
-        extracted = extracted.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-          .replace(/<[^>]+>/g, " ");
-      }
+    let extracted: Awaited<ReturnType<typeof extractDocument>>;
+    try {
+      extracted = await extractDocument(bytes, extension);
+    } catch (cause) {
+      if (cause instanceof ExtractError) return fail(cause.code, cause.status);
+      throw cause;
     }
-    extracted = extracted.replace(/\r\n/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim();
-    if (extracted.length < 40 && ocrPending.length === 0) return fail("no_extractable_text", 422);
+    const { text: extractedText, pageCount, ocrPending } = extracted;
+    if (extractedText.length < 40 && ocrPending.length === 0) return fail("no_extractable_text", 422);
     const document: WorkspaceDocument = {
       id,
       name,
@@ -144,15 +123,15 @@ export async function POST(request: Request) {
       textPath: `workspace/text/${id}.txt`,
       createdAt: new Date().toISOString(),
       pageCount,
-      characterCount: extracted.length,
+      characterCount: extractedText.length,
       ...(ocrPending.length ? { ocrPending } : {}),
     };
     try {
-      await writeDocument(document, extracted);
+      await writeDocument(document, extractedText);
     } catch {
       return fail("storage_failed", 502);
     }
-    return Response.json({ document, ...readerWindow(extracted, { segment: 0 }), target: 0 }, { status: 201 });
+    return Response.json({ document, ...readerWindow(extractedText, { segment: 0 }), target: 0 }, { status: 201 });
   } catch {
     return fail("processing_failed", 502);
   }

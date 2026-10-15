@@ -7,6 +7,7 @@ import type { WorkspaceDocument, WorkspaceLibraryItem } from "../lib/workspaceSt
 import { AssistantSheet, type AssistantIntent } from "./AssistantSheet";
 import BookReader, { type OpenedBook } from "./BookReader";
 import { errors, parseResponse, streamNdjson } from "./api";
+import { DocumentSheet, type DocumentActions } from "./DocumentSheet";
 import { Library } from "./Library";
 import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
@@ -107,6 +108,7 @@ function App() {
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [error, setError] = useState("");
+  const [managing, setManaging] = useState<string | null>(null);
   const [ocr, setOcr] = useState<OcrState>(null);
   const [ocrOpen, setOcrOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -185,6 +187,42 @@ function App() {
     }
   }
 
+  const patchDocument = (document: WorkspaceDocument) => {
+    setDocuments((items) => items.map((item) => item.id === document.id ? { ...item, ...document, progress: item.progress, progressAt: item.progressAt } : item));
+    setBook((current) => current && current.document.id === document.id ? { ...current, document } : current);
+  };
+
+  // Failures are reported here and re-thrown so the sheet can stop its spinner.
+  const manage: DocumentActions = {
+    open: (id) => void openDocument(id),
+    rename: async (id, name) => {
+      try {
+        const data = await parseResponse<{ document: WorkspaceDocument }>(await fetch(`/api/workspace/documents/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }));
+        patchDocument(data.document);
+      } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not rename."); throw cause; }
+    },
+    rescan: async (id) => {
+      try {
+        const data = await parseResponse<{ document: WorkspaceDocument; emptyPages: number; totalPages: number | null }>(await fetch(`/api/workspace/documents/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "rescan" }) }));
+        patchDocument(data.document);
+        return { emptyPages: data.emptyPages, totalPages: data.totalPages };
+      } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not check the file."); throw cause; }
+    },
+    reextract: async (id) => {
+      try {
+        const data = await parseResponse<{ document: WorkspaceDocument }>(await fetch(`/api/workspace/documents/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reextract" }) }));
+        patchDocument(data.document);
+      } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not read the file again."); throw cause; }
+    },
+    remove: async (id) => {
+      try {
+        await parseResponse(await fetch(`/api/workspace/documents/${id}`, { method: "DELETE" }));
+        setDocuments((items) => items.filter((item) => item.id !== id));
+      } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not delete the file."); throw cause; }
+    },
+    ocr: (id, pages) => void runOcr(id, pages),
+  };
+
   async function openDocument(id: string) {
     if (opening) return;
     setOpening(true);
@@ -262,10 +300,11 @@ function App() {
         {tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
-          : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
+          : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
       <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} />
     </div>
+    <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
     <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => setCalendarRefresh((value) => value + 1)} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />

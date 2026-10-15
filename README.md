@@ -90,3 +90,7 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 3. 在 Vercel 设置 `GOOGLE_VISION_API_KEY`（Sensitive，Production）并重新部署。
 
 页面图片会发送给 Google 识别；识别后的文字保存在私有存储里，每本书只需识别一次。
+
+### 管理已导入的文件
+
+资料库里每本书封面左上角的 “⋯” 打开文件选项：**重命名**；**Check for scanned pages**（根据已保存的文字重新检查哪些页没有文字，OCR 功能上线前导入的书需要点一次）；**Recognize text on N pages**（对这些页直接启动识别，不用先打开书）；**Open original PDF**；**Re-read the original file**（重新从原文件提取文字，会替换已保存的文字，包括已识别的内容）；**Delete**（永久删除文字、高亮、笔记和原文件，需要二次确认）。

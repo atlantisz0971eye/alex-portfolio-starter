@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { useMemo, useRef } from "react";
 import type { WorkspaceLibraryItem } from "../lib/workspaceStore";
 import type { OcrState } from "./OcrSheet";
@@ -12,6 +12,7 @@ type Props = {
   uploading: boolean;
   ocr: OcrState;
   onOpen: (id: string) => void;
+  onManage: (id: string) => void;
   onAdd: (file: File) => void;
   onSignOut: () => void;
 };
@@ -29,7 +30,7 @@ function Cover({ item }: { item: WorkspaceLibraryItem }) {
   </span>;
 }
 
-export function Library({ documents, loading, uploading, ocr, onOpen, onAdd, onSignOut }: Props) {
+export function Library({ documents, loading, uploading, ocr, onOpen, onManage, onAdd, onSignOut }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const current = useMemo(() => documents
     .filter((item) => percentOf(item) > 0 && percentOf(item) < 99)
@@ -62,12 +63,13 @@ export function Library({ documents, loading, uploading, ocr, onOpen, onAdd, onS
           <section aria-labelledby="books-heading">
             <h2 id="books-heading" className="section-label">All books <span>{documents.length}</span></h2>
             <ul className="grid">
-              {documents.map((item) => <li key={item.id}>
+              {documents.map((item) => <li key={item.id} className="tilewrap">
                 <button type="button" className="tile" onClick={() => onOpen(item.id)}>
                   <Cover item={item} />
                   <span className="tile__title">{title(item.name)}</span>
                   <small>{ocr?.running && ocr.docId === item.id ? `Recognizing text ${Math.round((ocr.done / Math.max(1, ocr.total)) * 100)}%` : item.ocrPending?.length ? "Scanned · needs text recognition" : percentOf(item) ? `${percentOf(item)}% read` : "New"}{item.pageCount ? ` · ${item.pageCount} pages` : ""}</small>
                 </button>
+                <button type="button" className="tile__more" aria-label={`Options for ${title(item.name)}`} onClick={() => onManage(item.id)}><MoreHorizontal size={18} /></button>
               </li>)}
             </ul>
           </section>
