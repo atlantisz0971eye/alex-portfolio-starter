@@ -12,6 +12,8 @@ export type NoteMeta = {
   updatedAt: string;
   deletedAt?: string;
   favorite?: boolean;
+  /** Marks pages the app manages itself, such as the vocabulary page. */
+  kind?: "vocabulary";
   preview: string;
 };
 type IndexEntry = NoteMeta & { text: string };
@@ -73,7 +75,7 @@ const descendants = (notes: IndexEntry[], id: string) => {
   return found;
 };
 
-export async function createNote(input: { parentId?: string | null; title?: string; icon?: string; content?: unknown }) {
+export async function createNote(input: { parentId?: string | null; title?: string; icon?: string; content?: unknown; kind?: "vocabulary" }) {
   const notes = await readIndex();
   if (notes.length >= MAX_NOTES) throw new NoteError("There are too many notes.");
   const parentId = input.parentId && notes.some((item) => item.id === input.parentId && !item.deletedAt) ? input.parentId : null;
@@ -84,6 +86,7 @@ export async function createNote(input: { parentId?: string | null; title?: stri
     id: randomUUID(), parentId, title: (input.title ?? "").slice(0, 200), icon: (input.icon ?? "").slice(0, 8),
     order: siblings.length ? Math.max(...siblings.map((item) => item.order)) + 1 : 0,
     createdAt: now, updatedAt: now, ...describe(content),
+    ...(input.kind ? { kind: input.kind } : {}),
   };
   await put(pagePath(entry.id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
   await writeIndex([...notes, entry]);
@@ -161,6 +164,30 @@ export async function appendToNote(id: string, markdown: string) {
   // An untouched empty first paragraph would only leave a blank line above the new text.
   const base = existing.length === 1 && existing[0].type === "paragraph" && !existing[0].content?.length ? [] : existing;
   return updateNote(id, { content: { type: "doc", content: [...base, ...added] } });
+}
+
+/** True when a saved entry for the word already exists (entries start with the word in bold). */
+function hasEntry(text: string, word: string) {
+  const target = word.toLowerCase();
+  return text.split("\n").some((line) => {
+    const lower = line.trim().toLowerCase();
+    return lower.startsWith(target) && !/[a-z]/.test(lower.charAt(target.length));
+  });
+}
+
+/** Adds a word to the Vocabulary page, creating the page on first use. Returns false when the word is already there. */
+export async function addVocabularyEntry(word: string, markdown: string) {
+  const notes = await readIndex();
+  let page = notes.find((item) => item.kind === "vocabulary" && !item.deletedAt);
+  let id = page?.id;
+  if (!id) {
+    const created = await createNote({ title: "Vocabulary", icon: "📖", kind: "vocabulary", content: markdownToDoc("> Words you save while reading appear here, newest last.") });
+    id = created.id;
+  }
+  const found = await readNote(id);
+  if (found && hasEntry(jsonToText(found.content), word)) return { id, duplicate: true };
+  await appendToNote(id, `---\n${markdown}`);
+  return { id, duplicate: false };
 }
 
 export async function searchNotes(query: string) {

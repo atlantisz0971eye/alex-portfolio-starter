@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, MessageCircle, NotebookPen, Trash2, X } from "lucide-react";
+import { BookmarkPlus, Check, Loader2, MessageCircle, NotebookPen, Trash2, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { MarkColor, WorkspaceMark } from "../lib/workspaceStore";
@@ -51,10 +51,11 @@ export function NoteSheet({ mark, onSave }: { mark: WorkspaceMark | null; onSave
   </Sheet>;
 }
 
-type TranslateProps = { source: string; context?: string; documentId: string; stream: StreamFn; onClose: () => void; onAsk: () => void };
+type TranslateProps = { source: string; context?: string; documentId: string; stream: StreamFn; onClose: () => void; onAsk: () => void; /** Saves a looked-up word to the Vocabulary note. */ onSave?: (answer: string) => Promise<"saved" | "duplicate"> };
 
 /** A small non-modal card that translates the selected passage without leaving the page. */
-export function TranslateCard({ source, context, documentId, stream, onClose, onAsk }: TranslateProps) {
+export function TranslateCard({ source, context, documentId, stream, onClose, onAsk, onSave }: TranslateProps) {
+  const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "duplicate" | "error">("idle");
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -66,6 +67,7 @@ export function TranslateCard({ source, context, documentId, stream, onClose, on
     setText("");
     setError("");
     setDone(false);
+    setSaved("idle");
     stream({ action: "translate", documentId, selection: source, context }, (delta) => {
       if (controller.signal.aborted) return;
       received += delta;
@@ -88,6 +90,8 @@ export function TranslateCard({ source, context, documentId, stream, onClose, on
     {error
       ? <p className="reader-translate__error">{error} <button type="button" onClick={() => setAttempt((value) => value + 1)}>Try again</button></p>
       : text ? <div className="reader-translate__text ws-markdown"><ReactMarkdown>{text}</ReactMarkdown></div> : <p className="reader-translate__wait"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
-    {done && <span className="reader-translate__done" />}
+    {done && onSave && source.trim().split(/\s+/).length <= 4 && source.length <= 60 && <button type="button" className="ws-pill reader-translate__save" disabled={saved === "saving" || saved === "saved" || saved === "duplicate"} onClick={() => { setSaved("saving"); onSave(text).then(setSaved).catch(() => setSaved("error")); }}>
+      {saved === "saving" ? <Loader2 className="ws-spin" size={14} /> : saved === "saved" || saved === "duplicate" ? <Check size={15} /> : <BookmarkPlus size={15} />} {saved === "saved" ? "Saved to Vocabulary" : saved === "duplicate" ? "Already in Vocabulary" : saved === "error" ? "Could not save · Try again" : "Save to Vocabulary"}
+    </button>}
   </aside>;
 }

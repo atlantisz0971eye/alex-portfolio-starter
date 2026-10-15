@@ -413,6 +413,20 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     return () => document.removeEventListener("selectionchange", onChange);
   }, []);
 
+  // Saves a looked-up word to the Vocabulary note with the sentence it appeared in.
+  const saveWord = async (word: string, answer: string, paragraph: string) => {
+    const needle = word.toLowerCase();
+    const sentence = paragraph.split(/(?<=[.!?。！？])\s+/).find((part) => part.toLowerCase().includes(needle)) ?? "";
+    const response = await fetch("/api/workspace/vocabulary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ word, entry: answer, sentence, source: `${book.document.name.replace(/\.[^.]+$/, "")}${currentPageRef.current ? `, p. ${currentPageRef.current}` : ""}` }),
+    });
+    const data = await response.json().catch(() => ({})) as { duplicate?: boolean };
+    if (!response.ok) throw new Error("save failed");
+    return data.duplicate ? "duplicate" as const : "saved" as const;
+  };
+
   const clearSelection = () => { window.getSelection()?.removeAllRanges(); setSelection(null); };
 
   const askAbout = () => {
@@ -496,6 +510,8 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     for (let i = 0; i < blocks.length && blocks[i].offset <= offset; i += 1) value = blocks[i].page ?? value;
     return value;
   }, [blocks, offset]);
+  const currentPageRef = useRef<number | null>(null);
+  currentPageRef.current = currentPage;
   const shown = scrub ?? offset;
   const percent = Math.min(100, Math.round((shown / Math.max(1, segment.totalLength)) * 100));
   const style = { "--ws-size": `${prefs.fontSize}px`, "--ws-leading": prefs.lineHeight } as React.CSSProperties;
@@ -555,7 +571,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       <button type="button" onClick={askAbout}><MessageCircle size={15} /> Ask</button>
     </div>}
 
-    {translating && <TranslateCard source={translating.text} context={translating.context} documentId={documentId} stream={stream} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating.text, offsetRef.current); setTranslating(null); }} />}
+    {translating && <TranslateCard source={translating.text} context={translating.context} documentId={documentId} stream={stream} onSave={(answer) => saveWord(translating.text, answer, translating.context)} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating.text, offsetRef.current); setTranslating(null); }} />}
 
     {activeMark && popoverMark && <MarkPopover mark={popoverMark} x={activeMark.x} y={activeMark.y}
       onColor={(color) => { updateMarks((current) => current.map((mark) => mark.id === popoverMark.id ? { ...mark, color } : mark)); setActiveMark(null); }}
