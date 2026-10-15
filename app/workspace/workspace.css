@@ -184,3 +184,5 @@
   .ws-root *, .ws-root *::before, .ws-root *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 .reader[data-mode="scroll"] .reader-folio { display: none; }
+.ws-card--error { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; color: #ffb4a8; }
+.ws-card--error p { margin: 0; font-size: 14px; }

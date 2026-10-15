@@ -28,7 +28,7 @@ const SWIPE_DISTANCE = 48;
 type Props = {
   book: OpenedBook;
   onBack: (offset: number) => void;
-  onAssistant: (mode: "open" | "translate" | "ask", selection?: string) => void;
+  onAssistant: (mode: "open" | "translate" | "ask", selection?: string, offset?: number) => void;
   onError: (message: string) => void;
 };
 
@@ -338,7 +338,7 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
 
   const applySelection = (mode: "translate" | "ask") => {
     if (!selection) return;
-    onAssistant(mode, selection.text);
+    onAssistant(mode, selection.text, offsetRef.current);
     window.getSelection()?.removeAllRanges();
     setSelection(null);
   };
@@ -367,7 +367,7 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
       <div className="reader-bar__actions">
         <button type="button" className="reader-icon" onClick={() => setSheet("contents")} aria-label="Contents"><List size={20} /></button>
         <button type="button" className="reader-icon" onClick={() => setSheet("settings")} aria-label="Appearance"><Type size={20} /></button>
-        <button type="button" className="reader-icon" onClick={() => onAssistant("open")} aria-label="Ask DeepSeek"><MessageCircle size={20} /></button>
+        <button type="button" className="reader-icon" onClick={() => onAssistant("open", undefined, offsetRef.current)} aria-label="Ask DeepSeek"><MessageCircle size={20} /></button>
       </div>
     </header>
 

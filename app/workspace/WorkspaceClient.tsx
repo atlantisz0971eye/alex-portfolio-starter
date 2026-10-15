@@ -31,6 +31,8 @@ const errors: Record<string, string> = {
   upload_failed: "Upload failed. Try again.",
   invalid_access_key: "Invalid access key.",
   invalid_selection: "Select a shorter passage to translate.",
+  ai_timeout: "DeepSeek is responding slowly right now. Try again.",
+  invalid_question: "Ask a slightly longer question.",
 };
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -181,15 +183,42 @@ function App() {
     }
   }
 
-  const callAssistant = useCallback(async <T,>(body: Record<string, unknown>) => parseResponse<T>(await fetch("/api/workspace/assistant", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })), []);
+  // Reads the assistant's newline-delimited events, reporting text as it arrives.
+  const streamAssistant = useCallback(async (body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal) => {
+    const response = await fetch("/api/workspace/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!response.ok || !response.body) return parseResponse<never>(response);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let done: { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] } | null = null;
+    const handle = (line: string) => {
+      if (!line.trim()) return;
+      const event = JSON.parse(line) as { t: string; v?: string; code?: string; coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
+      if (event.t === "delta" && event.v) onDelta(event.v);
+      else if (event.t === "error") throw new Error(errors[event.code ?? ""] ?? errors.assistant_failed);
+      else if (event.t === "done") done = { coverage: event.coverage, messages: event.messages };
+    };
+    for (;;) {
+      const { done: finished, value } = await reader.read();
+      if (finished) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      lines.forEach(handle);
+    }
+    handle(buffer);
+    if (!done) throw new Error("The answer was interrupted. Try again.");
+    return done as { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
+  }, []);
 
-  const openAssistant = useCallback((mode: AssistantIntent["mode"], selection?: string) => {
+  const openAssistant = useCallback((mode: AssistantIntent["mode"], selection?: string, offset?: number) => {
     intentId.current += 1;
-    setIntent({ id: intentId.current, mode, selection });
+    setIntent({ id: intentId.current, mode, selection, offset });
     setAssistantOpen(true);
   }, []);
 
@@ -212,7 +241,7 @@ function App() {
     <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} />
-      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} request={callAssistant} onError={setError} />
+      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} />
     </>}
     {error && <div className="ws-toast" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={16} /></button></div>}
   </>;

@@ -1,102 +1,127 @@
 "use client";
 
-import { BookOpen, Loader2, Send, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { BookOpen, Loader2, RotateCcw, Send, Sparkles, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { WorkspaceDocument } from "../lib/workspaceStore";
 import { Sheet } from "./Sheet";
 
-export type AssistantIntent = { id: number; mode: "open" | "translate" | "ask"; selection?: string };
+export type AssistantIntent = { id: number; mode: "open" | "translate" | "ask"; selection?: string; offset?: number };
+type Done = { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
+type Live = { kind: "guide" | "ask" | "translate"; question?: string; source?: string; text: string };
 type Props = {
   open: boolean;
   onClose: () => void;
   document: WorkspaceDocument;
   intent: AssistantIntent | null;
   onDocument: (document: WorkspaceDocument) => void;
-  request: <T>(body: Record<string, unknown>) => Promise<T>;
+  stream: (body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal) => Promise<Done>;
   onError: (message: string) => void;
 };
 
-export function AssistantSheet({ open, onClose, document, intent, onDocument, request, onError }: Props) {
+export function AssistantSheet({ open, onClose, document, intent, onDocument, stream, onError }: Props) {
   const [question, setQuestion] = useState("");
-  const [busy, setBusy] = useState<"guide" | "ask" | "translate" | null>(null);
+  const [live, setLive] = useState<Live | null>(null);
   const [translation, setTranslation] = useState<{ source: string; text: string } | null>(null);
+  const [failure, setFailure] = useState<{ message: string; retry: () => void } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const handled = useRef(0);
+  const offsetRef = useRef(0);
+  const documentRef = useRef(document);
+  documentRef.current = document;
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [document.messages?.length, translation, open]);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [document.messages?.length, translation, open, live?.text.length, failure]);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
-  async function guide() {
-    setBusy("guide");
+  const run = useCallback(async (next: Live, body: Record<string, unknown>) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setFailure(null);
+    setLive(next);
+    let text = "";
     try {
-      const data = await request<{ answer: string; coverage?: "full" | "excerpts" }>({ action: "guide", documentId: document.id });
-      onDocument({ ...document, guide: data.answer, guideCoverage: data.coverage });
+      const done = await stream(body, (delta) => {
+        text += delta;
+        setLive((current) => current && { ...current, text });
+      }, controller.signal);
+      const current = documentRef.current;
+      if (next.kind === "guide") onDocument({ ...current, guide: text, guideCoverage: done.coverage === "retrieved" ? "excerpts" : done.coverage });
+      else if (next.kind === "ask") onDocument({ ...current, messages: done.messages });
+      else setTranslation({ source: next.source ?? "", text });
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Could not generate the guide.");
-    } finally { setBusy(null); }
-  }
+      if (controller.signal.aborted) return;
+      const message = cause instanceof Error ? cause.message : "The assistant could not complete this request.";
+      setFailure({ message, retry: () => void run(next, body) });
+      onError(message);
+    } finally {
+      if (abortRef.current === controller) { abortRef.current = null; setLive(null); }
+    }
+  }, [onDocument, onError, stream]);
 
-  async function translate(selection: string) {
-    setBusy("translate");
-    setTranslation({ source: selection, text: "" });
-    try {
-      const data = await request<{ answer: string }>({ action: "translate", documentId: document.id, selection });
-      setTranslation({ source: selection, text: data.answer });
-    } catch (cause) {
-      setTranslation(null);
-      onError(cause instanceof Error ? cause.message : "Could not translate.");
-    } finally { setBusy(null); }
-  }
+  const guide = () => void run({ kind: "guide", text: "" }, { action: "guide", documentId: document.id });
+  const translate = useCallback((selection: string) => void run({ kind: "translate", source: selection, text: "" }, { action: "translate", documentId: documentRef.current.id, selection }), [run]);
 
-  async function ask(event?: React.FormEvent) {
+  function ask(event?: React.FormEvent) {
     event?.preventDefault();
     const text = question.trim();
-    if (text.length < 2 || busy) return;
-    setBusy("ask");
-    try {
-      const data = await request<{ messages: WorkspaceDocument["messages"] }>({ action: "ask", documentId: document.id, question: text });
-      onDocument({ ...document, messages: data.messages });
-      setQuestion("");
-    } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Could not get an answer.");
-    } finally { setBusy(null); }
+    if (text.length < 2 || live) return;
+    setQuestion("");
+    void run({ kind: "ask", question: text, text: "" }, { action: "ask", documentId: document.id, question: text, offset: offsetRef.current });
   }
 
   useEffect(() => {
     if (!intent || intent.id === handled.current) return;
     handled.current = intent.id;
-    if (intent.mode === "translate" && intent.selection) void translate(intent.selection);
+    offsetRef.current = intent.offset ?? 0;
+    if (intent.mode === "translate" && intent.selection) translate(intent.selection);
     if (intent.mode === "ask" && intent.selection) {
       setQuestion(`Explain this passage: “${intent.selection.slice(0, 400)}”`);
       window.setTimeout(() => inputRef.current?.focus(), 250);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent]);
+  }, [intent, translate]);
+
+  const busy = live !== null;
+  const showTranslation = live?.kind === "translate" ? { source: live.source ?? "", text: live.text } : translation;
 
   return <Sheet open={open} onClose={onClose} title="DeepSeek" size="tall" flush>
     <div className="ws-chat">
       <div className="ws-chat__scroll">
         <section className="ws-card">
           <div className="ws-card__head"><span><BookOpen size={15} /> Reading guide</span><small>{document.guideCoverage === "excerpts" ? "Based on excerpts" : document.guideCoverage === "full" ? "Based on full text" : ""}</small></div>
-          {document.guide
-            ? <div className="ws-markdown"><ReactMarkdown>{document.guide}</ReactMarkdown></div>
-            : <button type="button" className="ws-pill" onClick={() => void guide()} disabled={busy === "guide"}>{busy === "guide" ? <Loader2 className="ws-spin" size={16} /> : <Sparkles size={16} />} Generate guide</button>}
+          {live?.kind === "guide"
+            ? (live.text ? <div className="ws-markdown"><ReactMarkdown>{live.text}</ReactMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading the book…</p>)
+            : document.guide
+              ? <div className="ws-markdown"><ReactMarkdown>{document.guide}</ReactMarkdown></div>
+              : <button type="button" className="ws-pill" onClick={guide} disabled={busy}><Sparkles size={16} /> Generate guide</button>}
         </section>
-        {translation && <section className="ws-card">
+        {showTranslation && <section className="ws-card">
           <div className="ws-card__head"><span>Translation</span></div>
-          <p className="ws-quote">{translation.source.slice(0, 220)}{translation.source.length > 220 ? "…" : ""}</p>
-          {translation.text ? <p className="ws-translation">{translation.text}</p> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
+          <p className="ws-quote">{showTranslation.source.slice(0, 220)}{showTranslation.source.length > 220 ? "…" : ""}</p>
+          {showTranslation.text ? <p className="ws-translation">{showTranslation.text}</p> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
         </section>}
         {(document.messages ?? []).map((message, index) => <div key={index} className={`ws-message ws-message--${message.role}`}>
           <div className="ws-markdown"><ReactMarkdown>{message.content}</ReactMarkdown></div>
         </div>)}
-        {busy === "ask" && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Thinking…</p></div>}
+        {live?.kind === "ask" && <>
+          <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{live.question}</p></div></div>
+          <div className="ws-message ws-message--assistant">
+            {live.text ? <div className="ws-markdown"><ReactMarkdown>{live.text}</ReactMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Searching the book…</p>}
+          </div>
+        </>}
+        {failure && !busy && <div className="ws-card ws-card--error">
+          <p>{failure.message}</p>
+          <button type="button" className="ws-pill" onClick={failure.retry}><RotateCcw size={15} /> Try again</button>
+        </div>}
         <div ref={endRef} />
       </div>
       <form className="ws-compose" onSubmit={ask}>
         <textarea ref={inputRef} rows={1} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about this book" enterKeyHint="send" />
-        <button type="submit" aria-label="Send" disabled={question.trim().length < 2 || !!busy}>{busy === "ask" ? <Loader2 className="ws-spin" size={18} /> : <Send size={18} />}</button>
+        {busy
+          ? <button type="button" aria-label="Stop" onClick={() => abortRef.current?.abort()}><Square size={14} fill="currentColor" /></button>
+          : <button type="submit" aria-label="Send" disabled={question.trim().length < 2}><Send size={18} /></button>}
       </form>
     </div>
   </Sheet>;

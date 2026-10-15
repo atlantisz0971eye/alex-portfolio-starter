@@ -1,36 +1,108 @@
-type DeepSeekResponse = {
-  choices?: { message?: { content?: string | null }; finish_reason?: string | null }[];
-};
-
 export class DeepSeekError extends Error {
   constructor(readonly status: number) {
     super("DeepSeek request failed");
   }
 }
 
-export async function askDeepSeek(system: string, user: string, maxTokens = 1200) {
+const FIRST_TOKEN_MS = 30_000;
+const IDLE_MS = 30_000;
+const TOTAL_MS = 100_000;
+const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-flash";
+
+type Chunk = { choices?: { delta?: { content?: string | null } }[] };
+
+/**
+ * Streams the answer as it is generated. Fails fast when DeepSeek stalls instead of
+ * holding the request open until the platform times out.
+ */
+export async function* streamDeepSeek(system: string, user: string, maxTokens: number, signal?: AbortSignal): AsyncGenerator<string> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new DeepSeekError(503);
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "deepseek-flash",
-      thinking: { type: "disabled" },
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      temperature: 0.3,
-      max_tokens: maxTokens,
-      stream: false,
-    }),
-    signal: AbortSignal.timeout(105_000),
-    cache: "no-store",
-  });
-  if (!response.ok) throw new DeepSeekError(response.status);
-  const result = await response.json() as DeepSeekResponse;
-  const choice = result.choices?.[0];
-  const answer = choice?.message?.content?.trim();
-  if (!answer || choice?.finish_reason === "length") throw new DeepSeekError(502);
-  return answer;
+  const controller = new AbortController();
+  let stalled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (ms: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { stalled = true; controller.abort(); }, ms);
+  };
+  const total = setTimeout(() => { stalled = true; controller.abort(); }, TOTAL_MS);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort);
+  arm(FIRST_TOKEN_MS);
+  try {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        thinking: { type: "disabled" },
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: 0.3,
+        max_tokens: maxTokens,
+        stream: true,
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!response.ok || !response.body) throw new DeepSeekError(response.status || 502);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      arm(IDLE_MS);
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") return;
+        try {
+          const delta = (JSON.parse(data) as Chunk).choices?.[0]?.delta?.content;
+          if (delta) yield delta;
+        } catch {
+          // Ignore keep-alive or partial frames.
+        }
+      }
+    }
+  } catch (error) {
+    if (error instanceof DeepSeekError) throw error;
+    throw new DeepSeekError(stalled ? 504 : 502);
+  } finally {
+    clearTimeout(timer);
+    clearTimeout(total);
+    signal?.removeEventListener("abort", onAbort);
+    controller.abort();
+  }
+}
+
+/** One short, non-streamed call, used to turn a question into search keywords. */
+export async function quickDeepSeek(system: string, user: string, maxTokens: number, timeoutMs: number) {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return null;
+  try {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        thinking: { type: "disabled" },
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: 0,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const result = await response.json() as { choices?: { message?: { content?: string | null } }[] };
+    return result.choices?.[0]?.message?.content?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 export function guideExcerpt(text: string) {
