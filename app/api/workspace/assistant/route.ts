@@ -3,7 +3,7 @@ import { askDeepSeek, DeepSeekError, guideExcerpt } from "../../../lib/workspace
 import { readDocument, readDocumentText, writeDocument, workspaceStorageConfigured } from "../../../lib/workspaceStore";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const calls = new Map<string, { count: number; until: number }>();
 

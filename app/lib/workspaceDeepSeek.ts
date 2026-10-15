@@ -22,7 +22,7 @@ export async function askDeepSeek(system: string, user: string, maxTokens = 1200
       max_tokens: maxTokens,
       stream: false,
     }),
-    signal: AbortSignal.timeout(55_000),
+    signal: AbortSignal.timeout(105_000),
     cache: "no-store",
   });
   if (!response.ok) throw new DeepSeekError(response.status);
