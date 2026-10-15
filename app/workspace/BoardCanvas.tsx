@@ -15,18 +15,20 @@ type BoardNode = Node<TextData, "text"> | Node<ImageData, "image">;
 type Doc = { id: string; name: string; mimeType: string; pageCount: number | null };
 
 const TONES = ["paper", "sun", "sky", "leaf", "rose"];
-const BoardContext = createContext<{ boardId: string; update: (id: string, data: Partial<TextData>) => void }>({ boardId: "", update: () => undefined });
+const BoardContext = createContext<{ boardId: string; touch: boolean; update: (id: string, data: Partial<TextData>) => void; edit: (id: string) => void }>({ boardId: "", touch: false, update: () => undefined, edit: () => undefined });
 const headers = { "Content-Type": "application/json" };
 const endpoint = (id: string) => `/api/workspace/boards/${id}`;
 
 function TextCard({ id, data, selected }: NodeProps<Node<TextData, "text">>) {
-  const { update } = useContext(BoardContext);
+  const { update, touch, edit } = useContext(BoardContext);
   return <div className={`bnode bnode--text bnode--${data.tone}${selected ? " is-selected" : ""}`}>
     <NodeResizer isVisible={selected} minWidth={120} minHeight={64} />
     <Handle type="target" position={Position.Left} /><Handle type="source" position={Position.Right} />
     <div className="bnode__grip" aria-hidden="true"><i /></div>
-    <textarea className="nodrag nowheel" value={data.text} placeholder="Write something" onChange={(event) => update(id, { text: event.target.value })} />
-    {selected && <div className="bnode__tones nodrag">{TONES.map((tone) => <button key={tone} type="button" aria-label={`${tone} card`} className={`bnode__tone bnode--${tone}${tone === data.tone ? " is-on" : ""}`} onClick={() => update(id, { tone })} />)}</div>}
+    {touch
+      ? <div className="bnode__text nodrag" role="button" tabIndex={0} onClick={() => edit(id)}>{data.text || <span>Tap to write</span>}</div>
+      : <textarea className="nodrag nowheel" value={data.text} placeholder="Write something" onChange={(event) => update(id, { text: event.target.value })} />}
+    {!touch && selected && <div className="bnode__tones nodrag">{TONES.map((tone) => <button key={tone} type="button" aria-label={`${tone} card`} className={`bnode__tone bnode--${tone}${tone === data.tone ? " is-on" : ""}`} onClick={() => update(id, { tone })} />)}</div>}
   </div>;
 }
 
@@ -76,6 +78,10 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
   const [busy, setBusy] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  // Phones get a text sheet instead of typing on the canvas, where the keyboard fights the zoomed viewport.
+  const [touch, setTouch] = useState(false);
+  useEffect(() => { setTouch(window.matchMedia("(pointer: coarse)").matches); }, []);
   const loaded = useRef(false);
   const timer = useRef<number | undefined>(undefined);
   const latest = useRef({ nodes, edges, title });
@@ -147,6 +153,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
     const at = center();
     const id = crypto.randomUUID();
     setNodes((current) => [...deselect(current), { id, type: "text", position: { x: at.x - 110 + spread(current.length).x, y: at.y - 60 + spread(current.length).y }, width: 220, height: 130, data: { text: "", tone: "paper" }, selected: true }]);
+    if (touch) setEditId(id);
   };
 
   const addImages = (items: { name: string; width: number; height: number }[]) => {
@@ -184,7 +191,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
     setEdges((current) => current.filter((edge) => !edge.selected && !nodes.some((node) => node.selected && (node.id === edge.source || node.id === edge.target))));
   };
 
-  return <BoardContext.Provider value={{ boardId, update }}>
+  return <BoardContext.Provider value={{ boardId, touch, update, edit: setEditId }}>
     <div className="board" onFocus={(event) => setEditing(event.target instanceof HTMLTextAreaElement)} onBlur={() => setEditing(false)}>
       <header className="board__bar">
         <button type="button" className="ws-text-button" onClick={onBack}><ChevronLeft size={18} /> Boards</button>
@@ -206,6 +213,16 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
         {selectedCount > 0 && <button type="button" className="board__delete" onClick={removeSelected}><Trash2 size={18} /> Delete</button>}
       </div>
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(event) => void onFiles(event.target.files)} />
+      <Sheet open={editId !== null} onClose={() => setEditId(null)} title="Edit card" size="tall">
+        {(() => {
+          const node = nodes.find((item) => item.id === editId);
+          if (!node || node.type !== "text") return null;
+          return <div className="board-edit">
+            <textarea autoFocus value={node.data.text} placeholder="Write something" onChange={(event) => update(node.id, { text: event.target.value })} />
+            <div className="board-edit__tones">{TONES.map((tone) => <button key={tone} type="button" aria-label={`${tone} card`} className={`bnode__tone bnode--${tone}${tone === node.data.tone ? " is-on" : ""}`} onClick={() => update(node.id, { tone })} />)}</div>
+          </div>;
+        })()}
+      </Sheet>
       <PdfSheet open={pdfOpen} boardId={boardId} onClose={() => setPdfOpen(false)} onError={onError} onAdd={addImages} />
     </div>
   </BoardContext.Provider>;

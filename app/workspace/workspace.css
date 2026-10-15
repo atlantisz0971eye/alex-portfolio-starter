@@ -819,3 +819,9 @@
 .board-pdf { display: flex; flex-direction: column; gap: 16px; }
 .board-pdf__field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text-2); }
 .board-pdf__field select, .board-pdf__field input[type="text"], .board-pdf__field input:not([type]), .board-pdf__field input[inputmode] { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); font-size: 16px; }
+.bnode__text { height: calc(100% - 22px); padding: 2px 14px 12px; overflow: hidden; font-family: var(--serif); font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
+.bnode__text span { color: var(--text-2); }
+.board-edit { display: flex; flex-direction: column; gap: 14px; }
+.board-edit textarea { width: 100%; min-height: 160px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); font-family: var(--serif); font-size: 17px; line-height: 1.5; resize: vertical; outline: 0; }
+.board-edit__tones { display: flex; gap: 12px; }
+.board-edit__tones .bnode__tone { width: 28px; height: 28px; }
