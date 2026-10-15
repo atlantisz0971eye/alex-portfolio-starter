@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, NotebookPen, Sparkles, Sun } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LayoutDashboard, LogOut, Mail as MailIcon, Moon, NotebookPen, Sparkles, Sun } from "lucide-react";
 import { createContext, useContext, type ReactNode } from "react";
 
 export type Theme = "light" | "dark";
@@ -12,13 +12,14 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return <button type="button" className={className} onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}{className.includes("sidebar-theme") ? (theme === "dark" ? " Light mode" : " Dark mode") : ""}</button>;
 }
 
-export type Tab = "today" | "library" | "mail" | "calendar" | "notes";
+export type Tab = "today" | "library" | "mail" | "calendar" | "boards" | "notes";
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "today", label: "Today", icon: Sun },
   { id: "library", label: "Library", icon: BookOpen },
   { id: "mail", label: "Mail", icon: MailIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
+  { id: "boards", label: "Boards", icon: LayoutDashboard },
   { id: "notes", label: "Notes", icon: NotebookPen },
 ];
 

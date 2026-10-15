@@ -9,12 +9,13 @@ import { applyProposal, ProposalCard, type Proposal, type Status } from "./Propo
 import { Sheet } from "./Sheet";
 
 type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
-export type AssistantScreen = "today" | "library" | "mail" | "calendar" | "notes";
+export type AssistantScreen = "today" | "library" | "mail" | "calendar" | "boards" | "notes";
 
 const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   calendar: ["Summarize my week", "Find a free 2-hour slot this week", "Add events from my recent emails"],
   mail: ["Summarize my unread mail", "Which emails need a reply?", "Add events from this week’s emails to my calendar"],
   library: ["What am I reading, and how far along?", "What should I read next?"],
+  boards: ["Summarize my recent notes", "Find my notes about…"],
   notes: ["Summarize my recent notes", "Find my notes about…"],
   today: ["Re-plan my day around my new mail", "Which emails need a reply today?", "Add events from my recent emails"],
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],

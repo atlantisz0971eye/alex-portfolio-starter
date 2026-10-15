@@ -12,6 +12,7 @@ import { Library } from "./Library";
 import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
 import { GlobalAssistant } from "./GlobalAssistant";
+import { Boards } from "./Boards";
 import { Mail } from "./Mail";
 import { Notes } from "./Notes";
 import { Sidebar, TabBar, ThemeContext, type Tab, type Theme } from "./Shell";
@@ -321,6 +322,7 @@ function App() {
           ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
           : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
+          : tab === "boards" ? <Boards onError={setError} onSignOut={() => void signOut()} />
           : tab === "notes" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
