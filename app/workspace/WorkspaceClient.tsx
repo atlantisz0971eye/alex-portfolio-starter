@@ -6,53 +6,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkspaceDocument, WorkspaceLibraryItem } from "../lib/workspaceStore";
 import { AssistantSheet, type AssistantIntent } from "./AssistantSheet";
 import BookReader, { type OpenedBook } from "./BookReader";
+import { errors, parseResponse, streamNdjson } from "./api";
 import { Library } from "./Library";
+import { Mail } from "./Mail";
 
 type Props = { authorized: boolean; configured: boolean };
 
-const errors: Record<string, string> = {
-  unauthorized: "Session expired. Sign in again.",
-  storage_not_configured: "Private storage is not connected yet.",
-  ai_not_configured: "DeepSeek is not configured yet.",
-  no_extractable_text: "No readable text found. Scanned PDFs need OCR support.",
-  unsupported_format: "Supported formats: PDF, TXT, Markdown and HTML.",
-  invalid_pdf: "This file is not a valid PDF.",
-  pdf_encrypted: "This PDF is password-protected. Remove the password and upload it again.",
-  pdf_unreadable: "This PDF is damaged or uses an unsupported structure, so its text could not be read.",
-  file_too_large: "Maximum file size: 25 MB.",
-  file_not_found: "The upload did not reach storage. Try again.",
-  already_exists: "This upload was already processed.",
-  storage_failed: "Private storage failed while saving. Nothing was kept; try again.",
-  not_found: "That document no longer exists.",
-  invalid_request: "The request was not valid. Reload the page and try again.",
-  rate_limited: "Too many requests. Try again shortly.",
-  processing_failed: "Could not process this document. Check the file and try again.",
-  assistant_failed: "The assistant could not complete this request. Try again.",
-  upload_failed: "Upload failed. Try again.",
-  invalid_access_key: "Invalid access key.",
-  invalid_selection: "Select a shorter passage to translate.",
-  ai_timeout: "DeepSeek is responding slowly right now. Try again.",
-  ai_busy: "DeepSeek is overloaded right now. Try again in a moment.",
-  ai_auth: "DeepSeek rejected the API key. Check DEEPSEEK_API_KEY in Vercel.",
-  ai_balance: "The DeepSeek account has insufficient balance. Top it up on the DeepSeek platform.",
-  ai_request: "DeepSeek rejected the request, likely the model name. Check DEEPSEEK_MODEL.",
-  invalid_question: "Ask a slightly longer question.",
+const MAIL_NOTES: Record<string, string> = {
+  too_many_accounts: "Two Gmail accounts are already connected. Disconnect one first.",
+  denied: "Gmail access was not granted.",
+  invalid_state: "The Gmail sign-in expired. Try connecting again.",
+  not_configured: "Mail is not set up yet.",
+  failed: "Could not connect Gmail. Try again.",
 };
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  let data: { error?: string } | null = null;
-  try {
-    data = await response.json();
-  } catch {
-    // Platform errors such as gateway timeouts are not JSON.
-  }
-  if (!response.ok) {
-    if (data?.error && errors[data.error]) throw new Error(errors[data.error]);
-    if (response.status === 504 || response.status === 408) throw new Error("This took too long to process. Large or complex files may need another try.");
-    if (response.status === 413) throw new Error("The request was too large.");
-    throw new Error(`Something went wrong (${response.status}). Try again.`);
-  }
-  return data as T;
+function HomeTabs({ tab, onTab }: { tab: "library" | "mail"; onTab: (tab: "library" | "mail") => void }) {
+  return <div className="home-tabs ws-segment" role="tablist">
+    <button type="button" role="tab" aria-selected={tab === "library"} className={tab === "library" ? "is-on" : ""} onClick={() => onTab("library")}>Library</button>
+    <button type="button" role="tab" aria-selected={tab === "mail"} className={tab === "mail" ? "is-on" : ""} onClick={() => onTab("mail")}>Mail</button>
+  </div>;
 }
 
 function Login({ configured }: { configured: boolean }) {
@@ -123,6 +95,7 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
+  const [tab, setTab] = useState<"library" | "mail">("library");
   const [error, setError] = useState("");
   const intentId = useRef(0);
 
@@ -139,6 +112,15 @@ function App() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  // Back from Google's consent screen: show the outcome and drop the query string.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("mail");
+    if (!result) return;
+    setTab("mail");
+    if (result === "error") setError(MAIL_NOTES[params.get("reason") ?? ""] ?? MAIL_NOTES.failed);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
   useEffect(() => {
     if (!error) return;
     const timer = window.setTimeout(() => setError(""), 6000);
@@ -188,38 +170,7 @@ function App() {
     }
   }
 
-  // Reads the assistant's newline-delimited events, reporting text as it arrives.
-  const streamAssistant = useCallback(async (body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal) => {
-    const response = await fetch("/api/workspace/assistant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    });
-    if (!response.ok || !response.body) return parseResponse<never>(response);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let done: { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] } | null = null;
-    const handle = (line: string) => {
-      if (!line.trim()) return;
-      const event = JSON.parse(line) as { t: string; v?: string; code?: string; coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
-      if (event.t === "delta" && event.v) onDelta(event.v);
-      else if (event.t === "error") throw new Error(errors[event.code ?? ""] ?? errors.assistant_failed);
-      else if (event.t === "done") done = { coverage: event.coverage, messages: event.messages };
-    };
-    for (;;) {
-      const { done: finished, value } = await reader.read();
-      if (finished) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      lines.forEach(handle);
-    }
-    handle(buffer);
-    if (!done) throw new Error("The answer was interrupted. Try again.");
-    return done as { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
-  }, []);
+  const streamAssistant = useCallback((body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal) => streamNdjson("/api/workspace/assistant", body, onDelta, signal), []);
 
   const openAssistant = useCallback((mode: AssistantIntent["mode"], selection?: string, offset?: number) => {
     intentId.current += 1;
@@ -242,8 +193,10 @@ function App() {
 
   const updateDocument = (document: WorkspaceDocument) => setBook((current) => current && { ...current, document });
 
+  const tabs = <HomeTabs tab={tab} onTab={setTab} />;
+
   return <>
-    <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />
+    {tab === "mail" ? <Mail tabs={tabs} onError={setError} /> : <Library tabs={tabs} documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} />
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(page) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, page })); }} />

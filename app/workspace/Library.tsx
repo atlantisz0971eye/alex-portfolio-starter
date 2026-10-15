@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, Loader2, LogOut, Plus } from "lucide-react";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import type { WorkspaceLibraryItem } from "../lib/workspaceStore";
 
 type Props = {
@@ -11,17 +11,19 @@ type Props = {
   onOpen: (id: string) => void;
   onAdd: (file: File) => void;
   onSignOut: () => void;
+  tabs: ReactNode;
 };
 
 const title = (name: string) => name.replace(/\.[^.]+$/, "");
 
-export function Library({ documents, loading, uploading, onOpen, onAdd, onSignOut }: Props) {
+export function Library({ documents, loading, uploading, onOpen, onAdd, onSignOut, tabs }: Props) {
   const input = useRef<HTMLInputElement>(null);
   return <main className="library">
     <header className="library__head">
       <a href="/" className="ws-text-button">Portfolio</a>
       <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </header>
+    {tabs}
     <div className="library__title">
       <h1>Library</h1>
       <button type="button" className="ws-round" onClick={() => input.current?.click()} disabled={uploading} aria-label="Add document">{uploading ? <Loader2 className="ws-spin" size={20} /> : <Plus size={22} />}</button>

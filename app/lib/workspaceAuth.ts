@@ -59,3 +59,14 @@ export async function workspaceAuthorized() {
   if (!Number.isSafeInteger(expiry) || expiry <= now || expiry > now + SESSION_AGE_SECONDS) return false;
   return equal(provided, signature(expiresAt, config.sessionSecret));
 }
+
+/** Signs a short-lived value (such as an OAuth state) with the session secret. */
+export function workspaceSign(value: string) {
+  const config = secrets();
+  if (!config) throw new Error("Workspace access is not configured");
+  return createHmac("sha256", config.sessionSecret).update(`alex-workspace-sign:${value}`).digest("base64url");
+}
+
+export function workspaceSignatureMatches(value: string, provided: string) {
+  return equal(workspaceSign(value), provided);
+}

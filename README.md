@@ -56,3 +56,16 @@ app/
 - `DEEPSEEK_API_KEY`：沿用公开站点叙述功能已有的服务端密钥。
 
 本地开发时把这些值放在未提交的 `.env.local`。访问密钥和 Blob 令牌都不得以 `NEXT_PUBLIC_` 开头。配置缺失时，Workspace 会保持锁定或提示资料库尚未连接。私人文档只存入 Private Blob Store，并由已登录的服务端接口读取；会话使用 HttpOnly Cookie。第一版登录限流是函数实例内的兜底措施，发布前还应在 Vercel Firewall 为 `/api/workspace/session` 和 `/api/workspace/assistant` 配置跨实例限流。
+
+## Alex Workspace · 邮件（Gmail 只读）
+
+Workspace 顶部的 **Mail** 标签用于查看和搜索最多两个 Gmail 账号。授权范围只有 `gmail.readonly`：不能发信、删除或修改邮件。邮件正文只作为纯文本显示，不加载远程图片；只有点击 “Summarize” 或提问时，那一封邮件的文字才会发送给 DeepSeek。刷新令牌用 AES-256-GCM 加密后存入 Private Blob Store，没有 `MAIL_TOKEN_KEY` 就无法解开。
+
+配置步骤：
+
+1. 在 Google Cloud Console 新建项目，启用 **Gmail API**。
+2. 配置 OAuth 同意屏幕（外部用户），在“数据访问”里添加范围 `https://www.googleapis.com/auth/gmail.readonly`。应用处于“测试”状态时，只有列入测试用户的账号能授权，且刷新令牌约 7 天过期，需要重新连接；个人使用可将应用发布到“正式版”（会出现“未验证应用”提示，点击继续即可）。
+3. 创建 **OAuth 客户端 ID**（Web 应用），授权重定向 URI 填：
+   - `https://alex-portfolio-sepia.vercel.app/api/workspace/mail/callback`
+   - 本地调试再加 `http://localhost:3000/api/workspace/mail/callback`
+4. 在 Vercel 设置环境变量（Sensitive）：`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`，以及随机的 `MAIL_TOKEN_KEY`（至少 32 个字符，丢失后需要重新连接所有账号）。重新部署后在 Mail 页点击 “Connect Gmail”。

@@ -1,5 +1,6 @@
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
-import { DeepSeekError, deepSeekErrorCode, guideExcerpt, quickDeepSeek, streamDeepSeek } from "../../../lib/workspaceDeepSeek";
+import { DeepSeekError, guideExcerpt, quickDeepSeek, streamDeepSeek } from "../../../lib/workspaceDeepSeek";
+import { ndjson } from "../../../lib/workspaceStream";
 import { needsEnglishKeywords, queryTerms, retrieveContext } from "../../../lib/workspaceRetrieval";
 import { readDocument, readDocumentText, writeDocument, workspaceStorageConfigured } from "../../../lib/workspaceStore";
 
@@ -99,26 +100,5 @@ export async function POST(request: Request) {
     if (!answer.trim()) throw new DeepSeekError(502);
     if (request.signal.aborted) return;
     send({ t: "done", ...(await prepared.finish(answer.trim())) });
-  });
-}
-
-/** Newline-delimited JSON events so the browser can render the answer as it arrives. */
-function ndjson(run: (send: (event: Record<string, unknown>) => void) => Promise<void>) {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (event: Record<string, unknown>) => { try { controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)); } catch { /* client went away */ } };
-      try {
-        await run(send);
-      } catch (error) {
-        const status = error instanceof DeepSeekError ? error.status : 502;
-        send({ t: "error", code: deepSeekErrorCode(status) });
-      } finally {
-        try { controller.close(); } catch { /* already closed */ }
-      }
-    },
-  });
-  return new Response(stream, {
-    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store, no-transform", "X-Accel-Buffering": "no" },
   });
 }
