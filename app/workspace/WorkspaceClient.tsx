@@ -152,6 +152,25 @@ function Reader() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  // iOS keeps 100dvh unchanged when the keyboard opens, which would hide the
+  // question box. Track the visual viewport so the layout shrinks with it.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const root = document.documentElement;
+    const sync = () => {
+      root.style.setProperty("--ws-vh", `${viewport.height}px`);
+      if (viewport.offsetTop > 0) window.scrollTo(0, 0);
+    };
+    sync();
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+      root.style.removeProperty("--ws-vh");
+    };
+  }, []);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [active?.document.messages?.length]);
 
   async function openDocument(id: string, section = 0) {
@@ -260,7 +279,7 @@ function Reader() {
       <span className="workspace-header__title">Workspace</span>
       <div className="workspace-header__actions">
         <span className="workspace-private"><LockKeyhole size={12} /> PRIVATE</span>
-        <button type="button" className="workspace-dot-action" onClick={logout} aria-label="Sign out" title="Sign out">
+        <button type="button" className="workspace-dot-action workspace-icon-only" onClick={logout} aria-label="Sign out" title="Sign out">
           <span className="workspace-dot-action__content"><LogOut size={15} /> Sign out</span>
         </button>
       </div>
@@ -278,10 +297,10 @@ function Reader() {
       <div className="workspace-library__label"><FolderOpen size={14} /> DOCUMENTS</div>
       <div className="workspace-document-list">
         {loadingLibrary ? <div className="workspace-list-empty"><Loader2 className="workspace-spin" size={18} /> Loading</div> : documents.length ? documents.map((document) =>
-          <div key={document.id} className={`workspace-document ${active?.document.id === document.id ? "is-active" : ""}`}>
+          <div key={document.id} className={`workspace-document ${active?.document.id === document.id ? "is-active" : ""}`} onClick={() => void openDocument(document.id)}>
             <FileText size={18} />
             <div className="workspace-document__meta"><strong>{document.name}</strong><small>{formatDate(document.createdAt)} · {document.pageCount ? `${document.pageCount} pages` : `${Math.max(1, Math.round(document.characterCount / 1000))}k characters`}</small></div>
-            <button type="button" className="workspace-dot-action workspace-document__open" aria-label={`Open ${document.name}`} title={`Open ${document.name}`} onClick={() => void openDocument(document.id)}><span className="workspace-dot-action__content"><ArrowRight size={14} /> Open</span></button>
+            <button type="button" className="workspace-dot-action workspace-document__open" aria-label={`Open ${document.name}`} title={`Open ${document.name}`}><span className="workspace-dot-action__content"><ArrowRight size={14} /> Open</span></button>
           </div>
         ) : <div className="workspace-list-empty"><span>No documents yet.</span></div>}
       </div>
@@ -300,7 +319,7 @@ function Reader() {
             <button type="button" className="workspace-dot-action workspace-panel-toggle" aria-label={panelOpen ? "Hide assistant" : "Show assistant"} title={panelOpen ? "Hide assistant" : "Show assistant"} onClick={() => setPanelOpen(!panelOpen)}><span className="workspace-dot-action__content">{panelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} Assistant</span></button>
           </div>
         </div>
-        {view === "original" ? <iframe className="workspace-pdf" title={active.document.name} src={`/api/workspace/documents/${active.document.id}/file`} /> : <div className="workspace-reader__scroll"><div className="workspace-paper"><p className="workspace-paper__label">SOURCE TEXT <span>·</span> SELECT A PARAGRAPH TO TRANSLATE</p>{paragraphs.map((paragraph, index) => <button type="button" key={`${active.document.id}-${index}`} className={`workspace-paragraph ${selection === paragraph ? "is-selected" : ""}`} onClick={() => { setSelection(paragraph); setTranslation(""); }}>{paragraph}</button>)}</div></div>}
+        {view === "original" ? <iframe className="workspace-pdf" title={active.document.name} src={`/api/workspace/documents/${active.document.id}/file`} /> : <div className="workspace-reader__scroll"><div className="workspace-paper"><p className="workspace-paper__label">SOURCE TEXT <span>·</span> SELECT A PARAGRAPH TO TRANSLATE</p>{paragraphs.map((paragraph, index) => <div role="button" tabIndex={0} aria-pressed={selection === paragraph} key={`${active.document.id}-${index}`} className={`workspace-paragraph ${selection === paragraph ? "is-selected" : ""}`} onClick={() => { if (window.getSelection()?.toString()) return; setSelection(paragraph); setTranslation(""); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelection(paragraph); setTranslation(""); } }}>{paragraph}</div>)}</div></div>}
         {view === "text" && active.sectionCount > 1 && <nav className="workspace-sections" aria-label="Reading sections">
           <button type="button" className="workspace-dot-action" aria-label="Previous section" title="Previous section" disabled={loadingSection || !!busy || active.section === 0} onClick={() => void openDocument(active.document.id, active.section - 1)}><span className="workspace-dot-action__content"><ArrowLeft size={15} /> Previous</span></button>
           <span aria-live="polite">{loadingSection ? "Loading…" : `Section ${active.section + 1} / ${active.sectionCount}`}</span>
