@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronLeft, Languages, List, MessageCircle, Type } from "lucide-react";
+import { ChevronLeft, Highlighter, Languages, List, MessageCircle, Type } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Chapter } from "../lib/workspaceOutline";
-import type { WorkspaceDocument } from "../lib/workspaceStore";
+import type { MarkColor, WorkspaceDocument, WorkspaceMark } from "../lib/workspaceStore";
+import { MarkPopover, NoteSheet, renderMarked, TranslateCard, type StreamFn } from "./ReaderExtras";
 import { ContentsSheet, SettingsSheet } from "./ReaderSheets";
 import { toBlocks } from "./readerText";
 import { useReaderPrefs } from "./readerPrefs";
@@ -30,9 +31,12 @@ type Props = {
   onBack: (offset: number) => void;
   onAssistant: (mode: "open" | "translate" | "ask", selection?: string, offset?: number) => void;
   onError: (message: string) => void;
+  stream: StreamFn;
+  /** A page cited by the assistant; each request has a new `seq`. */
+  citation: { seq: number; page: number } | null;
 };
 
-export default function BookReader({ book, onBack, onAssistant, onError }: Props) {
+export default function BookReader({ book, onBack, onAssistant, onError, stream, citation }: Props) {
   const [prefs, setPrefs] = useReaderPrefs();
   const documentId = book.document.id;
   const isPdf = book.document.mimeType === "application/pdf";
@@ -46,6 +50,13 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
   const [loading, setLoading] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [selection, setSelection] = useState<SelectionState | null>(null);
+  const [marks, setMarks] = useState<WorkspaceMark[]>([]);
+  const [activeMark, setActiveMark] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [noteMark, setNoteMark] = useState<string | null>(null);
+  const [translating, setTranslating] = useState<string | null>(null);
+  const marksLoaded = useRef(false);
+  const marksTimer = useRef<number | undefined>(undefined);
+  const rangeRef = useRef<Range | null>(null);
 
   const viewRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
@@ -95,6 +106,32 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
       flushProgress(true);
     };
   }, [flushProgress]);
+
+  // ---- highlights -----------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/workspace/marks?id=${encodeURIComponent(documentId)}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<{ marks: WorkspaceMark[] }> : null)
+      .then((data) => { if (!cancelled && data) { setMarks(data.marks); marksLoaded.current = true; } })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [documentId]);
+
+  const updateMarks = useCallback((change: (current: WorkspaceMark[]) => WorkspaceMark[]) => {
+    setMarks((current) => {
+      const next = change(current);
+      window.clearTimeout(marksTimer.current);
+      // Never write before the saved list has loaded, or it would be overwritten.
+      if (marksLoaded.current) {
+        marksTimer.current = window.setTimeout(() => {
+          void fetch("/api/workspace/marks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: documentId, marks: next }), keepalive: true })
+            .then((response) => { if (!response.ok) onError("Could not save highlights."); })
+            .catch(() => onError("Could not save highlights."));
+        }, 600);
+      }
+      return next;
+    });
+  }, [documentId, onError]);
 
   // ---- geometry -------------------------------------------------------------
   useEffect(() => {
@@ -314,6 +351,12 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
     if (Math.abs(event.clientX - g.x) > 10 || Math.abs(event.clientY - g.y) > 10 || hasSelection()) return;
     const rect = viewRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const hit = (event.target as HTMLElement).closest?.("mark[data-mark]") as HTMLElement | null;
+    if (hit?.dataset.mark) {
+      const box = hit.getBoundingClientRect();
+      setActiveMark({ id: hit.dataset.mark, x: Math.min(Math.max(box.left + box.width / 2, 130), window.innerWidth - 130), y: Math.min(box.bottom + 10, window.innerHeight - 70) });
+      return;
+    }
     const ratio = (event.clientX - rect.left) / rect.width;
     if (paged && ratio < 0.25) turn(-1);
     else if (paged && ratio > 0.75) turn(1);
@@ -329,6 +372,7 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
         setSelection(null);
         return;
       }
+      rangeRef.current = current.getRangeAt(0).cloneRange();
       const rect = current.getRangeAt(0).getBoundingClientRect();
       setSelection({ text: text.slice(0, 6000), x: Math.min(Math.max(rect.left + rect.width / 2, 110), window.innerWidth - 110), y: Math.min(rect.bottom + 14, window.innerHeight - 70) });
     };
@@ -336,12 +380,73 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
     return () => document.removeEventListener("selectionchange", onChange);
   }, []);
 
-  const applySelection = (mode: "translate" | "ask") => {
+  const clearSelection = () => { window.getSelection()?.removeAllRanges(); setSelection(null); };
+
+  const askAbout = () => {
     if (!selection) return;
-    onAssistant(mode, selection.text, offsetRef.current);
-    window.getSelection()?.removeAllRanges();
-    setSelection(null);
+    onAssistant("ask", selection.text, offsetRef.current);
+    clearSelection();
   };
+
+  const translateSelection = () => {
+    if (!selection) return;
+    setTranslating(selection.text);
+    clearSelection();
+  };
+
+  const highlight = (color: MarkColor = "yellow") => {
+    const range = rangeRef.current;
+    if (!range) return;
+    const created: WorkspaceMark[] = [];
+    blockEls.current.forEach((el, index) => {
+      const block = blocks[index];
+      if (!el || !block || block.heading !== undefined || !range.intersectsNode(el)) return;
+      const whole = document.createRange();
+      whole.selectNodeContents(el);
+      let from = 0;
+      let to = block.text.length;
+      if (range.compareBoundaryPoints(Range.START_TO_START, whole) > 0) {
+        const before = document.createRange();
+        before.selectNodeContents(el);
+        before.setEnd(range.startContainer, range.startOffset);
+        from = before.toString().length;
+      }
+      if (range.compareBoundaryPoints(Range.END_TO_END, whole) < 0) {
+        const before = document.createRange();
+        before.selectNodeContents(el);
+        before.setEnd(range.endContainer, range.endOffset);
+        to = before.toString().length;
+      }
+      const slice = block.text.slice(from, to);
+      from += slice.length - slice.trimStart().length;
+      to = from + slice.trim().length;
+      if (to > from) created.push({ id: crypto.randomUUID(), blockOffset: block.offset, from, to, text: block.text.slice(from, to), color, createdAt: new Date().toISOString() });
+    });
+    if (!created.length) return;
+    updateMarks((current) => [
+      ...current.filter((mark) => !created.some((item) => item.blockOffset === mark.blockOffset && mark.from < item.to && item.from < mark.to)),
+      ...created,
+    ]);
+    clearSelection();
+  };
+
+  const marksByBlock = useMemo(() => {
+    const map = new Map<number, WorkspaceMark[]>();
+    for (const mark of marks) map.set(mark.blockOffset, [...(map.get(mark.blockOffset) ?? []), mark]);
+    return map;
+  }, [marks]);
+  const popoverMark = marks.find((mark) => mark.id === activeMark?.id) ?? null;
+
+  // A page cited in the assistant's answer: find it in the text and go there.
+  const lastCitation = useRef(0);
+  useEffect(() => {
+    if (!citation || citation.seq === lastCitation.current) return;
+    lastCitation.current = citation.seq;
+    void fetch(`/api/workspace/documents?id=${encodeURIComponent(documentId)}&page=${citation.page}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<{ offset: number }> : Promise.reject(new Error("missing")))
+      .then(({ offset: target }) => jumpTo(target))
+      .catch(() => onError(`Page ${citation.page} was not found in this book.`));
+  }, [citation, documentId, jumpTo, onError]);
 
   // ---- display --------------------------------------------------------------
   const currentChapter = useMemo(() => {
@@ -375,7 +480,7 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
       <article className="reader-pages" ref={pagesRef} lang={/[㐀-鿿]/.test(segment.text.slice(0, 400)) ? "zh" : "en"}>
         {blocks.map((block, index) => block.heading !== undefined
           ? <h2 key={block.offset} className="reader-chapter" ref={(el) => { blockEls.current[index] = el; }}>{block.heading.split(" · ").map((part, i) => i === 0 ? <small key={i}>{part}</small> : <span key={i}>{part}</span>)}</h2>
-          : <p key={block.offset} ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{block.text}</p>)}
+          : <p key={block.offset} ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{renderMarked(block.text, marksByBlock.get(block.offset) ?? [])}</p>)}
         {!paged && <div className="reader-scroll-end">
           {segment.index > 0 && <button type="button" className="ws-text-button" onClick={() => void loadSegment(`segment=${segment.index - 1}`, segment.index - 1, { kind: "first" })}>Previous section</button>}
           {segment.index < segment.starts.length - 1 && <button type="button" className="ws-text-button" onClick={() => void loadSegment(`segment=${segment.index + 1}`, segment.index + 1, { kind: "first" })}>Next section</button>}
@@ -395,11 +500,21 @@ export default function BookReader({ book, onBack, onAssistant, onError }: Props
     {!chrome && <div className="reader-folio" aria-hidden="true"><span>{currentChapter}</span><span>{isPdf && currentPage ? currentPage : `${percent}%`}</span></div>}
 
     {selection && <div className="reader-selection" style={{ left: selection.x, top: selection.y }} onPointerDown={(event) => event.preventDefault()}>
-      <button type="button" onClick={() => applySelection("translate")}><Languages size={15} /> Translate</button>
-      <button type="button" onClick={() => applySelection("ask")}><MessageCircle size={15} /> Ask</button>
+      <button type="button" onClick={() => highlight()}><Highlighter size={15} /> Highlight</button>
+      <button type="button" onClick={translateSelection}><Languages size={15} /> Translate</button>
+      <button type="button" onClick={askAbout}><MessageCircle size={15} /> Ask</button>
     </div>}
 
+    {translating && <TranslateCard source={translating} documentId={documentId} stream={stream} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating, offsetRef.current); setTranslating(null); }} />}
+
+    {activeMark && popoverMark && <MarkPopover mark={popoverMark} x={activeMark.x} y={activeMark.y}
+      onColor={(color) => { updateMarks((current) => current.map((mark) => mark.id === popoverMark.id ? { ...mark, color } : mark)); setActiveMark(null); }}
+      onNote={() => { setNoteMark(popoverMark.id); setActiveMark(null); }}
+      onDelete={() => { updateMarks((current) => current.filter((mark) => mark.id !== popoverMark.id)); setActiveMark(null); }}
+      onClose={() => setActiveMark(null)} />}
+    <NoteSheet mark={marks.find((mark) => mark.id === noteMark) ?? null} onSave={(note) => { updateMarks((current) => current.map((mark) => mark.id === noteMark ? { ...mark, note: note.trim() || undefined } : mark)); setNoteMark(null); }} />
+
     <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} prefs={prefs} update={setPrefs} />
-    <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} onJump={jumpTo} />
+    <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} marks={marks} onJump={jumpTo} />
   </div>;
 }

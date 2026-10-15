@@ -22,6 +22,20 @@ const metaPath = (id: string) => `workspace/docs/${id}.json`;
 // record that the library list reads for every document.
 const statePath = (id: string) => `workspace/state/${id}.json`;
 const progressPath = (id: string) => `workspace/progress/${id}.json`;
+const marksPath = (id: string) => `workspace/marks/${id}.json`;
+
+export type MarkColor = "yellow" | "green" | "blue" | "pink";
+/** A highlight inside one reading block, anchored by the block's offset in the document text. */
+export type WorkspaceMark = {
+  id: string;
+  blockOffset: number;
+  from: number;
+  to: number;
+  text: string;
+  color: MarkColor;
+  note?: string;
+  createdAt: string;
+};
 
 export type WorkspaceLibraryItem = WorkspaceDocumentSummary & { progress: number | null };
 const textPath = (id: string) => `workspace/text/${id}.txt`;
@@ -92,6 +106,16 @@ export async function readProgress(id: string): Promise<number | null> {
   return typeof offset === "number" && Number.isFinite(offset) && offset >= 0 ? offset : null;
 }
 
+export async function readMarks(id: string): Promise<WorkspaceMark[]> {
+  if (!validDocumentId(id)) return [];
+  const raw = await readText(marksPath(id));
+  return raw ? JSON.parse(raw) as WorkspaceMark[] : [];
+}
+
+export async function writeMarks(id: string, marks: WorkspaceMark[]) {
+  await put(marksPath(id), JSON.stringify(marks), { access: "private", allowOverwrite: true, contentType: "application/json" });
+}
+
 export async function writeProgress(id: string, offset: number) {
   await put(progressPath(id), JSON.stringify({ offset, updatedAt: new Date().toISOString() }), {
     access: "private",
@@ -123,13 +147,13 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
 }
 
 export async function deleteDocument(document: WorkspaceDocument) {
-  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), textPath(document.id), document.filePath]);
+  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), textPath(document.id), document.filePath]);
 }
 
 /** Best-effort removal of everything an interrupted upload may have left behind. */
 export async function discardUpload(id: string, filePath: string) {
   try {
-    await del([filePath, textPath(id), statePath(id), progressPath(id), metaPath(id)]);
+    await del([filePath, textPath(id), statePath(id), progressPath(id), marksPath(id), metaPath(id)]);
   } catch {
     // Nothing more can be done here; the original error is what the caller reports.
   }

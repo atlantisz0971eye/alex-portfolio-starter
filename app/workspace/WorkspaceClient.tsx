@@ -122,6 +122,7 @@ function App() {
   const [book, setBook] = useState<OpenedBook | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
+  const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
   const [error, setError] = useState("");
   const intentId = useRef(0);
 
@@ -244,8 +245,8 @@ function App() {
   return <>
     <Library documents={documents} loading={loading} uploading={uploading || opening} onOpen={(id) => void openDocument(id)} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />
     {book && <>
-      <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} />
-      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} />
+      <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} />
+      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(page) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, page })); }} />
     </>}
     {error && <div className="ws-toast" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={16} /></button></div>}
   </>;

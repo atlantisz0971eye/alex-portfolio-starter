@@ -1,6 +1,8 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { useState } from "react";
+import type { WorkspaceMark } from "../lib/workspaceStore";
 import type { Chapter } from "../lib/workspaceOutline";
 import { FONT_RANGE, type ReaderFont, type ReaderPrefs, type ReaderTheme } from "./readerPrefs";
 import { Sheet } from "./Sheet";
@@ -45,22 +47,37 @@ export function SettingsSheet({ open, onClose, prefs, update }: SettingsProps) {
   </Sheet>;
 }
 
-type ContentsProps = { open: boolean; onClose: () => void; chapters: Chapter[]; starts: number[]; offset: number; totalLength: number; onJump: (offset: number) => void };
+type ContentsProps = { open: boolean; onClose: () => void; chapters: Chapter[]; starts: number[]; offset: number; totalLength: number; marks: WorkspaceMark[]; onJump: (offset: number) => void };
 
-export function ContentsSheet({ open, onClose, chapters, starts, offset, totalLength, onJump }: ContentsProps) {
+export function ContentsSheet({ open, onClose, chapters, starts, offset, totalLength, marks, onJump }: ContentsProps) {
+  const [tab, setTab] = useState<"contents" | "highlights">("contents");
   const items = chapters.length
     ? chapters.map((chapter) => ({ title: chapter.title.replace(" · ", " — "), offset: chapter.offset }))
     : starts.map((start, index) => ({ title: `Section ${index + 1}`, offset: start }));
   let currentIndex = 0;
   items.forEach((item, index) => { if (item.offset <= offset) currentIndex = index; });
-  return <Sheet open={open} onClose={onClose} title="Contents" size="tall">
-    {!chapters.length && <p className="ws-note">No chapter headings were found, so the book is divided into sections.</p>}
-    <ol className="ws-contents">
-      {items.map((item, index) => <li key={`${item.offset}-${index}`}>
-        <button type="button" className={index === currentIndex ? "is-current" : ""} onClick={() => onJump(item.offset)}>
-          <span>{item.title}</span><small>{Math.round((item.offset / Math.max(1, totalLength)) * 100)}%</small>
+  const sortedMarks = [...marks].sort((x, y) => x.blockOffset + x.from - (y.blockOffset + y.from));
+  return <Sheet open={open} onClose={onClose} title={tab === "contents" ? "Contents" : "Highlights"} size="tall">
+    <div className="ws-segment" role="tablist">
+      <button type="button" role="tab" aria-selected={tab === "contents"} className={tab === "contents" ? "is-on" : ""} onClick={() => setTab("contents")}>Contents</button>
+      <button type="button" role="tab" aria-selected={tab === "highlights"} className={tab === "highlights" ? "is-on" : ""} onClick={() => setTab("highlights")}>Highlights{marks.length ? ` · ${marks.length}` : ""}</button>
+    </div>
+    {tab === "contents" ? <>
+      {!chapters.length && <p className="ws-note">No chapter headings were found, so the book is divided into sections.</p>}
+      <ol className="ws-contents">
+        {items.map((item, index) => <li key={`${item.offset}-${index}`}>
+          <button type="button" className={index === currentIndex ? "is-current" : ""} onClick={() => onJump(item.offset)}>
+            <span>{item.title}</span><small>{Math.round((item.offset / Math.max(1, totalLength)) * 100)}%</small>
+          </button>
+        </li>)}
+      </ol>
+    </> : sortedMarks.length === 0 ? <p className="ws-note">Select text and tap Highlight to save passages here.</p> : <ul className="ws-marks">
+      {sortedMarks.map((mark) => <li key={mark.id}>
+        <button type="button" onClick={() => onJump(mark.blockOffset)}>
+          <span className={`ws-marks__text hl-${mark.color}`}>{mark.text.slice(0, 220)}{mark.text.length > 220 ? "…" : ""}</span>
+          {mark.note && <em>{mark.note}</em>}
         </button>
       </li>)}
-    </ol>
+    </ul>}
   </Sheet>;
 }

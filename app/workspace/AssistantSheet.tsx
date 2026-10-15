@@ -6,6 +6,19 @@ import ReactMarkdown from "react-markdown";
 import type { WorkspaceDocument } from "../lib/workspaceStore";
 import { Sheet } from "./Sheet";
 
+/** Turns "[Page 12]" mentions into links that jump the reader to that page. */
+function withCitations(markdown: string) {
+  return markdown.replace(/\[(?:Page|p\.?)\s*(\d{1,5})(?:\s*[-–,，、]\s*\d{1,5})?\]/gi, (_match, page) => `[p. ${page}](#cite-${page})`);
+}
+
+function Markdown({ children, onCite }: { children: string; onCite: (page: number) => void }) {
+  return <ReactMarkdown components={{
+    a: ({ href, children: label }) => href?.startsWith("#cite-")
+      ? <button type="button" className="ws-cite" onClick={() => onCite(Number(href.slice(6)))}>{label}</button>
+      : <a href={href} target="_blank" rel="noreferrer">{label}</a>,
+  }}>{withCitations(children)}</ReactMarkdown>;
+}
+
 export type AssistantIntent = { id: number; mode: "open" | "translate" | "ask"; selection?: string; offset?: number };
 type Done = { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
 type Live = { kind: "guide" | "ask" | "translate"; question?: string; source?: string; text: string };
@@ -17,9 +30,10 @@ type Props = {
   onDocument: (document: WorkspaceDocument) => void;
   stream: (body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal) => Promise<Done>;
   onError: (message: string) => void;
+  onCite: (page: number) => void;
 };
 
-export function AssistantSheet({ open, onClose, document, intent, onDocument, stream, onError }: Props) {
+export function AssistantSheet({ open, onClose, document, intent, onDocument, stream, onError, onCite }: Props) {
   const [question, setQuestion] = useState("");
   const [live, setLive] = useState<Live | null>(null);
   const [translation, setTranslation] = useState<{ source: string; text: string } | null>(null);
@@ -92,9 +106,9 @@ export function AssistantSheet({ open, onClose, document, intent, onDocument, st
         <section className="ws-card">
           <div className="ws-card__head"><span><BookOpen size={15} /> Reading guide</span><small>{document.guideCoverage === "excerpts" ? "Based on excerpts" : document.guideCoverage === "full" ? "Based on full text" : ""}</small></div>
           {live?.kind === "guide"
-            ? (live.text ? <div className="ws-markdown"><ReactMarkdown>{live.text}</ReactMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading the book…</p>)
+            ? (live.text ? <div className="ws-markdown"><Markdown onCite={onCite}>{live.text}</Markdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading the book…</p>)
             : document.guide
-              ? <div className="ws-markdown"><ReactMarkdown>{document.guide}</ReactMarkdown></div>
+              ? <div className="ws-markdown"><Markdown onCite={onCite}>{document.guide}</Markdown></div>
               : <button type="button" className="ws-pill" onClick={guide} disabled={busy}><Sparkles size={16} /> Generate guide</button>}
         </section>
         {showTranslation && <section className="ws-card">
@@ -103,12 +117,12 @@ export function AssistantSheet({ open, onClose, document, intent, onDocument, st
           {showTranslation.text ? <p className="ws-translation">{showTranslation.text}</p> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
         </section>}
         {(document.messages ?? []).map((message, index) => <div key={index} className={`ws-message ws-message--${message.role}`}>
-          <div className="ws-markdown"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+          <div className="ws-markdown"><Markdown onCite={onCite}>{message.content}</Markdown></div>
         </div>)}
         {live?.kind === "ask" && <>
           <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{live.question}</p></div></div>
           <div className="ws-message ws-message--assistant">
-            {live.text ? <div className="ws-markdown"><ReactMarkdown>{live.text}</ReactMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Searching the book…</p>}
+            {live.text ? <div className="ws-markdown"><Markdown onCite={onCite}>{live.text}</Markdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Searching the book…</p>}
           </div>
         </>}
         {failure && !busy && <div className="ws-card ws-card--error">

@@ -56,6 +56,15 @@ export async function GET(request: Request) {
     const document = await readDocument(id);
     if (!document) return Response.json({ error: "not_found" }, { status: 404 });
     const text = await readDocumentText(id);
+    const pageParam = params.get("page");
+    if (pageParam !== null) {
+      // Resolve a printed page number (a citation) to a position in the text.
+      const page = Number(pageParam);
+      const marker = `[Page ${page}]`;
+      const at = Number.isSafeInteger(page) && page > 0 ? (text ?? "").indexOf(marker) : -1;
+      // Land on the first text after the marker, not the passage before it.
+      return at === -1 ? Response.json({ error: "not_found" }, { status: 404 }) : Response.json({ offset: at + marker.length + 1 }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     // Without an explicit target, reopen where the reader left off.
     const saved = segment === undefined && offset === undefined ? await readProgress(id).catch(() => null) : null;
     const window = readerWindow(text ?? "", { segment, offset: offset ?? saved ?? 0 });
