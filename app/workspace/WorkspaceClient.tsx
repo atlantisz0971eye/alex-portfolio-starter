@@ -71,7 +71,8 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
     const root = document.documentElement;
     const sync = () => {
       root.style.setProperty("--ws-vh", `${viewport?.height ?? window.innerHeight}px`);
-      if (viewport && viewport.offsetTop > 0) window.scrollTo(0, 0);
+      // When the keyboard opens, iOS pans the visual viewport instead of resizing the page; follow it so nothing is left uncovered.
+      root.style.setProperty("--ws-top", `${viewport?.offsetTop ?? 0}px`);
     };
     sync();
     // iOS reports the keyboard height late and scrolls clipped containers to reveal the caret, so re-check and undo both.
@@ -94,6 +95,7 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
       window.removeEventListener("focusout", settle);
       document.removeEventListener("scroll", unscroll, true);
       root.style.removeProperty("--ws-vh");
+      root.style.removeProperty("--ws-top");
     };
   }, []);
   const [theme, setTheme] = useState<Theme>("light");

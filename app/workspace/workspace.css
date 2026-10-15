@@ -24,7 +24,7 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --sat: env(safe-area-inset-top, 0px);
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: var(--ws-top, 0px); left: 0; right: 0;
   height: var(--ws-vh, 100dvh);
   overflow: hidden;
   background: var(--bg);
