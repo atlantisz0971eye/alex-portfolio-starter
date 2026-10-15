@@ -1,13 +1,28 @@
 export class DeepSeekError extends Error {
+  /** `status` is DeepSeek's HTTP status, or 0 when the key is not configured here. */
   constructor(readonly status: number) {
     super("DeepSeek request failed");
   }
 }
 
-const FIRST_TOKEN_MS = 30_000;
+/** Maps an upstream status to the error code the client explains to the reader. */
+export function deepSeekErrorCode(status: number) {
+  if (status === 0) return "ai_not_configured";
+  if (status === 401) return "ai_auth";
+  if (status === 402) return "ai_balance";
+  if (status === 429) return "rate_limited";
+  if (status === 504) return "ai_timeout";
+  if (status === 400 || status === 404 || status === 422) return "ai_request";
+  if (status === 500 || status === 502 || status === 503) return "ai_busy";
+  return "assistant_failed";
+}
+
+const FIRST_TOKEN_MS = 35_000;
 const IDLE_MS = 30_000;
 const TOTAL_MS = 100_000;
 const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-flash";
+// Any OpenAI-compatible host serving DeepSeek works, which helps when the official API is queued.
+const ENDPOINT = `${(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "")}/chat/completions`;
 
 type Chunk = { choices?: { delta?: { content?: string | null } }[] };
 
@@ -17,7 +32,7 @@ type Chunk = { choices?: { delta?: { content?: string | null } }[] };
  */
 export async function* streamDeepSeek(system: string, user: string, maxTokens: number, signal?: AbortSignal): AsyncGenerator<string> {
   const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) throw new DeepSeekError(503);
+  if (!key) throw new DeepSeekError(0);
   const controller = new AbortController();
   let stalled = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -30,7 +45,7 @@ export async function* streamDeepSeek(system: string, user: string, maxTokens: n
   signal?.addEventListener("abort", onAbort);
   arm(FIRST_TOKEN_MS);
   try {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
+    const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -44,14 +59,17 @@ export async function* streamDeepSeek(system: string, user: string, maxTokens: n
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!response.ok || !response.body) throw new DeepSeekError(response.status || 502);
+    if (!response.ok || !response.body) {
+      // The status and reason show up in the platform's runtime logs.
+      console.error("DeepSeek request failed", response.status, MODEL, (await response.text().catch(() => "")).slice(0, 300));
+      throw new DeepSeekError(response.status || 502);
+    }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      arm(IDLE_MS);
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -59,6 +77,8 @@ export async function* streamDeepSeek(system: string, user: string, maxTokens: n
         if (!line.startsWith("data:")) continue;
         const data = line.slice(5).trim();
         if (data === "[DONE]") return;
+        // Keep-alive comments only mean DeepSeek has queued the request, so only real data resets the clock.
+        arm(IDLE_MS);
         try {
           const delta = (JSON.parse(data) as Chunk).choices?.[0]?.delta?.content;
           if (delta) yield delta;
@@ -83,7 +103,7 @@ export async function quickDeepSeek(system: string, user: string, maxTokens: num
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) return null;
   try {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
+    const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({

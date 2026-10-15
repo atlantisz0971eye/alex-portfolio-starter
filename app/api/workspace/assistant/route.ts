@@ -1,5 +1,5 @@
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
-import { DeepSeekError, guideExcerpt, quickDeepSeek, streamDeepSeek } from "../../../lib/workspaceDeepSeek";
+import { DeepSeekError, deepSeekErrorCode, guideExcerpt, quickDeepSeek, streamDeepSeek } from "../../../lib/workspaceDeepSeek";
 import { needsEnglishKeywords, queryTerms, retrieveContext } from "../../../lib/workspaceRetrieval";
 import { readDocument, readDocumentText, writeDocument, workspaceStorageConfigured } from "../../../lib/workspaceStore";
 
@@ -112,7 +112,7 @@ function ndjson(run: (send: (event: Record<string, unknown>) => void) => Promise
         await run(send);
       } catch (error) {
         const status = error instanceof DeepSeekError ? error.status : 502;
-        send({ t: "error", code: status === 503 ? "ai_not_configured" : status === 429 ? "rate_limited" : status === 504 ? "ai_timeout" : "assistant_failed" });
+        send({ t: "error", code: deepSeekErrorCode(status) });
       } finally {
         try { controller.close(); } catch { /* already closed */ }
       }

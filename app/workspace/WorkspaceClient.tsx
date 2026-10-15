@@ -32,6 +32,10 @@ const errors: Record<string, string> = {
   invalid_access_key: "Invalid access key.",
   invalid_selection: "Select a shorter passage to translate.",
   ai_timeout: "DeepSeek is responding slowly right now. Try again.",
+  ai_busy: "DeepSeek is overloaded right now. Try again in a moment.",
+  ai_auth: "DeepSeek rejected the API key. Check DEEPSEEK_API_KEY in Vercel.",
+  ai_balance: "The DeepSeek account has insufficient balance. Top it up on the DeepSeek platform.",
+  ai_request: "DeepSeek rejected the request, likely the model name. Check DEEPSEEK_MODEL.",
   invalid_question: "Ask a slightly longer question.",
 };
 
