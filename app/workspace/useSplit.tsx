@@ -43,8 +43,8 @@ export function useRemembered(key: string, fallback: string) {
 }
 
 /** The draggable line between two panes, with pull tabs that slide a pane away or back. */
-export function Divider({ bind, left, right }: { bind: ReturnType<ReturnType<typeof useSplit>["bind"]>; left?: { label: string; collapsed: boolean; onToggle: () => void }; right?: { label: string; collapsed: boolean; onToggle: () => void } }) {
-  return <div className="ms-split" role="separator" aria-orientation="vertical" {...bind}>
+export function Divider({ bind, left, right, collapsed = false }: { collapsed?: boolean; bind: ReturnType<ReturnType<typeof useSplit>["bind"]>; left?: { label: string; collapsed: boolean; onToggle: () => void }; right?: { label: string; collapsed: boolean; onToggle: () => void } }) {
+  return <div className={`ms-split${collapsed ? " is-collapsed" : ""}`} role="separator" aria-orientation="vertical" {...bind}>
     <div className="ms-split__tabs">
       {left && <button type="button" aria-label={left.label} title={left.label} onClick={left.onToggle}>{left.collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}</button>}
       {right && <button type="button" aria-label={right.label} title={right.label} onClick={right.onToggle}>{right.collapsed ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}</button>}

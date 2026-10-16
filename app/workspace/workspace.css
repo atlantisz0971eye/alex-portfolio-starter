@@ -882,7 +882,7 @@
 .ms-split { position: relative; z-index: 6; width: 10px; cursor: col-resize; touch-action: none; user-select: none; }
 .ms-split::before { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: var(--line); transition: background .15s, width .15s, left .15s; }
 .ms-split:hover::before, body.is-resizing .ms-split::before { left: 3px; width: 3px; background: var(--accent); opacity: .55; }
-.ms-split__tabs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity .15s; }
+.ms-split__tabs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 6px; opacity: .45; transition: opacity .15s; }
 .ms-split:hover .ms-split__tabs, .ms-split:focus-within .ms-split__tabs, body.is-resizing .ms-split__tabs { opacity: 1; }
 .ms-split__tabs button { display: grid; place-items: center; width: 18px; height: 40px; border-radius: 9px; background: var(--float); border: 1px solid var(--line); color: var(--text-2); box-shadow: 0 2px 8px var(--shade); cursor: pointer; }
 .ms-split__tabs button:hover { color: var(--text); background: var(--panel-2); }
@@ -948,3 +948,7 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .dl-form__colors { display: flex; gap: 8px; align-items: center; min-height: 44px; }
 .dl-form__colors button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; }
 .dl-form__colors button.is-on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+
+/* A hidden pane must be easy to find again: its pull tab stays fully visible and wider. */
+.ms-split.is-collapsed .ms-split__tabs { opacity: 1; }
+.ms-split.is-collapsed .ms-split__tabs button { width: 22px; height: 56px; color: var(--text); }

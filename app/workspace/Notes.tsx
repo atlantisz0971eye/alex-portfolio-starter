@@ -312,7 +312,7 @@ export function Notes({ onError, onSignOut, refresh, openId }: Props) {
       <TopRow onSignOut={onSignOut} />
       <div className="notes" style={wide ? { gridTemplateColumns: `${listOpen ? listSplit.size : 0}px 10px minmax(0, 1fr)` } : undefined}>
         <section className={`notes__list${listOpen ? "" : " is-collapsed"}`} aria-label="Pages">{list}</section>
-        {wide && <Divider bind={listSplit.bind(1)} left={{ label: listOpen ? "Hide the page list" : "Show the page list", collapsed: !listOpen, onToggle: () => setListState(listOpen ? "closed" : "open") }} />}
+        {wide && <Divider collapsed={!listOpen} bind={listSplit.bind(1)} left={{ label: listOpen ? "Hide the page list" : "Show the page list", collapsed: !listOpen, onToggle: () => setListState(listOpen ? "closed" : "open") }} />}
         {wide && <section className="notes__pane" aria-label="Page">{editor || <div className="empty"><FileText size={28} /><p>Select a mindstream or create a new one.</p></div>}</section>}
       </div>
     </main>
@@ -409,7 +409,7 @@ function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBa
       </div>
     </div>}
     </div>
-    {roomy && <Divider bind={noteSplit.bind(1)} left={{ label: layout === "board" ? "Show the note" : "Hide the note", collapsed: layout === "board", onToggle: () => setLayout(layout === "board" ? "both" : "board") }} right={{ label: layout === "note" ? "Show the board" : "Hide the board", collapsed: layout === "note", onToggle: () => setLayout(layout === "note" ? "both" : "note") }} />}
+    {roomy && <Divider collapsed={layout !== "both"} bind={noteSplit.bind(1)} left={{ label: layout === "board" ? "Show the note" : "Hide the note", collapsed: layout === "board", onToggle: () => setLayout(layout === "board" ? "both" : "board") }} right={{ label: layout === "note" ? "Show the board" : "Hide the board", collapsed: layout === "note", onToggle: () => setLayout(layout === "note" ? "both" : "note") }} />}
     <div className={`nview__boardpane${roomy && layout === "note" ? " is-collapsed" : ""}`} aria-label="Board">
       {loaded && <StreamBoard noteId={loaded.note.id} title={title} onBoardId={setBoardId} onSaveState={setBoardSave} onError={onError} />}
     </div>
