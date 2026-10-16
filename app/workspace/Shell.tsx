@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, NotebookPen, Sparkles, Sun, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, Sun, Waypoints } from "lucide-react";
 import { createContext, useContext, type ReactNode } from "react";
 
 export type Theme = "light" | "dark";
@@ -12,7 +12,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return <button type="button" className={className} onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}{className.includes("sidebar-theme") ? (theme === "dark" ? " Light mode" : " Dark mode") : ""}</button>;
 }
 
-export type Tab = "today" | "library" | "mail" | "calendar" | "mindstreams" | "notes";
+export type Tab = "today" | "library" | "mail" | "calendar" | "mindstreams";
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "today", label: "Today", icon: Sun },
@@ -20,7 +20,6 @@ const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "mail", label: "Mail", icon: MailIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
   { id: "mindstreams", label: "Mindstreams", icon: Waypoints },
-  { id: "notes", label: "Notes", icon: NotebookPen },
 ];
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */

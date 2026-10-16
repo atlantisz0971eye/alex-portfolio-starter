@@ -1,6 +1,6 @@
 import { layoutOrganized, type Organized } from "./boardLayout";
-import { BoardError, readBoard, updateBoard, type BoardContent } from "./boardStore";
-import { appendToNote, createNote, readNote, updateNote } from "./notesStore";
+import { BoardError, createBoard, listBoards, readBoard, updateBoard, type BoardContent } from "./boardStore";
+import { appendToNote, createNote, listNotes, readNote, updateNote, validNoteId } from "./notesStore";
 import { jsonToText, markdownToDoc } from "./notesText";
 import { outlineOfBoard } from "./mindstream";
 
@@ -13,6 +13,42 @@ export async function ensureNote(boardId: string) {
   const note = await createNote({ title: found.board.title, icon: "🧠", kind: "mindstream" });
   await updateBoard(boardId, { noteId: note.id });
   return { found, noteId: note.id };
+}
+
+/** The board of a note: found by its pairing, or made empty the first time the page is opened. */
+export async function ensureBoardForNote(noteId: string) {
+  const note = validNoteId(noteId) ? await readNote(noteId) : null;
+  if (!note || note.note.deletedAt) throw new BoardError("That page no longer exists.");
+  const existing = (await listBoards()).find((board) => board.noteId === noteId);
+  if (existing) return existing.id;
+  const board = await createBoard(note.note.title || "Untitled", noteId);
+  await updateBoard(board.id, { noteId });
+  return board.id;
+}
+
+/** Accepts either id: the assistant and the client may hold the note id or the board id of the same mindstream. */
+export async function resolveBoardId(id: string) {
+  if (await readBoard(id)) return id;
+  return ensureBoardForNote(id);
+}
+
+/** Boards created before notes and boards were merged have no page in the tree; give each one. */
+export async function adoptOrphanBoards() {
+  const boards = await listBoards();
+  let adopted = 0;
+  for (const board of boards) {
+    const note = board.noteId ? await readNote(board.noteId) : null;
+    if (note && !note.note.deletedAt) continue;
+    const created = await createNote({ title: board.title, icon: "🧠", kind: "mindstream" });
+    await updateBoard(board.id, { noteId: created.id });
+    adopted += 1;
+  }
+  return adopted;
+}
+
+export async function listStreams() {
+  const notes = (await listNotes()).filter((note) => !note.deletedAt && note.kind !== "vocabulary");
+  return notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export type BoardOp =
@@ -105,7 +141,7 @@ export async function applyBoardOps(boardId: string, ops: BoardOp[]) {
   }
   if (!changed) throw new BoardError("None of those changes could be applied. The cards may have changed.");
   await save(boardId, { nodes, edges });
-  return { changed };
+  return { changed, noteId: found.board.noteId };
 }
 
 /** Adds an organized card tree beside what is already on the board, or replaces the text cards (photos stay). */
@@ -123,5 +159,5 @@ export async function applyTree(boardId: string, mode: "add" | "replace", tree: 
   const top = nodes.length ? nodes.reduce((min, node) => Math.min(min, node.position.y), Infinity) : 0;
   const { root, children, edges: tree_ } = layoutOrganized(tree, right + 140, top);
   await save(boardId, { nodes: [...nodes, root, ...children], edges: [...edges, ...tree_] });
-  return { added: children.length + 1 };
+  return { added: children.length + 1, noteId: found.board.noteId };
 }

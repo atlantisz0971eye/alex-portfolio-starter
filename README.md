@@ -93,7 +93,7 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 
 ## Alex Workspace · Mindstreams
 
-一个 Mindstream 是一块白板（board）加上与它配对的一篇笔记（note），两者保持同步，由 DeepSeek 互相转换。宽屏左边是笔记、右边是白板；手机上顶部切换 Note / Board。配对的笔记不会出现在 Notes 标签里，删除 Mindstream 时它进入 Notes 的废纸篓。
+Mindstreams 取代了原来的 Notes 标签：它是一棵页面树（保留子页面、收藏、废纸篓、搜索、导出 Markdown），而每个页面都是一篇笔记加一块与它配对的白板，两者保持同步，由 DeepSeek 互相转换。子页面本身也是完整的 Mindstream，有自己的白板（sub board）。宽屏时左边页面树、中间笔记、右边白板；窄一些的窗口和手机上顶部切换 Note / Board。白板在第一次打开页面时才会创建，所以只写笔记不会变重。词汇本、助手的笔记工具和今天面板仍然使用同一个笔记存储。早先单独创建的白板会在打开 Mindstreams 时自动在页面树里补上一页。
 
 **白板**：无限画布，文字卡、照片、PDF 页都能摆上去，自动保存。**Scan notes** 直接拍纸质笔记（自动去阴影、提亮），**Photo** 从相册导入，**PDF** 从资料库或小文件（≤4 MB）导入页面。选中照片后点 **Read notes**：识别文字（可手动改错字），再整理成层级卡片，预览确认后才加到画布并连线。
 

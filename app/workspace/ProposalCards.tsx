@@ -33,8 +33,8 @@ export async function applyProposal(proposal: Proposal) {
     // The open panes save first, so the server change is built on what is on screen, then they reload.
     await flushMindstream();
     const body = proposal.op === "ms_note" ? { kind: "note", boardId: proposal.ms.boardId, mode: proposal.ms.mode, markdown: proposal.ms.markdown } : { kind: "board", boardId: proposal.ms.boardId, ops: proposal.ms.ops };
-    await parseResponse(await fetch("/api/workspace/mindstream/apply", { method: "POST", headers: json, body: JSON.stringify(body) }));
-    notifyMindstreamChanged(proposal.ms.boardId);
+    const result = await parseResponse<{ noteId?: string }>(await fetch("/api/workspace/mindstream/apply", { method: "POST", headers: json, body: JSON.stringify(body) }));
+    notifyMindstreamChanged(proposal.ms.boardId, result.noteId);
     return;
   }
   if (proposal.op === "note_create" && proposal.note) await parseResponse(await fetch("/api/workspace/notes", { method: "POST", headers: json, body: JSON.stringify({ title: proposal.note.title, markdown: proposal.note.markdown, parentId: proposal.note.parentId ?? null }) }));

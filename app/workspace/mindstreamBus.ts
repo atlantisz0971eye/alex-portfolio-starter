@@ -20,4 +20,5 @@ export async function flushMindstream() {
 }
 
 export const MINDSTREAM_CHANGED = "mindstream:changed";
-export const notifyMindstreamChanged = (boardId: string) => window.dispatchEvent(new CustomEvent(MINDSTREAM_CHANGED, { detail: boardId }));
+export type ChangedDetail = { boardId: string; noteId?: string };
+export const notifyMindstreamChanged = (boardId: string, noteId?: string) => window.dispatchEvent(new CustomEvent<ChangedDetail>(MINDSTREAM_CHANGED, { detail: { boardId, noteId } }));

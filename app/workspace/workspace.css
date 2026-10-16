@@ -865,3 +865,14 @@
 .ms__opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 .ms__opt b { font-weight: 500; }
 .ms__opt small { color: var(--text-2); font-size: 13px; }
+
+/* ===== Mindstream page: note and board in one view ===== */
+.nview__body { position: relative; flex: 1; min-height: 0; }
+.nview__notepane, .nview__boardpane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.nview__boardpane .board { position: absolute; inset: 0; z-index: auto; animation: none; }
+.nview[data-roomy="false"][data-view="board"] .nview__notepane, .nview[data-roomy="false"][data-view="note"] .nview__boardpane { opacity: 0; pointer-events: none; z-index: -1; }
+.nview[data-roomy="true"] .nview__body { display: grid; grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1.15fr); }
+.nview[data-roomy="true"] .nview__notepane, .nview[data-roomy="true"] .nview__boardpane { position: relative; inset: auto; }
+.nview[data-roomy="true"] .nview__boardpane { border-left: 1px solid var(--line); }
+.nview__bar .ms__switch { margin-left: auto; }
+.nview__bar .ms__convert { margin-left: 0; }

@@ -1,12 +1,13 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Download, FilePlus2, FileText, FolderInput, Loader2, MoreHorizontal, Plus, RotateCcw, Search, Smile, Star, Copy, Trash2, Waypoints, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowRightLeft, Download, FilePlus2, FileText, FolderInput, LayoutDashboard, Loader2, MoreHorizontal, Plus, RotateCcw, Search, Smile, Star, Copy, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { jsonToMarkdown, type JSONNode } from "../lib/notesText";
 import type { NoteMeta } from "../lib/notesStore";
-import { layoutOrganized, type Organized } from "../lib/boardLayout";
 import { parseResponse } from "./api";
+import { MINDSTREAM_CHANGED, registerFlush, setCurrentMindstream, type ChangedDetail } from "./mindstreamBus";
 import { NoteEditor } from "./NoteEditor";
+import { ConvertSheet, StreamBoard, type Direction } from "./StreamParts";
 import { Sheet } from "./Sheet";
 import { PageTitle, TopRow } from "./Shell";
 
@@ -19,59 +20,10 @@ const jsonHeaders = { "Content-Type": "application/json" };
 
 const label = (note: NoteMeta) => note.title.trim() || "Untitled";
 
-/** Mindstream, note → board: DeepSeek proposes a card tree for the note; the board is created after you review it. */
-function NoteStreamSheet({ note, onClose, onError, onCreated }: { note: NoteMeta | null; onClose: () => void; onError: (message: string) => void; onCreated: (boardId: string) => void }) {
-  const [result, setResult] = useState<Organized | null>(null);
-  const [saving, setSaving] = useState(false);
-  const id = note?.id;
+type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId?: string | null };
 
-  useEffect(() => {
-    if (!note) return;
-    let cancelled = false;
-    setResult(null);
-    void (async () => {
-      try {
-        const data = await parseResponse<Organized>(await fetch("/api/workspace/mindstream/board", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ noteId: note.id }) }));
-        if (!cancelled) setResult(data);
-      } catch (cause) {
-        if (cancelled) return;
-        onError(cause instanceof Error ? cause.message : "Could not make a board.");
-        onClose();
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function create() {
-    if (!result || !note) return;
-    setSaving(true);
-    try {
-      const { board } = await parseResponse<{ board: { id: string } }>(await fetch("/api/workspace/boards", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ title: result.title || label(note), fromNoteId: note.id }) }));
-      const { root, children, edges } = layoutOrganized(result, 0, 0);
-      await parseResponse(await fetch(`/api/workspace/boards/${board.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ noteId: note.id, content: { nodes: [root, ...children], edges } }) }));
-      onCreated(board.id);
-    } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Could not create the board.");
-    } finally {
-      setSaving(false);
-    }
-  }
-  const depthOf = (items: Organized["items"], index: number): number => items[index].parent === null ? 0 : depthOf(items, items[index].parent as number) + 1;
-
-  return <Sheet open={!!note} onClose={onClose} title="Mindstream · note to board" size="tall" primary={{ label: saving ? "Creating…" : "Create board", onClick: () => void create(), disabled: !result || saving }}>
-    {!result ? <p className="board-read__wait"><Loader2 className="ws-spin" size={16} /> DeepSeek is mapping your note…</p> : <div className="board-read">
-      <p className="board-read__hint">Review the cards. Nothing is created until you confirm.</p>
-      <ul className="board-read__tree">
-        <li className="is-title">{result.title}</li>
-        {result.items.map((item, index) => <li key={index} style={{ paddingLeft: 14 + depthOf(result.items, index) * 18 }}>{item.text}</li>)}
-      </ul>
-    </div>}
-  </Sheet>;
-}
-
-type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId?: string | null; onOpenBoard: (id: string) => void };
-
-export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Props) {
+/** Mindstreams: a tree of pages, each one a note and a board that stay in step. */
+export function Notes({ onError, onSignOut, refresh, openId }: Props) {
   const [notes, setNotes] = useState<NoteMeta[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -82,7 +34,7 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [moveFor, setMoveFor] = useState<string | null>(null);
-  const [streamFor, setStreamFor] = useState<NoteMeta | null>(null);
+  const [revision, setRevision] = useState(0);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [wide, setWide] = useState(false);
 
@@ -110,6 +62,15 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
     }
   }, [onError]);
   useEffect(() => { void loadList(); }, [loadList, refresh]);
+  // Boards made before notes and boards were merged get a page in the tree, once per visit.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { adopted } = await parseResponse<{ adopted: number }>(await fetch("/api/workspace/mindstreams/migrate", { method: "POST" }));
+        if (adopted > 0) void loadList();
+      } catch { /* the tree still works without it */ }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- saving ---------------------------------------------------------------
   const flush = useCallback(async (keepalive = false) => {
@@ -147,6 +108,30 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
     window.addEventListener("pagehide", onHide as EventListener);
     return () => { document.removeEventListener("visibilitychange", onHide); window.removeEventListener("pagehide", onHide as EventListener); void flush(true); };
   }, [flush]);
+
+  // The assistant and Convert change a mindstream on the server: save what is on screen first, then reload what changed.
+  const activeRef = useRef<string | null>(null);
+  useEffect(() => registerFlush(async () => { await flush(); }), [flush]);
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const id = activeRef.current;
+      if (!id || (event as CustomEvent<ChangedDetail>).detail?.noteId !== id) return;
+      pending.current = null;
+      void (async () => {
+        try {
+          const data = await parseResponse<Loaded>(await fetch(`${api}/${id}`, { cache: "no-store" }));
+          if (activeRef.current !== id) return;
+          setLoaded(data);
+          contentRef.current = data.content;
+          setRevision((value) => value + 1);
+          void loadList();
+        } catch { /* the next open will show the saved version */ }
+      })();
+    };
+    window.addEventListener(MINDSTREAM_CHANGED, onChange);
+    return () => window.removeEventListener(MINDSTREAM_CHANGED, onChange);
+  }, [loadList]);
+  useEffect(() => { activeRef.current = activeId; setCurrentMindstream(activeId); return () => setCurrentMindstream(null); }, [activeId]);
 
   // ---- opening and creating -------------------------------------------------
   const open = useCallback(async (id: string | null) => {
@@ -196,8 +181,7 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
   }, [query]);
 
   // ---- tree -----------------------------------------------------------------
-  // A mindstream owns its note, so it lives in the Mindstreams tab and is left out of this tree.
-  const live = useMemo(() => (notes ?? []).filter((item) => !item.deletedAt && item.kind !== "mindstream"), [notes]);
+  const live = useMemo(() => (notes ?? []).filter((item) => !item.deletedAt), [notes]);
   const children = useMemo(() => {
     const map = new Map<string | null, NoteMeta[]>();
     for (const item of live) map.set(item.parentId, [...(map.get(item.parentId) ?? []), item]);
@@ -275,10 +259,10 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
   };
 
   const list = <>
-    <PageTitle actions={<button type="button" className="ws-round" aria-label="New page" onClick={() => void create(null)}><Plus size={22} /></button>}>Notes</PageTitle>
+    <PageTitle actions={<button type="button" className="ws-round" aria-label="New page" onClick={() => void create(null)}><Plus size={22} /></button>}>Mindstreams</PageTitle>
     <label className="mail-search">
       <Search size={16} />
-      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notes" aria-label="Search notes" autoCapitalize="none" autoCorrect="off" />
+      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search mindstreams" aria-label="Search mindstreams" autoCapitalize="none" autoCorrect="off" />
       {query && <button type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={16} /></button>}
     </label>
     {notes === null ? <div className="mail-skeleton"><div><span className="skeleton skeleton--line" /><span className="skeleton skeleton--line skeleton--short" /></div></div>
@@ -289,7 +273,7 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
         </> : <>
           <div className="ntree__tabs"><button type="button" className="is-on">Pages</button><button type="button" onClick={() => setView("trash")}>Trash{trashed.length ? ` · ${trashed.length}` : ""}</button></div>
           {favorites.length > 0 && <><h2 className="section-label">Favorites</h2><ul className="ntree">{favorites.map((note) => <li key={`f-${note.id}`}><div className={`ntree__row${activeId === note.id ? " is-active" : ""}`}><button type="button" className="ntree__main" onClick={() => void open(note.id)}><span className="ntree__icon">{note.icon || <FileText size={16} />}</span><span className="ntree__title">{label(note)}</span></button></div></li>)}</ul></>}
-          {live.length === 0 ? <div className="empty"><FilePlus2 size={28} /><p>No pages yet.</p><button type="button" className="ws-pill ws-pill--solid" onClick={() => void create(null)}><Plus size={16} /> New page</button></div>
+          {live.length === 0 ? <div className="empty"><FilePlus2 size={28} /><p>No mindstreams yet.</p><button type="button" className="ws-pill ws-pill--solid" onClick={() => void create(null)}><Plus size={16} /> New page</button></div>
             : <><h2 className="section-label">Pages</h2><ul className="ntree">{(children.get(null) ?? []).map((note) => row(note, 0))}</ul></>}
         </>}
   </>;
@@ -309,6 +293,8 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
     onIcon={(icon) => void patchNote(activeId, { icon })}
     onMenu={() => setMenuFor(activeId)}
     onAddSubpage={() => void create(activeId)}
+    onError={onError}
+    revision={revision}
   />;
 
   const menuNote = notes?.find((item) => item.id === menuFor) ?? null;
@@ -322,7 +308,7 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
       <TopRow onSignOut={onSignOut} />
       <div className="notes">
         <section className="notes__list" aria-label="Pages">{list}</section>
-        {wide && <section className="notes__pane" aria-label="Page">{editor || <div className="empty"><FileText size={28} /><p>Select a page or create a new one.</p></div>}</section>}
+        {wide && <section className="notes__pane" aria-label="Page">{editor || <div className="empty"><FileText size={28} /><p>Select a mindstream or create a new one.</p></div>}</section>}
       </div>
     </main>
     {!wide && editor && <div className="note-overlay">{editor}</div>}
@@ -333,12 +319,10 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
         <button type="button" onClick={() => { void patchNote(menuNote.id, { favorite: !menuNote.favorite }); setMenuFor(null); }}><Star size={18} /> {menuNote.favorite ? "Remove from favorites" : "Add to favorites"}</button>
         <button type="button" onClick={() => { setMenuFor(null); void duplicate(menuNote.id); }}><Copy size={18} /> Duplicate</button>
         <button type="button" onClick={() => { setMoveFor(menuNote.id); setMenuFor(null); }}><FolderInput size={18} /> Move to…</button>
-        <button type="button" onClick={() => { void flush(); setStreamFor(menuNote); setMenuFor(null); }}><Waypoints size={18} /> Mindstream: make a board</button>
         <button type="button" onClick={() => { setMenuFor(null); void exportMarkdown(menuNote.id); }}><Download size={18} /> Export as Markdown</button>
         <button type="button" className="is-danger" onClick={() => { setMenuFor(null); void trash(menuNote.id); }}><Trash2 size={18} /> Move to trash</button>
       </div>}
     </Sheet>
-    <NoteStreamSheet note={streamFor} onClose={() => setStreamFor(null)} onError={onError} onCreated={(id) => { setStreamFor(null); onOpenBoard(id); }} />
     <Sheet open={!!moveTarget} onClose={() => setMoveFor(null)} title="Move to" size="tall">
       {moveTarget && <div className="doc__group">
         <button type="button" onClick={() => { void patchNote(moveTarget.id, { parentId: null }); setMoveFor(null); }}><FileText size={18} /> Top level</button>
@@ -362,22 +346,48 @@ type ViewProps = {
   onIcon: (icon: string) => void;
   onMenu: () => void;
   onAddSubpage: () => void;
+  onError: (message: string) => void;
+  revision: number;
 };
 
-function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBack, onOpen, onTitle, onContent, onIcon, onMenu, onAddSubpage }: ViewProps) {
+function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBack, onOpen, onTitle, onContent, onIcon, onMenu, onAddSubpage, onError, revision }: ViewProps) {
   const [title, setTitle] = useState("");
   const [picker, setPicker] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
+  const root = useRef<HTMLElement>(null);
+  const [roomy, setRoomy] = useState(false);
+  const [view, setView] = useState<"note" | "board">("note");
+  const [boardId, setBoardId] = useState<string | null>(null);
+  const [boardSave, setBoardSave] = useState<"saved" | "saving" | "error">("saved");
+  const [convertMenu, setConvertMenu] = useState(false);
+  const [direction, setDirection] = useState<Direction | null>(null);
+  // Note and board sit side by side when the pane is wide enough, and switch otherwise.
+  useEffect(() => {
+    const el = root.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setRoomy(entry.contentRect.width >= 860));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => { if (loaded) setTitle(loaded.note.title); }, [loaded?.note.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const el = area.current; if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }, [title, loaded]);
   const fresh = loaded && !loaded.note.title && !loaded.note.preview;
 
-  return <article className="nview">
+  const status = saveState === "error" || boardSave === "error" ? "error" : saveState === "saving" || boardSave === "saving" ? "saving" : "saved";
+
+  return <article className="nview" ref={root} data-roomy={roomy ? "true" : "false"} data-view={view}>
     <header className="nview__bar">
-      {showBack ? <button type="button" className="ws-text-button" onClick={onBack}><ChevronLeft size={22} /> Notes</button> : <span className="nview__crumb">{parent ? `${parent.icon} ${label(parent)}` : ""}</span>}
-      <span className={`nview__status is-${saveState}`} aria-live="polite">{saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : "Saved"}</span>
+      {showBack ? <button type="button" className="ws-text-button" onClick={onBack}><ChevronLeft size={22} /> Mindstreams</button> : <span className="nview__crumb">{parent ? `${parent.icon} ${label(parent)}` : ""}</span>}
+      {!roomy && <div className="ws-segment ms__switch" role="group" aria-label="View">
+        <button type="button" className={view === "note" ? "is-on" : ""} onClick={() => setView("note")}><FileText size={15} /> Note</button>
+        <button type="button" className={view === "board" ? "is-on" : ""} onClick={() => setView("board")}><LayoutDashboard size={15} /> Board</button>
+      </div>}
+      <button type="button" className="ws-pill ms__convert" onClick={() => setConvertMenu(true)}><ArrowRightLeft size={15} /> Convert</button>
+      <span className={`nview__status is-${status}`} aria-live="polite">{status === "saving" ? "Saving…" : status === "error" ? "Not saved" : "Saved"}</span>
       <button type="button" className="ws-round" aria-label="Page options" onClick={onMenu}><MoreHorizontal size={18} /></button>
     </header>
+    <div className="nview__body">
+    <div className="nview__notepane">
     {loading || !loaded ? <div className="nview__scroll"><p className="empty"><Loader2 className="ws-spin" size={18} /></p></div> : <div className="nview__scroll">
       <div className="nview__page">
         <button type="button" className="nview__icon" aria-label="Choose an icon" onClick={() => setPicker(true)}>{loaded.note.icon || <Smile size={26} />}</button>
@@ -385,11 +395,23 @@ function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBa
           onChange={(event) => { const value = event.target.value.replace(/\n/g, " "); setTitle(value); onTitle(value); }}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); (document.querySelector(".note-prose") as HTMLElement | null)?.focus(); } }}
           autoFocus={!!fresh} />
-        <NoteEditor initial={loaded.content} onChange={onContent} autoFocus={false} />
+        <NoteEditor key={`${loaded.note.id}-${revision}`} initial={loaded.content} onChange={onContent} autoFocus={false} />
         {subpages.length > 0 && <div className="nview__subs"><h2 className="section-label">Subpages</h2><ul>{subpages.map((page) => <li key={page.id}><button type="button" onClick={() => onOpen(page.id)}><span>{page.icon || <FileText size={16} />}</span> {label(page)}</button></li>)}</ul></div>}
         <button type="button" className="ws-pill nview__add" onClick={onAddSubpage}><Plus size={15} /> Add a subpage</button>
       </div>
     </div>}
+    </div>
+    <div className="nview__boardpane" aria-label="Board">
+      {loaded && <StreamBoard noteId={loaded.note.id} title={title} onBoardId={setBoardId} onSaveState={setBoardSave} onError={onError} />}
+    </div>
+    </div>
+    <Sheet open={convertMenu} onClose={() => setConvertMenu(false)} title="Convert" size="compact">
+      <div className="doc__group">
+        <button type="button" onClick={() => { setConvertMenu(false); setDirection("toNote"); }}><LayoutDashboard size={18} /> <span className="ms__opt"><b>Board → note</b><small>DeepSeek writes a connected note from your cards</small></span></button>
+        <button type="button" onClick={() => { setConvertMenu(false); setDirection("toBoard"); }}><FileText size={18} /> <span className="ms__opt"><b>Note → board</b><small>DeepSeek turns the note into linked cards</small></span></button>
+      </div>
+    </Sheet>
+    {loaded && <ConvertSheet direction={direction} boardId={boardId} noteId={loaded.note.id} onClose={() => setDirection(null)} onError={onError} onDone={() => setDirection(null)} />}
     <Sheet open={picker} onClose={() => setPicker(false)} title="Icon" size="compact">
       <div className="emoji-grid">{EMOJI.map((emoji) => <button key={emoji} type="button" onClick={() => { onIcon(emoji); setPicker(false); }}>{emoji}</button>)}</div>
       {loaded?.note.icon && <button type="button" className="ws-pill" onClick={() => { onIcon(""); setPicker(false); }}>Remove icon</button>}

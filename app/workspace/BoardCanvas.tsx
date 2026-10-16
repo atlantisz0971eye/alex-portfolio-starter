@@ -8,7 +8,7 @@ import { layoutOrganized } from "../lib/boardLayout";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
 import { Sheet } from "./Sheet";
-import { MINDSTREAM_CHANGED, registerFlush } from "./mindstreamBus";
+import { MINDSTREAM_CHANGED, registerFlush, type ChangedDetail } from "./mindstreamBus";
 import { ThemeContext } from "./Shell";
 
 type TextData = { text: string; tone: string };
@@ -153,7 +153,7 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
 
   useEffect(() => { void load(true); }, [load]);
   useEffect(() => {
-    const onChange = (event: Event) => { if ((event as CustomEvent).detail === boardId) void load(false); };
+    const onChange = (event: Event) => { if ((event as CustomEvent<ChangedDetail>).detail?.boardId === boardId) void load(false); };
     window.addEventListener(MINDSTREAM_CHANGED, onChange);
     return () => window.removeEventListener(MINDSTREAM_CHANGED, onChange);
   }, [boardId, load]);
