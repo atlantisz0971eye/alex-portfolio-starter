@@ -839,3 +839,29 @@
 .board__tools .board__scan { background: var(--text); color: var(--bg); }
 .board__tools .board__scan:hover { background: var(--text); opacity: .88; }
 @media (max-width: 520px) { .board__bar .ws-text-button span { display: none; } .board__bar .ws-text-button { min-width: 40px; justify-content: center; } }
+
+/* ===== Mindstream: note and board of one mindstream ===== */
+.ms { position: absolute; inset: 0; z-index: 12; display: flex; flex-direction: column; background: var(--bg); animation: ws-in .3s cubic-bezier(.2,.8,.2,1); }
+.ms__bar { gap: 4px; }
+.ms__switch { flex: none; }
+.ms__switch button { display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; min-height: 32px; font-size: 13px; }
+.ms__body { position: relative; flex: 1; min-height: 0; }
+.ms__note, .ms__board { position: absolute; inset: 0; }
+.ms[data-wide="false"][data-view="board"] .ms__note, .ms[data-wide="false"][data-view="note"] .ms__board { opacity: 0; pointer-events: none; z-index: -1; }
+.ms__note .nview__scroll { position: absolute; inset: 0; overflow-y: auto; padding-bottom: calc(var(--sab) + 40px); }
+.ms__board .board { position: absolute; inset: 0; z-index: auto; animation: none; }
+.ms[data-wide="true"] .ms__body { display: grid; grid-template-columns: minmax(380px, 0.8fr) minmax(0, 1.2fr); }
+.ms[data-wide="true"] .ms__note, .ms[data-wide="true"] .ms__board { position: relative; inset: auto; min-width: 0; }
+.ms[data-wide="true"] .ms__note { border-right: 1px solid var(--line); }
+.ms__mode { align-self: flex-start; }
+.ms__mode button { padding: 0 14px; min-height: 34px; font-size: 14px; }
+@media (max-width: 520px) { .ms__bar .ws-text-button span { display: none; } .ms__bar { padding-right: 8px; } .ms__bar .board__state { display: none; } }
+.ms__bar { flex-wrap: wrap; }
+.ms__tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.ms__convert { min-height: 34px !important; padding: 0 14px !important; font-size: 14px !important; }
+.ms__hint { display: block; margin-left: auto; font-size: 12px; color: var(--text-2); }
+.board__scan span { white-space: nowrap; }
+@media (max-width: 700px) { .ms__bar .board__title { flex: 1 1 120px; } .ms__tools { width: 100%; justify-content: space-between; padding: 0 4px 4px; } .ms__bar .board__state { display: inline; } }
+.ms__opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.ms__opt b { font-weight: 500; }
+.ms__opt small { color: var(--text-2); font-size: 13px; }

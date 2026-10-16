@@ -91,16 +91,19 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 
 页面图片会发送给 Google 识别；识别后的文字保存在私有存储里，每本书只需识别一次。
 
-## Alex Workspace · Boards（画布）
+## Alex Workspace · Mindstreams
 
-Boards 是无限画布：文字卡、照片、PDF 页都可以摆在上面，自动保存。**Scan notes** 直接拍纸质笔记（自动去阴影、提亮），**Photo** 从相册导入，**PDF** 从资料库或小文件（≤4 MB）导入页面。选中照片后点 **Read notes**：识别文字（可手动改错字），再用 DeepSeek 整理成层级卡片，预览确认后才加到画布并连线。
+一个 Mindstream 是一块白板（board）加上与它配对的一篇笔记（note），两者保持同步，由 DeepSeek 互相转换。宽屏左边是笔记、右边是白板；手机上顶部切换 Note / Board。配对的笔记不会出现在 Notes 标签里，删除 Mindstream 时它进入 Notes 的废纸篓。
+
+**白板**：无限画布，文字卡、照片、PDF 页都能摆上去，自动保存。**Scan notes** 直接拍纸质笔记（自动去阴影、提亮），**Photo** 从相册导入，**PDF** 从资料库或小文件（≤4 MB）导入页面。选中照片后点 **Read notes**：识别文字（可手动改错字），再整理成层级卡片，预览确认后才加到画布并连线。
 
 识别引擎：设置了 `GEMINI_API_KEY` 时用 Gemini（默认 `gemini-3.8-flash`，可用 `GEMINI_MODEL` 改，例如换成 `gemini-3.5-flash-lite`）直接读图，能处理潦草手写，并顺带给出卡片草稿，不确定的词标 `[?]`；没设置时退回 Google Cloud Vision。Gemini 请使用开通计费的付费层密钥（付费层的数据不会用于改进 Google 产品）。
 
-### Mindstream：笔记与画布互相生成
+**Convert**：
+- **Board → note**：DeepSeek 按连线层级把卡片写成串联笔记（概述、分节、待办），可编辑，选择“加到末尾”或“替换笔记”，确认后才写入。
+- **Note → board**：DeepSeek 把笔记整理成卡片树，选择“加卡片”（摆在现有内容右侧）或“替换卡片”（照片保留），确认后才写入。
 
-- **画布 → 笔记**：画布顶栏的 **Mindstream** 把所有文字卡按连线层级交给 DeepSeek，写成一篇带概述、分节和待办的串联笔记；先预览并可编辑，确认后才在 Notes 里创建，画布顶栏之后会出现 **Note** 链接跳回这篇笔记。
-- **笔记 → 画布**：Notes 里某页的 ⋯ 菜单选 **Mindstream: make a board**，DeepSeek 把笔记整理成卡片树，预览确认后创建一块新画布并打开。
+**助手整体编辑**：打开一个 Mindstream 后呼出助手（⌘K），可以说“检查这个 mindstream 有什么问题”。助手会读取笔记和卡片，指出矛盾、遗漏、重复或含糊之处，再提出修复：改写或追加笔记、增删改卡片、补连线。所有修改都是提议，逐条确认后才生效，生效前会先保存你当前正在编辑的内容，之后两侧自动刷新。
 
 ### 管理已导入的文件
 

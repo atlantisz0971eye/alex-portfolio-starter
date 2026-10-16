@@ -196,7 +196,8 @@ export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Prop
   }, [query]);
 
   // ---- tree -----------------------------------------------------------------
-  const live = useMemo(() => (notes ?? []).filter((item) => !item.deletedAt), [notes]);
+  // A mindstream owns its note, so it lives in the Mindstreams tab and is left out of this tree.
+  const live = useMemo(() => (notes ?? []).filter((item) => !item.deletedAt && item.kind !== "mindstream"), [notes]);
   const children = useMemo(() => {
     const map = new Map<string | null, NoteMeta[]>();
     for (const item of live) map.set(item.parentId, [...(map.get(item.parentId) ?? []), item]);

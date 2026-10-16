@@ -4,18 +4,19 @@ import { Check, Loader2, Send, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { streamNdjson } from "./api";
+import { currentMindstream } from "./mindstreamBus";
 import { zone } from "./calendarFormat";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { Sheet } from "./Sheet";
 
 type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
-export type AssistantScreen = "today" | "library" | "mail" | "calendar" | "boards" | "notes";
+export type AssistantScreen = "today" | "library" | "mail" | "calendar" | "mindstreams" | "notes";
 
 const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   calendar: ["Summarize my week", "Find a free 2-hour slot this week", "Add events from my recent emails"],
   mail: ["Summarize my unread mail", "Which emails need a reply?", "Add events from this week’s emails to my calendar"],
   library: ["What am I reading, and how far along?", "What should I read next?"],
-  boards: ["Summarize my recent notes", "Find my notes about…"],
+  mindstreams: ["Review this mindstream for gaps and contradictions", "Which cards are missing from the note?", "Tidy the board: merge duplicates and vague cards"],
   notes: ["Summarize my recent notes", "Find my notes about…"],
   today: ["Re-plan my day around my new mail", "Which emails need a reply today?", "Add events from my recent emails"],
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
@@ -48,7 +49,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     setMessages((current) => [...current, { role: "user", text: message }, { role: "assistant", text: "" }]);
     const patchLast = (change: (item: Message) => Message) => setMessages((current) => current.map((item, index) => index === current.length - 1 ? change(item) : item));
     try {
-      await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
+      await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen, mindstreamId: screen === "mindstreams" ? currentMindstream() : null }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
         if (event.t === "tool" && typeof event.label === "string") patchLast((item) => ({ ...item, tools: [...(item.tools ?? []), event.label as string] }));
         else if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
       });

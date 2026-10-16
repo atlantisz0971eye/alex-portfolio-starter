@@ -13,7 +13,7 @@ export type NoteMeta = {
   deletedAt?: string;
   favorite?: boolean;
   /** Marks pages the app manages itself, such as the vocabulary page. */
-  kind?: "vocabulary";
+  kind?: "vocabulary" | "mindstream";
   preview: string;
 };
 type IndexEntry = NoteMeta & { text: string };
@@ -75,7 +75,7 @@ const descendants = (notes: IndexEntry[], id: string) => {
   return found;
 };
 
-export async function createNote(input: { parentId?: string | null; title?: string; icon?: string; content?: unknown; kind?: "vocabulary" }) {
+export async function createNote(input: { parentId?: string | null; title?: string; icon?: string; content?: unknown; kind?: "vocabulary" | "mindstream" }) {
   const notes = await readIndex();
   if (notes.length >= MAX_NOTES) throw new NoteError("There are too many notes.");
   const parentId = input.parentId && notes.some((item) => item.id === input.parentId && !item.deletedAt) ? input.parentId : null;

@@ -1,6 +1,7 @@
 import { runAgentLoop } from "../../../lib/agentLoop";
 import { agentSystem } from "../../../lib/agentPrompt";
 import type { Proposal } from "../../../lib/agentTools";
+import { validBoardId } from "../../../lib/boardStore";
 import { calendarGuard } from "../../../lib/calendarGuard";
 import { validZone } from "../../../lib/calendarTime";
 import type { ChatMessage } from "../../../lib/workspaceDeepSeek";
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (count >= 15) return Response.json({ error: "rate_limited" }, { status: 429 });
   calls.set(key, { count: count + 1, until: now + 60_000 });
 
-  let body: { message?: unknown; history?: unknown; zone?: unknown; context?: unknown };
+  let body: { message?: unknown; history?: unknown; zone?: unknown; context?: unknown; mindstreamId?: unknown };
   try {
     if (Number(request.headers.get("content-length")) > 14_000) throw new Error("too large");
     body = await request.json();
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   const message = typeof body.message === "string" ? body.message.trim() : "";
   if (message.length < 1 || message.length > 2000) return Response.json({ error: "invalid_question" }, { status: 400 });
   const zone = validZone(body.zone);
-  const screen = ["library", "mail", "calendar"].includes(String(body.context)) ? String(body.context) : "";
+  const screen = ["library", "mail", "calendar", "mindstreams"].includes(String(body.context)) ? String(body.context) : "";
   const history: ChatMessage[] = Array.isArray(body.history)
     ? body.history.slice(-8).filter((item): item is { role: string; content: string } => !!item && typeof item === "object" && typeof (item as { content?: unknown }).content === "string")
         .map((item) => ({ role: item.role === "assistant" ? "assistant" as const : "user" as const, content: item.content.slice(0, 2500) }))
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
 
   let system: string;
   try {
-    system = await agentSystem(zone, screen);
+    const openStream = typeof body.mindstreamId === "string" && validBoardId(body.mindstreamId) ? body.mindstreamId : null;
+    system = await agentSystem(zone, screen, openStream ? `用户此刻正打开的 mindstream id：${openStream}（“这个 mindstream / 当前的”指它，先用 mindstream_read 读取）。` : "");
   } catch {
     return Response.json({ error: "calendar_failed" }, { status: 502 });
   }

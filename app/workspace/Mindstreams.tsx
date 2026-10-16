@@ -1,17 +1,17 @@
 "use client";
 
-import { LayoutDashboard, Loader2, Plus, Trash2 } from "lucide-react";
+import { Waypoints, Loader2, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
-import { BoardCanvas } from "./BoardCanvas";
+import { Mindstream } from "./Mindstream";
 import { PageTitle, TopRow } from "./Shell";
 
-type Props = { onError: (message: string) => void; onSignOut: () => void; openId?: string | null; onOpenNote: (id: string) => void };
+type Props = { onError: (message: string) => void; onSignOut: () => void; openId?: string | null; refresh: number };
 const when = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
-/** Boards: free-form canvases for lecture notes, photos of paper notebooks and pages from PDFs. */
-export function Boards({ onError, onSignOut, openId: initialOpen, onOpenNote }: Props) {
+/** Mindstreams: each one is a note and a board that stay in step, with DeepSeek turning one into the other. */
+export function Mindstreams({ onError, onSignOut, openId: initialOpen, refresh }: Props) {
   const [boards, setBoards] = useState<BoardMeta[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(initialOpen ?? null);
   const [creating, setCreating] = useState(false);
@@ -21,10 +21,10 @@ export function Boards({ onError, onSignOut, openId: initialOpen, onOpenNote }: 
       setBoards((await parseResponse<{ boards: BoardMeta[] }>(await fetch("/api/workspace/boards", { cache: "no-store" }))).boards);
     } catch (cause) {
       setBoards((current) => current ?? []);
-      onError(cause instanceof Error ? cause.message : "Could not load boards.");
+      onError(cause instanceof Error ? cause.message : "Could not load mindstreams.");
     }
   }, [onError]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, refresh]);
 
   async function create() {
     setCreating(true);
@@ -33,28 +33,28 @@ export function Boards({ onError, onSignOut, openId: initialOpen, onOpenNote }: 
       setBoards((current) => [board, ...(current ?? [])]);
       setOpenId(board.id);
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Could not create a board.");
+      onError(cause instanceof Error ? cause.message : "Could not create a mindstream.");
     } finally {
       setCreating(false);
     }
   }
 
   async function remove(board: BoardMeta) {
-    if (!window.confirm(`Delete “${board.title}” and its images?`)) return;
+    if (!window.confirm(`Delete the mindstream “${board.title}”, its board and images? Its note moves to the Notes trash.`)) return;
     try {
       await parseResponse(await fetch(`/api/workspace/boards/${board.id}`, { method: "DELETE" }));
       setBoards((current) => (current ?? []).filter((item) => item.id !== board.id));
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Could not delete the board.");
+      onError(cause instanceof Error ? cause.message : "Could not delete the mindstream.");
     }
   }
 
   return <>
     <main className="page">
       <TopRow onSignOut={onSignOut} />
-      <PageTitle actions={<button type="button" className="ws-round" aria-label="New board" onClick={() => void create()} disabled={creating}>{creating ? <Loader2 className="ws-spin" size={18} /> : <Plus size={18} />}</button>}>Boards</PageTitle>
+      <PageTitle actions={<button type="button" className="ws-round" aria-label="New mindstream" onClick={() => void create()} disabled={creating}>{creating ? <Loader2 className="ws-spin" size={18} /> : <Plus size={18} />}</button>}>Mindstreams</PageTitle>
       {boards === null && <div className="mail-skeleton"><div><span className="skeleton skeleton--line" /><span className="skeleton skeleton--line skeleton--short" /></div></div>}
-      {boards?.length === 0 && <div className="empty"><LayoutDashboard size={28} /><p>No boards yet.</p><small>Lay out lecture notes, photos of your notebook and PDF pages on one canvas.</small><button type="button" className="ws-pill ws-pill--solid" onClick={() => void create()}><Plus size={16} /> New board</button></div>}
+      {boards?.length === 0 && <div className="empty"><Waypoints size={28} /><p>No mindstreams yet.</p><small>A mindstream is a note and a board that stay in step. Photograph your notebook, sketch on the board, and let DeepSeek turn one into the other.</small><button type="button" className="ws-pill ws-pill--solid" onClick={() => void create()}><Plus size={16} /> New mindstream</button></div>}
       {boards && boards.length > 0 && <ul className="boards">
         {boards.map((board) => <li key={board.id}>
           <button type="button" className="boards__card ws-card" onClick={() => setOpenId(board.id)}>
@@ -65,6 +65,6 @@ export function Boards({ onError, onSignOut, openId: initialOpen, onOpenNote }: 
         </li>)}
       </ul>}
     </main>
-    {openId && <BoardCanvas boardId={openId} onBack={() => setOpenId(null)} onError={onError} onChanged={() => void load()} onOpenNote={onOpenNote} />}
+    {openId && <Mindstream boardId={openId} onClose={() => setOpenId(null)} onError={onError} onChanged={() => void load()} />}
   </>;
 }

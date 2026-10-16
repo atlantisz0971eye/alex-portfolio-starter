@@ -1,6 +1,7 @@
 import { boardFailure } from "../../../../lib/boardHttp";
 import { BoardError, deleteBoard, readBoard, updateBoard, validBoardId } from "../../../../lib/boardStore";
 import { calendarGuard } from "../../../../lib/calendarGuard";
+import { setTrashed } from "../../../../lib/notesStore";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
@@ -38,7 +39,11 @@ export async function DELETE(_request: Request, { params }: Context) {
   try {
     const { id } = await params;
     if (!validBoardId(id)) return Response.json({ error: "not_found" }, { status: 404 });
-    return (await deleteBoard(id)) ? Response.json({ ok: true }) : Response.json({ error: "not_found" }, { status: 404 });
+    const found = await readBoard(id);
+    if (!(await deleteBoard(id))) return Response.json({ error: "not_found" }, { status: 404 });
+    // The paired note is not deleted for good: it goes to the Notes trash, where it can be restored.
+    if (found?.board.noteId) await setTrashed(found.board.noteId, true).catch(() => undefined);
+    return Response.json({ ok: true });
   } catch (error) {
     return boardFailure(error);
   }

@@ -2,12 +2,13 @@
 
 import { addEdge, Background, BackgroundVariant, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, useEdgesState, useNodesState, useReactFlow, type Connection, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ChevronLeft, FileText, Image as ImageIcon, Loader2, ScanLine, ScanText, Sparkles, StickyNote, Trash2, Waypoints } from "lucide-react";
+import { FileText, Image as ImageIcon, Loader2, ScanLine, ScanText, Sparkles, StickyNote, Trash2 } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { layoutOrganized } from "../lib/boardLayout";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
 import { Sheet } from "./Sheet";
+import { MINDSTREAM_CHANGED, registerFlush } from "./mindstreamBus";
 import { ThemeContext } from "./Shell";
 
 type TextData = { text: string; tone: string };
@@ -104,20 +105,20 @@ async function shrink(file: File, clean = false) {
 const persist = (nodes: BoardNode[]) => nodes.map(({ id, type, position, data, width, height, style }) => ({ id, type, position, data, width, height, style }));
 const persistEdges = (edges: Edge[]) => edges.map(({ id, source, target }) => ({ id, source, target }));
 
-function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: string; onBack: () => void; onError: (message: string) => void; onChanged: () => void; onOpenNote: (id: string) => void }) {
+type CanvasProps = { boardId: string; title: string; onTitle: (title: string) => void; onSaveState: (state: "saved" | "saving" | "error") => void; onBack: () => void; onError: (message: string) => void; onChanged: () => void };
+
+function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChanged }: CanvasProps) {
   const { theme } = useContext(ThemeContext);
   const flow = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState<BoardNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [meta, setMeta] = useState<BoardMeta | null>(null);
-  const [title, setTitle] = useState("");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [busy, setBusy] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [readId, setReadId] = useState<string | null>(null);
-  const [streamOpen, setStreamOpen] = useState(false);
   // Phones get a text sheet instead of typing on the canvas, where the keyboard fights the zoomed viewport.
   const [touch, setTouch] = useState(false);
   useEffect(() => { setTouch(window.matchMedia("(pointer: coarse)").matches); }, []);
@@ -126,29 +127,36 @@ function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: s
   const latest = useRef({ nodes, edges, title });
   const callbacks = useRef({ onError, onChanged });
   const dirty = useRef(false);
+  const lastSaved = useRef<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const scan = useRef<HTMLInputElement>(null);
   latest.current = { nodes, edges, title };
   callbacks.current = { onError, onChanged };
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = await parseResponse<{ board: BoardMeta; content: { nodes: BoardNode[]; edges: Edge[] } }>(await fetch(endpoint(boardId), { cache: "no-store" }));
-        if (cancelled) return;
-        setMeta(data.board);
-        setTitle(data.board.title);
-        setNodes(data.content.nodes);
-        setEdges(data.content.edges);
-        window.setTimeout(() => { loaded.current = true; void flow.fitView({ padding: 0.3, maxZoom: 1 }); }, 50);
-      } catch (cause) {
-        onError(cause instanceof Error ? cause.message : "Could not open the board.");
-        onBack();
-      }
-    })();
-    return () => { cancelled = true; };
+  /** Loads the board from the server. A reload (after the assistant changed it) keeps the current view. */
+  const load = useCallback(async (first: boolean) => {
+    try {
+      const data = await parseResponse<{ board: BoardMeta; content: { nodes: BoardNode[]; edges: Edge[] } }>(await fetch(endpoint(boardId), { cache: "no-store" }));
+      setMeta(data.board);
+      onTitle(data.board.title);
+      setNodes(data.content.nodes);
+      setEdges(data.content.edges);
+      dirty.current = false;
+      lastSaved.current = null;
+      if (first) window.setTimeout(() => { loaded.current = true; void flow.fitView({ padding: 0.3, maxZoom: 1 }); }, 50);
+    } catch (cause) {
+      if (!first) return callbacks.current.onError(cause instanceof Error ? cause.message : "Could not refresh the board.");
+      callbacks.current.onError(cause instanceof Error ? cause.message : "Could not open the board.");
+      onBack();
+    }
   }, [boardId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { void load(true); }, [load]);
+  useEffect(() => {
+    const onChange = (event: Event) => { if ((event as CustomEvent).detail === boardId) void load(false); };
+    window.addEventListener(MINDSTREAM_CHANGED, onChange);
+    return () => window.removeEventListener(MINDSTREAM_CHANGED, onChange);
+  }, [boardId, load]);
 
   // Saves only when something changed. The callbacks live in a ref so a parent re-render never retriggers a save.
   const save = useCallback(async () => {
@@ -169,7 +177,6 @@ function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: s
 
   // Autosave after a pause. Selection and measuring also change the node list, so only meaningful edits count.
   const signature = useMemo(() => JSON.stringify([persist(nodes), persistEdges(edges), title]), [nodes, edges, title]);
-  const lastSaved = useRef<string | null>(null);
   useEffect(() => {
     if (!loaded.current) return;
     if (lastSaved.current === null) { lastSaved.current = signature; return; }
@@ -181,6 +188,8 @@ function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: s
     timer.current = window.setTimeout(() => void save(), 1000);
   }, [signature, save]);
   useEffect(() => () => { window.clearTimeout(timer.current); void save(); }, [save]);
+  useEffect(() => registerFlush(async () => { window.clearTimeout(timer.current); await save(); }), [save]);
+  useEffect(() => { onSaveState(saveState); }, [saveState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const center = () => {
     const box = document.querySelector(".board__canvas")?.getBoundingClientRect();
@@ -242,13 +251,6 @@ function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: s
 
   return <BoardContext.Provider value={{ boardId, touch, update, edit: setEditId, read: setReadId }}>
     <div className="board" onFocus={(event) => setEditing(event.target instanceof HTMLTextAreaElement)} onBlur={() => setEditing(false)}>
-      <header className="board__bar">
-        <button type="button" className="ws-text-button" onClick={onBack}><ChevronLeft size={18} /> Boards</button>
-        <input className="board__title" value={title} placeholder="Untitled board" aria-label="Board title" onChange={(event) => setTitle(event.target.value)} />
-        {meta?.noteId && <button type="button" className="ws-text-button" onClick={() => onOpenNote(meta.noteId!)}><FileText size={16} /> <span>Note</span></button>}
-        <button type="button" className="ws-text-button" onClick={() => { if (nodes.some((node) => node.type === "text" && (node.data as TextData).text.trim())) { void save(); setStreamOpen(true); } else onError("Add a few text cards first, then Mindstream can write a note from them."); }}><Waypoints size={16} /> <span>Mindstream</span></button>
-        <span className="board__state" aria-live="polite">{saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : meta ? "Saved" : ""}</span>
-      </header>
       <div className="board__canvas">
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} colorMode={theme} minZoom={0.1} maxZoom={2.5} zoomOnDoubleClick={false} connectionRadius={32} deleteKeyCode={["Backspace", "Delete"]} proOptions={{ hideAttribution: true }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} />
@@ -277,56 +279,9 @@ function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: s
         })()}
       </Sheet>
       <ReadSheet boardId={boardId} node={readId ? nodes.find((item) => item.id === readId && item.type === "image") ?? null : null} onClose={() => setReadId(null)} onError={onError} onAdd={(source, result) => { addOrganized(source, result); setReadId(null); }} />
-      <StreamSheet open={streamOpen} boardId={boardId} title={title} onClose={() => setStreamOpen(false)} onError={onError} onCreated={(noteId) => { setMeta((current) => current ? { ...current, noteId } : current); setStreamOpen(false); onOpenNote(noteId); }} />
       <PdfSheet open={pdfOpen} boardId={boardId} onClose={() => setPdfOpen(false)} onError={onError} onAdd={addImages} />
     </div>
   </BoardContext.Provider>;
-}
-
-/** Mindstream, board → note: DeepSeek writes a connected summary; you can edit it before it becomes a note. */
-function StreamSheet({ open, boardId, title, onClose, onError, onCreated }: { open: boolean; boardId: string; title: string; onClose: () => void; onError: (message: string) => void; onCreated: (noteId: string) => void }) {
-  const [markdown, setMarkdown] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setMarkdown(null);
-    void (async () => {
-      try {
-        const data = await parseResponse<{ markdown: string }>(await fetch("/api/workspace/mindstream/note", { method: "POST", headers, body: JSON.stringify({ boardId }) }));
-        if (!cancelled) setMarkdown(data.markdown);
-      } catch (cause) {
-        if (cancelled) return;
-        onError(cause instanceof Error ? cause.message : "Could not write the note.");
-        onClose();
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open, boardId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function create() {
-    if (!markdown) return;
-    setSaving(true);
-    try {
-      const heading = markdown.match(/^#\s+(.+)$/m);
-      const body = heading ? markdown.replace(heading[0], "").trim() : markdown;
-      const { note } = await parseResponse<{ note: { id: string } }>(await fetch("/api/workspace/notes", { method: "POST", headers, body: JSON.stringify({ title: heading?.[1]?.trim() || title || "Board summary", markdown: body, icon: "🧠" }) }));
-      await fetch(`/api/workspace/boards/${boardId}`, { method: "PATCH", headers, body: JSON.stringify({ noteId: note.id }) }).catch(() => undefined);
-      onCreated(note.id);
-    } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Could not create the note.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return <Sheet open={open} onClose={onClose} title="Mindstream · board to note" size="tall" primary={{ label: saving ? "Creating…" : "Create note", onClick: () => void create(), disabled: !markdown || saving }}>
-    {markdown === null ? <p className="board-read__wait"><Loader2 className="ws-spin" size={16} /> DeepSeek is connecting your cards…</p> : <div className="board-read">
-      <p className="board-read__hint">A note written from your cards. Edit it here, then create it in Notes.</p>
-      <textarea value={markdown} onChange={(event) => setMarkdown(event.target.value)} style={{ minHeight: 360 }} />
-    </div>}
-  </Sheet>;
 }
 
 /** Photo of a paper page → recognized text you can correct → proposed cards you confirm. */
@@ -459,6 +414,6 @@ function PdfSheet({ open, boardId, onClose, onError, onAdd }: { open: boolean; b
   </Sheet>;
 }
 
-export function BoardCanvas(props: { boardId: string; onBack: () => void; onError: (message: string) => void; onChanged: () => void; onOpenNote: (id: string) => void }) {
+export function BoardCanvas(props: CanvasProps) {
   return <ReactFlowProvider><Inner {...props} /></ReactFlowProvider>;
 }

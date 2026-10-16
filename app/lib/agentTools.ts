@@ -4,6 +4,8 @@ import { getMessage, listMessages, MailAuthError } from "./gmail";
 import { mailConfigured } from "./mailGuard";
 import { readAccounts } from "./mailStore";
 import type { ToolSpec } from "./workspaceDeepSeek";
+import { listBoards, validBoardId } from "./boardStore";
+import { readMindstream, type BoardOp } from "./mindstreamOps";
 import { listNotes, readNote, searchNotes, validNoteId } from "./notesStore";
 import { jsonToText } from "./notesText";
 import { queryTerms, retrieveContext } from "./workspaceRetrieval";
@@ -39,13 +41,17 @@ export const TOOLS: ToolSpec[] = [
   fn("notes_read", "Read one note in full as plain text. Use ids returned by notes_search or notes_list.", { id: { type: "string" } }, ["id"]),
   fn("notes_create", "Propose a new note. The body is Markdown (headings, bullets, - [ ] tasks, quotes). Nothing is saved until the user confirms.", { title: { type: "string" }, markdown: { type: "string" }, parentId: { type: "string", description: "Optional id of a note to nest it under" } }, ["title", "markdown"]),
   fn("notes_append", "Propose adding Markdown text to the end of an existing note. Nothing is saved until the user confirms.", { id: { type: "string" }, markdown: { type: "string" } }, ["id", "markdown"]),
+  fn("mindstream_list", "List the user's mindstreams. A mindstream is a board of cards plus the one note paired with it.", {}),
+  fn("mindstream_read", "Read one mindstream in full: its note text and its board as an outline where every card has an id. Use this before reviewing or editing a mindstream.", { id: { type: "string", description: "Mindstream id from mindstream_list or the system prompt" } }, ["id"]),
+  fn("mindstream_edit_note", "Propose changing the note of a mindstream: append new Markdown, or replace the whole note with a corrected version. Nothing changes until the user confirms.", { id: { type: "string" }, mode: { type: "string", enum: ["append", "replace"] }, markdown: { type: "string" }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "mode", "markdown"]),
+  fn("mindstream_edit_board", "Propose changes to the cards of a mindstream board. Each change is one of: {op:'add', text, parentId?} {op:'update', cardId, text} {op:'delete', cardId} {op:'link', from, to}. Use card ids from mindstream_read. Nothing changes until the user confirms.", { id: { type: "string" }, ops: { type: "array", items: { type: "object" } }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "ops"]),
   fn("library_list", "List the documents in the user's reading library with reading progress.", {}),
   fn("library_search", "Find the passages of one library document that are most relevant to a query. Write the query in the document's language.", { documentId: { type: "string" }, query: { type: "string" } }, ["documentId", "query"]),
 ];
 
 export type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat?: unknown };
 export type Proposal = {
-  op: "create" | "update" | "delete" | "note_create" | "note_append";
+  op: "create" | "update" | "delete" | "note_create" | "note_append" | "ms_note" | "ms_board";
   id?: string;
   scope?: "this" | "all";
   occurrenceDate?: string;
@@ -56,6 +62,8 @@ export type Proposal = {
   conflicts: string[];
   /** For note proposals: what will be written. */
   note?: { id?: string; title: string; markdown: string; parentId?: string | null };
+  /** For mindstream proposals: which mindstream, and what will change. */
+  ms?: { boardId: string; title: string; mode?: "replace" | "append"; markdown?: string; ops?: BoardOp[]; lines?: string[]; why?: string };
 };
 
 const summary = (event: Summary): Summary => ({ title: event.title, start: event.start, end: event.end, allDay: event.allDay, location: event.location, category: event.category, repeat: event.repeat ?? null });
@@ -69,6 +77,8 @@ export function describeCall(name: string, rawArgs: string) {
     case "notes_search": return `Searching notes: ${String(args.query ?? "").slice(0, 60)}`;
     case "notes_list": case "notes_read": return "Reading your notes";
     case "notes_create": case "notes_append": return "Preparing a note";
+    case "mindstream_list": case "mindstream_read": return "Reading your mindstream";
+    case "mindstream_edit_note": case "mindstream_edit_board": return "Preparing mindstream changes";
     case "library_list": return "Looking through your library";
     case "library_search": return `Searching a book: ${String(args.query ?? "").slice(0, 60)}`;
     default: return "Preparing a calendar change";
@@ -189,6 +199,41 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (!markdown.trim()) return "Error: there is nothing to add.";
         ctx.proposals.push({ op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
         return `Proposed adding text to "${found.note.title || "Untitled"}". Awaiting the user's confirmation.`;
+      }
+      case "mindstream_list": {
+        const boards = await listBoards();
+        return cut(boards.length ? boards.map((board) => `- [${board.id}] ${board.title} | ${board.nodeCount} items | updated ${board.updatedAt.slice(0, 10)}`).join("\n") : "There are no mindstreams yet.");
+      }
+      case "mindstream_read": {
+        if (typeof args.id !== "string" || !validBoardId(args.id)) return "Error: no mindstream has that id.";
+        const stream = await readMindstream(args.id);
+        return cut(`Mindstream: ${stream.title}\nPhotos on the board: ${stream.photos}\n\n## NOTE\n${stream.noteText.trim() || "(empty)"}\n\n## BOARD (card ids in brackets)\n${stream.withIds || "(no text cards)"}`);
+      }
+      case "mindstream_edit_note": {
+        if (typeof args.id !== "string" || !validBoardId(args.id)) return "Error: no mindstream has that id.";
+        const markdown = String(args.markdown ?? "").slice(0, 20_000);
+        if (!markdown.trim()) return "Error: there is nothing to write.";
+        const stream = await readMindstream(args.id);
+        const mode = args.mode === "replace" ? "replace" : "append";
+        ctx.proposals.push({ op: "ms_note", conflicts: [], ms: { boardId: args.id, title: stream.title, mode, markdown, why: typeof args.why === "string" ? args.why.slice(0, 200) : undefined } });
+        return `Proposed ${mode === "replace" ? "rewriting" : "adding to"} the note of "${stream.title}". Awaiting the user's confirmation.`;
+      }
+      case "mindstream_edit_board": {
+        if (typeof args.id !== "string" || !validBoardId(args.id)) return "Error: no mindstream has that id.";
+        const stream = await readMindstream(args.id);
+        const known = new Map(stream.withIds.split("\n").map((line) => line.match(/\[([0-9a-f-]{36})\]\s*(.*)$/)).filter((m): m is RegExpMatchArray => !!m).map((m) => [m[1], m[2]]));
+        const ops = (Array.isArray(args.ops) ? args.ops : []).slice(0, 40).filter((op): op is BoardOp => {
+          const o = op as Record<string, unknown>;
+          if (o?.op === "add") return typeof o.text === "string" && !!o.text.trim() && (!o.parentId || known.has(String(o.parentId)));
+          if (o?.op === "update") return typeof o.text === "string" && !!o.text.trim() && known.has(String(o.cardId));
+          if (o?.op === "delete") return known.has(String(o.cardId));
+          if (o?.op === "link") return known.has(String(o.from)) && known.has(String(o.to));
+          return false;
+        });
+        if (!ops.length) return "Error: none of those changes refer to cards that exist. Use ids from mindstream_read.";
+        const lines = ops.map((op) => op.op === "add" ? `+ ${op.text}${op.parentId ? ` (under “${known.get(op.parentId)}”)` : ""}` : op.op === "update" ? `✎ “${known.get(op.cardId)}” → ${op.text}` : op.op === "delete" ? `− ${known.get(op.cardId)}` : `⟷ “${known.get(op.from)}” → “${known.get(op.to)}”`);
+        ctx.proposals.push({ op: "ms_board", conflicts: [], ms: { boardId: args.id, title: stream.title, ops, lines, why: typeof args.why === "string" ? args.why.slice(0, 200) : undefined } });
+        return `Proposed ${ops.length} change(s) to the board of "${stream.title}". Awaiting the user's confirmation.`;
       }
       case "library_list": {
         const documents = await listDocuments();
