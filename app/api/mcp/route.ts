@@ -6,13 +6,19 @@ export const maxDuration = 60;
 
 const calls = new Map<string, { count: number; until: number }>();
 
+// Pasting a secret into a form or a shell often adds a stray space, newline or pair of quotes; ignore those.
+const clean = (value: string) => value.trim().replace(/^["']|["']$/g, "").trim();
+
 function authorized(request: Request) {
-  const token = process.env.WORKSPACE_MCP_TOKEN;
-  if (!token || token.length < 32) return "not_configured" as const;
-  const given = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const token = clean(process.env.WORKSPACE_MCP_TOKEN ?? "");
+  if (token.length < 32) return "not_configured" as const;
+  const given = clean((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""));
   const a = createHash("sha256").update(given).digest();
   const b = createHash("sha256").update(token).digest();
-  return timingSafeEqual(new Uint8Array(a), new Uint8Array(b)) ? "ok" as const : "denied" as const;
+  if (timingSafeEqual(new Uint8Array(a), new Uint8Array(b))) return "ok" as const;
+  // Lengths only, never the values: enough to tell an empty or truncated key from a different one.
+  console.error(`MCP auth failed: received ${given.length} characters, expected ${token.length}`);
+  return "denied" as const;
 }
 
 /** MCP over Streamable HTTP: JSON-RPC in a POST body, answered with JSON. Browsers are refused (no Origin header allowed). */
