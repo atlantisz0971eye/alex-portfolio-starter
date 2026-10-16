@@ -97,6 +97,11 @@ Boards 是无限画布：文字卡、照片、PDF 页都可以摆在上面，自
 
 识别引擎：设置了 `GEMINI_API_KEY` 时用 Gemini（默认 `gemini-3.8-flash`，可用 `GEMINI_MODEL` 改，例如换成 `gemini-3.5-flash-lite`）直接读图，能处理潦草手写，并顺带给出卡片草稿，不确定的词标 `[?]`；没设置时退回 Google Cloud Vision。Gemini 请使用开通计费的付费层密钥（付费层的数据不会用于改进 Google 产品）。
 
+### Mindstream：笔记与画布互相生成
+
+- **画布 → 笔记**：画布顶栏的 **Mindstream** 把所有文字卡按连线层级交给 DeepSeek，写成一篇带概述、分节和待办的串联笔记；先预览并可编辑，确认后才在 Notes 里创建，画布顶栏之后会出现 **Note** 链接跳回这篇笔记。
+- **笔记 → 画布**：Notes 里某页的 ⋯ 菜单选 **Mindstream: make a board**，DeepSeek 把笔记整理成卡片树，预览确认后创建一块新画布并打开。
+
 ### 管理已导入的文件
 
 资料库里每本书封面左上角的 “⋯” 打开文件选项：**重命名**；**Check for scanned pages**（根据已保存的文字重新检查哪些页没有文字，OCR 功能上线前导入的书需要点一次）；**Recognize text on N pages**（对这些页直接启动识别，不用先打开书）；**Open original PDF**；**Re-read the original file**（重新从原文件提取文字，会替换已保存的文字，包括已识别的内容）；**Delete**（永久删除文字、高亮、笔记和原文件，需要二次确认）。

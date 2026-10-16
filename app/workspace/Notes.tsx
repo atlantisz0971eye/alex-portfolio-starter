@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Download, FilePlus2, FileText, FolderInput, Loader2, MoreHorizontal, Plus, RotateCcw, Search, Smile, Star, Copy, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, FilePlus2, FileText, FolderInput, Loader2, MoreHorizontal, Plus, RotateCcw, Search, Smile, Star, Copy, Trash2, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { jsonToMarkdown, type JSONNode } from "../lib/notesText";
 import type { NoteMeta } from "../lib/notesStore";
+import { layoutOrganized, type Organized } from "../lib/boardLayout";
 import { parseResponse } from "./api";
 import { NoteEditor } from "./NoteEditor";
 import { Sheet } from "./Sheet";
@@ -18,9 +19,59 @@ const jsonHeaders = { "Content-Type": "application/json" };
 
 const label = (note: NoteMeta) => note.title.trim() || "Untitled";
 
-type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId?: string | null };
+/** Mindstream, note → board: DeepSeek proposes a card tree for the note; the board is created after you review it. */
+function NoteStreamSheet({ note, onClose, onError, onCreated }: { note: NoteMeta | null; onClose: () => void; onError: (message: string) => void; onCreated: (boardId: string) => void }) {
+  const [result, setResult] = useState<Organized | null>(null);
+  const [saving, setSaving] = useState(false);
+  const id = note?.id;
 
-export function Notes({ onError, onSignOut, refresh, openId }: Props) {
+  useEffect(() => {
+    if (!note) return;
+    let cancelled = false;
+    setResult(null);
+    void (async () => {
+      try {
+        const data = await parseResponse<Organized>(await fetch("/api/workspace/mindstream/board", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ noteId: note.id }) }));
+        if (!cancelled) setResult(data);
+      } catch (cause) {
+        if (cancelled) return;
+        onError(cause instanceof Error ? cause.message : "Could not make a board.");
+        onClose();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function create() {
+    if (!result || !note) return;
+    setSaving(true);
+    try {
+      const { board } = await parseResponse<{ board: { id: string } }>(await fetch("/api/workspace/boards", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ title: result.title || label(note), fromNoteId: note.id }) }));
+      const { root, children, edges } = layoutOrganized(result, 0, 0);
+      await parseResponse(await fetch(`/api/workspace/boards/${board.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ noteId: note.id, content: { nodes: [root, ...children], edges } }) }));
+      onCreated(board.id);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Could not create the board.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  const depthOf = (items: Organized["items"], index: number): number => items[index].parent === null ? 0 : depthOf(items, items[index].parent as number) + 1;
+
+  return <Sheet open={!!note} onClose={onClose} title="Mindstream · note to board" size="tall" primary={{ label: saving ? "Creating…" : "Create board", onClick: () => void create(), disabled: !result || saving }}>
+    {!result ? <p className="board-read__wait"><Loader2 className="ws-spin" size={16} /> DeepSeek is mapping your note…</p> : <div className="board-read">
+      <p className="board-read__hint">Review the cards. Nothing is created until you confirm.</p>
+      <ul className="board-read__tree">
+        <li className="is-title">{result.title}</li>
+        {result.items.map((item, index) => <li key={index} style={{ paddingLeft: 14 + depthOf(result.items, index) * 18 }}>{item.text}</li>)}
+      </ul>
+    </div>}
+  </Sheet>;
+}
+
+type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId?: string | null; onOpenBoard: (id: string) => void };
+
+export function Notes({ onError, onSignOut, refresh, openId, onOpenBoard }: Props) {
   const [notes, setNotes] = useState<NoteMeta[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -31,6 +82,7 @@ export function Notes({ onError, onSignOut, refresh, openId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [moveFor, setMoveFor] = useState<string | null>(null);
+  const [streamFor, setStreamFor] = useState<NoteMeta | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [wide, setWide] = useState(false);
 
@@ -280,10 +332,12 @@ export function Notes({ onError, onSignOut, refresh, openId }: Props) {
         <button type="button" onClick={() => { void patchNote(menuNote.id, { favorite: !menuNote.favorite }); setMenuFor(null); }}><Star size={18} /> {menuNote.favorite ? "Remove from favorites" : "Add to favorites"}</button>
         <button type="button" onClick={() => { setMenuFor(null); void duplicate(menuNote.id); }}><Copy size={18} /> Duplicate</button>
         <button type="button" onClick={() => { setMoveFor(menuNote.id); setMenuFor(null); }}><FolderInput size={18} /> Move to…</button>
+        <button type="button" onClick={() => { void flush(); setStreamFor(menuNote); setMenuFor(null); }}><Waypoints size={18} /> Mindstream: make a board</button>
         <button type="button" onClick={() => { setMenuFor(null); void exportMarkdown(menuNote.id); }}><Download size={18} /> Export as Markdown</button>
         <button type="button" className="is-danger" onClick={() => { setMenuFor(null); void trash(menuNote.id); }}><Trash2 size={18} /> Move to trash</button>
       </div>}
     </Sheet>
+    <NoteStreamSheet note={streamFor} onClose={() => setStreamFor(null)} onError={onError} onCreated={(id) => { setStreamFor(null); onOpenBoard(id); }} />
     <Sheet open={!!moveTarget} onClose={() => setMoveFor(null)} title="Move to" size="tall">
       {moveTarget && <div className="doc__group">
         <button type="button" onClick={() => { void patchNote(moveTarget.id, { parentId: null }); setMoveFor(null); }}><FileText size={18} /> Top level</button>

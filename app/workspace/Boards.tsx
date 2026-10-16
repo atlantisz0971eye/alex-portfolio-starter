@@ -7,13 +7,13 @@ import { parseResponse } from "./api";
 import { BoardCanvas } from "./BoardCanvas";
 import { PageTitle, TopRow } from "./Shell";
 
-type Props = { onError: (message: string) => void; onSignOut: () => void };
+type Props = { onError: (message: string) => void; onSignOut: () => void; openId?: string | null; onOpenNote: (id: string) => void };
 const when = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
 /** Boards: free-form canvases for lecture notes, photos of paper notebooks and pages from PDFs. */
-export function Boards({ onError, onSignOut }: Props) {
+export function Boards({ onError, onSignOut, openId: initialOpen, onOpenNote }: Props) {
   const [boards, setBoards] = useState<BoardMeta[] | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpen ?? null);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
@@ -65,6 +65,6 @@ export function Boards({ onError, onSignOut }: Props) {
         </li>)}
       </ul>}
     </main>
-    {openId && <BoardCanvas boardId={openId} onBack={() => setOpenId(null)} onError={onError} onChanged={() => void load()} />}
+    {openId && <BoardCanvas boardId={openId} onBack={() => setOpenId(null)} onError={onError} onChanged={() => void load()} onOpenNote={onOpenNote} />}
   </>;
 }

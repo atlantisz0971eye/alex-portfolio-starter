@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
   try {
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    return Response.json({ board: await createBoard(typeof body.title === "string" ? body.title : "") }, { status: 201 });
+    return Response.json({ board: await createBoard(typeof body.title === "string" ? body.title : "", typeof body.fromNoteId === "string" ? body.fromNoteId : undefined) }, { status: 201 });
   } catch (error) {
     return boardFailure(error);
   }

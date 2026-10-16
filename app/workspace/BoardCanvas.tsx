@@ -2,8 +2,9 @@
 
 import { addEdge, Background, BackgroundVariant, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, useEdgesState, useNodesState, useReactFlow, type Connection, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ChevronLeft, FileText, Image as ImageIcon, Loader2, ScanLine, ScanText, Sparkles, StickyNote, Trash2 } from "lucide-react";
+import { ChevronLeft, FileText, Image as ImageIcon, Loader2, ScanLine, ScanText, Sparkles, StickyNote, Trash2, Waypoints } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { layoutOrganized } from "../lib/boardLayout";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
 import { Sheet } from "./Sheet";
@@ -103,7 +104,7 @@ async function shrink(file: File, clean = false) {
 const persist = (nodes: BoardNode[]) => nodes.map(({ id, type, position, data, width, height, style }) => ({ id, type, position, data, width, height, style }));
 const persistEdges = (edges: Edge[]) => edges.map(({ id, source, target }) => ({ id, source, target }));
 
-function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBack: () => void; onError: (message: string) => void; onChanged: () => void }) {
+function Inner({ boardId, onBack, onError, onChanged, onOpenNote }: { boardId: string; onBack: () => void; onError: (message: string) => void; onChanged: () => void; onOpenNote: (id: string) => void }) {
   const { theme } = useContext(ThemeContext);
   const flow = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState<BoardNode>([]);
@@ -116,6 +117,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
   const [editing, setEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [readId, setReadId] = useState<string | null>(null);
+  const [streamOpen, setStreamOpen] = useState(false);
   // Phones get a text sheet instead of typing on the canvas, where the keyboard fights the zoomed viewport.
   const [touch, setTouch] = useState(false);
   useEffect(() => { setTouch(window.matchMedia("(pointer: coarse)").matches); }, []);
@@ -224,20 +226,9 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
 
   /** Lays the organized notes out as a tree to the right of the photo and links them to it. */
   const addOrganized = (source: BoardNode, result: Organized) => {
-    const startX = source.position.x + (source.width ?? 300) + 120;
-    const depthOf = (index: number): number => { const parent = result.items[index].parent; return parent === null ? 1 : depthOf(parent) + 1; };
-    const root = { id: crypto.randomUUID(), type: "text" as const, position: { x: startX, y: source.position.y }, width: 260, height: 80, data: { text: result.title, tone: "sun" } };
-    let cursor = source.position.y;
-    const children = result.items.map((item, index) => {
-      const depth = depthOf(index);
-      const height = Math.max(76, 52 + Math.ceil(item.text.length / 16) * 22);
-      const node = { id: crypto.randomUUID(), type: "text" as const, position: { x: startX + depth * 300, y: cursor + 90 }, width: 260, height, data: { text: item.text, tone: "paper" } };
-      cursor += height + 18;
-      return node;
-    });
-    const newEdges: Edge[] = [{ id: crypto.randomUUID(), source: source.id, target: root.id }, ...result.items.map((item, index) => ({ id: crypto.randomUUID(), source: item.parent === null ? root.id : children[item.parent].id, target: children[index].id }))];
+    const { root, children, edges: tree } = layoutOrganized(result, source.position.x + (source.width ?? 300) + 120, source.position.y);
     setNodes((current) => [...deselect(current), root, ...children]);
-    setEdges((current) => [...current, ...newEdges]);
+    setEdges((current) => [...current, { id: crypto.randomUUID(), source: source.id, target: root.id }, ...tree]);
     window.setTimeout(() => void flow.fitView({ nodes: [source, root, ...children].map((item) => ({ id: item.id })), padding: 0.2, maxZoom: 1, duration: 400 }), 80);
   };
 
@@ -254,6 +245,8 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
       <header className="board__bar">
         <button type="button" className="ws-text-button" onClick={onBack}><ChevronLeft size={18} /> Boards</button>
         <input className="board__title" value={title} placeholder="Untitled board" aria-label="Board title" onChange={(event) => setTitle(event.target.value)} />
+        {meta?.noteId && <button type="button" className="ws-text-button" onClick={() => onOpenNote(meta.noteId!)}><FileText size={16} /> <span>Note</span></button>}
+        <button type="button" className="ws-text-button" onClick={() => { if (nodes.some((node) => node.type === "text" && (node.data as TextData).text.trim())) { void save(); setStreamOpen(true); } else onError("Add a few text cards first, then Mindstream can write a note from them."); }}><Waypoints size={16} /> <span>Mindstream</span></button>
         <span className="board__state" aria-live="polite">{saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : meta ? "Saved" : ""}</span>
       </header>
       <div className="board__canvas">
@@ -284,9 +277,56 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
         })()}
       </Sheet>
       <ReadSheet boardId={boardId} node={readId ? nodes.find((item) => item.id === readId && item.type === "image") ?? null : null} onClose={() => setReadId(null)} onError={onError} onAdd={(source, result) => { addOrganized(source, result); setReadId(null); }} />
+      <StreamSheet open={streamOpen} boardId={boardId} title={title} onClose={() => setStreamOpen(false)} onError={onError} onCreated={(noteId) => { setMeta((current) => current ? { ...current, noteId } : current); setStreamOpen(false); onOpenNote(noteId); }} />
       <PdfSheet open={pdfOpen} boardId={boardId} onClose={() => setPdfOpen(false)} onError={onError} onAdd={addImages} />
     </div>
   </BoardContext.Provider>;
+}
+
+/** Mindstream, board → note: DeepSeek writes a connected summary; you can edit it before it becomes a note. */
+function StreamSheet({ open, boardId, title, onClose, onError, onCreated }: { open: boolean; boardId: string; title: string; onClose: () => void; onError: (message: string) => void; onCreated: (noteId: string) => void }) {
+  const [markdown, setMarkdown] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setMarkdown(null);
+    void (async () => {
+      try {
+        const data = await parseResponse<{ markdown: string }>(await fetch("/api/workspace/mindstream/note", { method: "POST", headers, body: JSON.stringify({ boardId }) }));
+        if (!cancelled) setMarkdown(data.markdown);
+      } catch (cause) {
+        if (cancelled) return;
+        onError(cause instanceof Error ? cause.message : "Could not write the note.");
+        onClose();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, boardId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function create() {
+    if (!markdown) return;
+    setSaving(true);
+    try {
+      const heading = markdown.match(/^#\s+(.+)$/m);
+      const body = heading ? markdown.replace(heading[0], "").trim() : markdown;
+      const { note } = await parseResponse<{ note: { id: string } }>(await fetch("/api/workspace/notes", { method: "POST", headers, body: JSON.stringify({ title: heading?.[1]?.trim() || title || "Board summary", markdown: body, icon: "🧠" }) }));
+      await fetch(`/api/workspace/boards/${boardId}`, { method: "PATCH", headers, body: JSON.stringify({ noteId: note.id }) }).catch(() => undefined);
+      onCreated(note.id);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Could not create the note.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Sheet open={open} onClose={onClose} title="Mindstream · board to note" size="tall" primary={{ label: saving ? "Creating…" : "Create note", onClick: () => void create(), disabled: !markdown || saving }}>
+    {markdown === null ? <p className="board-read__wait"><Loader2 className="ws-spin" size={16} /> DeepSeek is connecting your cards…</p> : <div className="board-read">
+      <p className="board-read__hint">A note written from your cards. Edit it here, then create it in Notes.</p>
+      <textarea value={markdown} onChange={(event) => setMarkdown(event.target.value)} style={{ minHeight: 360 }} />
+    </div>}
+  </Sheet>;
 }
 
 /** Photo of a paper page → recognized text you can correct → proposed cards you confirm. */
@@ -419,6 +459,6 @@ function PdfSheet({ open, boardId, onClose, onError, onAdd }: { open: boolean; b
   </Sheet>;
 }
 
-export function BoardCanvas(props: { boardId: string; onBack: () => void; onError: (message: string) => void; onChanged: () => void }) {
+export function BoardCanvas(props: { boardId: string; onBack: () => void; onError: (message: string) => void; onChanged: () => void; onOpenNote: (id: string) => void }) {
   return <ReactFlowProvider><Inner {...props} /></ReactFlowProvider>;
 }

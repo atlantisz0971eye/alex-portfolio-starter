@@ -1,9 +1,10 @@
+import type { Organized } from "./boardLayout";
 import { quickDeepSeek } from "./workspaceDeepSeek";
 
-export type OrganizedItem = { text: string; parent: number | null };
-export type Organized = { title: string; items: OrganizedItem[] };
+export type { Organized };
+export type OrganizedItem = Organized["items"][number];
 
-const SYSTEM = `你是课堂笔记整理助手。用户给你一页手写或印刷笔记的 OCR 文本（可能中英混合，有错字和乱序）。
+const SYSTEM = `你是课堂笔记整理助手。用户给你一篇笔记的文本（可能来自手写照片的识别，也可能是直接输入的，中英混合，可能有错字和乱序）。
 把它整理成思维导图的层级节点，只输出 JSON，不要任何解释，格式：
 {"title":"这页笔记的标题（不超过 30 字）","items":[{"text":"节点文字","parent":null},{"text":"子节点","parent":0}]}
 规则：

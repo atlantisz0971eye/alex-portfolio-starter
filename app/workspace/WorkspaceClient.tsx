@@ -116,6 +116,12 @@ function App() {
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
   const [tab, setTab] = useState<Tab>("today");
+  const [notesOpenId, setNotesOpenId] = useState<string | null>(null);
+  const [boardsOpenId, setBoardsOpenId] = useState<string | null>(null);
+  const openNote = (id: string) => { setNotesOpenId(id); setTab("notes"); };
+  const openBoard = (id: string) => { setBoardsOpenId(id); setTab("boards"); };
+  // A deep link only applies to the visit it was made for.
+  useEffect(() => { if (tab !== "boards") setBoardsOpenId(null); if (tab !== "notes") setNotesOpenId(null); }, [tab]);
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [notesRefresh, setNotesRefresh] = useState(0);
@@ -336,8 +342,8 @@ function App() {
           ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
           : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
-          : tab === "boards" ? <Boards onError={setError} onSignOut={() => void signOut()} />
-          : tab === "notes" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh} />
+          : tab === "boards" ? <Boards onError={setError} onSignOut={() => void signOut()} openId={boardsOpenId} onOpenNote={openNote} />
+          : tab === "notes" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh} openId={notesOpenId} onOpenBoard={openBoard} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>

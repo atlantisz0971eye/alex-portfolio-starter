@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: Context) {
     if (!validBoardId(id)) return Response.json({ error: "not_found" }, { status: 404 });
     if (Number(request.headers.get("content-length")) > 1_000_000) throw new BoardError("This board is too large.");
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const board = await updateBoard(id, { title: body.title, content: body.content });
+    const board = await updateBoard(id, { title: body.title, content: body.content, noteId: body.noteId });
     return board ? Response.json({ board }) : Response.json({ error: "not_found" }, { status: 404 });
   } catch (error) {
     return boardFailure(error);

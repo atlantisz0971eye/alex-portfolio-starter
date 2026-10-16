@@ -838,3 +838,4 @@
 @media (max-width: 480px) { .board__tools button span { display: none; } .board__tools button.board__scan span { display: inline; } .board__tools button { padding: 0 12px; } }
 .board__tools .board__scan { background: var(--text); color: var(--bg); }
 .board__tools .board__scan:hover { background: var(--text); opacity: .88; }
+@media (max-width: 520px) { .board__bar .ws-text-button span { display: none; } .board__bar .ws-text-button { min-width: 40px; justify-content: center; } }

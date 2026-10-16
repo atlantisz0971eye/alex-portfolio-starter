@@ -1,7 +1,7 @@
 import { del, get, list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 
-export type BoardMeta = { id: string; title: string; createdAt: string; updatedAt: string; nodeCount: number };
+export type BoardMeta = { id: string; title: string; createdAt: string; updatedAt: string; nodeCount: number; /** The note last written from this board (Mindstream). */ noteId?: string; /** The note this board was made from. */ fromNoteId?: string };
 export type BoardContent = { nodes: unknown[]; edges: unknown[] };
 
 const INDEX = "workspace/boards/index.json";
@@ -36,11 +36,11 @@ export async function readBoard(id: string): Promise<{ board: BoardMeta; content
   return { board, content: raw ? JSON.parse(raw) as BoardContent : { nodes: [], edges: [] } };
 }
 
-export async function createBoard(title: string) {
+export async function createBoard(title: string, fromNoteId?: string) {
   const boards = await readIndex();
   if (boards.length >= MAX_BOARDS) throw new BoardError("There are too many boards.");
   const now = new Date().toISOString();
-  const board: BoardMeta = { id: randomUUID(), title: title.trim().slice(0, 120) || "Untitled board", createdAt: now, updatedAt: now, nodeCount: 0 };
+  const board: BoardMeta = { id: randomUUID(), title: title.trim().slice(0, 120) || "Untitled board", createdAt: now, updatedAt: now, nodeCount: 0, ...(fromNoteId && validBoardId(fromNoteId) ? { fromNoteId } : {}) };
   await put(contentPath(board.id), JSON.stringify({ nodes: [], edges: [] }), { access: "private", allowOverwrite: true, contentType: "application/json" });
   await writeIndex([board, ...boards]);
   return board;
@@ -54,11 +54,12 @@ function check(content: unknown): BoardContent {
   return { nodes: value.nodes, edges: value.edges };
 }
 
-export async function updateBoard(id: string, patch: { title?: unknown; content?: unknown }) {
+export async function updateBoard(id: string, patch: { title?: unknown; content?: unknown; noteId?: unknown }) {
   const boards = await readIndex();
   const board = boards.find((item) => item.id === id);
   if (!board) return null;
   if (typeof patch.title === "string") board.title = patch.title.trim().slice(0, 120) || "Untitled board";
+  if (typeof patch.noteId === "string" && validBoardId(patch.noteId)) board.noteId = patch.noteId;
   if (patch.content !== undefined) {
     const content = check(patch.content);
     await put(contentPath(id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });

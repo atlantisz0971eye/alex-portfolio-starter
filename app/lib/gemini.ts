@@ -1,7 +1,7 @@
 import type { Organized } from "./boardOrganize";
 
 export class GeminiError extends Error {
-  constructor(readonly code: "gemini_not_configured" | "gemini_forbidden" | "gemini_failed") {
+  constructor(readonly code: "gemini_not_configured" | "gemini_forbidden" | "gemini_billing" | "gemini_failed") {
     super(code);
   }
 }
@@ -39,6 +39,7 @@ export async function readNotesWithGemini(image: Uint8Array, mime: string): Prom
   const data = await response.json().catch(() => ({})) as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } };
   if (!response.ok) {
     console.error("Gemini request failed", response.status, data.error?.message?.slice(0, 300));
+    if (response.status === 402) throw new GeminiError("gemini_billing");
     throw new GeminiError(response.status === 400 || response.status === 401 || response.status === 403 || response.status === 429 ? "gemini_forbidden" : "gemini_failed");
   }
   const raw = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim() ?? "";
