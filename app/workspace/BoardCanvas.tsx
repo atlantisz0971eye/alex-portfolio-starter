@@ -82,7 +82,7 @@ function cleanPage(canvas: HTMLCanvasElement) {
   context.putImageData(image, 0, 0);
 }
 
-async function shrink(file: File, clean = false) {
+export async function shrink(file: File, clean = false) {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);

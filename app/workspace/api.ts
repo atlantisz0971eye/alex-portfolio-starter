@@ -39,6 +39,13 @@ export const errors: Record<string, string> = {
   gemini_failed: "Gemini could not read this page. Try again, or retake the photo.",
   board_empty: "This board has no text cards to summarize yet.",
   note_empty: "This note is too short to turn into a board.",
+  invalid_devlog: "That could not be saved.",
+  devlog_failed: "The devlog could not be reached. Try again.",
+  devlog_empty: "There are no log entries in that range yet.",
+  no_repo: "This project has no GitHub repository set.",
+  github_not_found: "GitHub could not find that repository. If it is private, add GITHUB_TOKEN in Vercel.",
+  github_denied: "GitHub refused the request. Check GITHUB_TOKEN in Vercel.",
+  github_failed: "GitHub could not be reached. Try again.",
   organize_failed: "DeepSeek could not organize this text. Try again, or shorten the text.",
   no_text_found: "No text was found in that image.",
   invalid_question: "Ask a slightly longer question.",
@@ -52,7 +59,7 @@ export async function parseResponse<T>(response: Response): Promise<T> {
     // Platform errors such as gateway timeouts are not JSON.
   }
   if (!response.ok) {
-    if (data?.error === "invalid_event" && data.message) throw new Error(data.message);
+    if (data?.message && /^invalid_(event|board|note|devlog)$/.test(data.error ?? "")) throw new Error(data.message);
     if (data?.error && errors[data.error]) throw new Error(errors[data.error]);
     if (response.status === 504 || response.status === 408) throw new Error("This took too long to process. Large or complex files may need another try.");
     if (response.status === 413) throw new Error("The request was too large.");

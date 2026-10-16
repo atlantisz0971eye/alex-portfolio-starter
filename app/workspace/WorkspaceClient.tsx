@@ -13,6 +13,7 @@ import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
 import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
+import { Devlog } from "./Devlog";
 import { Notes } from "./Notes";
 import { Sidebar, TabBar, ThemeContext, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
@@ -116,6 +117,9 @@ function App() {
   const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
   const [tab, setTab] = useState<Tab>("today");
   const [mindstreamRefresh, setMindstreamRefresh] = useState(0);
+  const [streamOpenId, setStreamOpenId] = useState<string | null>(null);
+  // A link from the devlog only applies to that visit.
+  useEffect(() => { if (tab !== "mindstreams") setStreamOpenId(null); }, [tab]);
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [notesRefresh, setNotesRefresh] = useState(0);
@@ -336,7 +340,8 @@ function App() {
           ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
           : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
-          : tab === "mindstreams" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} />
+          : tab === "mindstreams" ? <Notes onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />
+          : tab === "devlog" ? <Devlog onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); setTab("mindstreams"); }} />
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
