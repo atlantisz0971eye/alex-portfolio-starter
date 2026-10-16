@@ -7,6 +7,7 @@ import type { NoteMeta } from "../lib/notesStore";
 import { parseResponse } from "./api";
 import { MINDSTREAM_CHANGED, registerFlush, setCurrentMindstream, type ChangedDetail } from "./mindstreamBus";
 import { NoteEditor } from "./NoteEditor";
+import { Divider, useRemembered, useSplit } from "./useSplit";
 import { ConvertSheet, StreamBoard, type Direction } from "./StreamParts";
 import { Sheet } from "./Sheet";
 import { PageTitle, TopRow } from "./Shell";
@@ -37,6 +38,9 @@ export function Notes({ onError, onSignOut, refresh, openId }: Props) {
   const [revision, setRevision] = useState(0);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [wide, setWide] = useState(false);
+  const listSplit = useSplit("ws-ms-list", 300, 220, 520);
+  const [listState, setListState] = useRemembered("ws-ms-list-open", "open");
+  const listOpen = listState !== "closed";
 
   type Pending = { id: string; title?: string; content?: JSONNode };
   const pending = useRef<Pending | null>(null);
@@ -306,8 +310,9 @@ export function Notes({ onError, onSignOut, refresh, openId }: Props) {
   return <>
     <main className={`page page--notes${wide ? " is-split" : ""}`}>
       <TopRow onSignOut={onSignOut} />
-      <div className="notes">
-        <section className="notes__list" aria-label="Pages">{list}</section>
+      <div className="notes" style={wide ? { gridTemplateColumns: `${listOpen ? listSplit.size : 0}px 10px minmax(0, 1fr)` } : undefined}>
+        <section className={`notes__list${listOpen ? "" : " is-collapsed"}`} aria-label="Pages">{list}</section>
+        {wide && <Divider bind={listSplit.bind(1)} left={{ label: listOpen ? "Hide the page list" : "Show the page list", collapsed: !listOpen, onToggle: () => setListState(listOpen ? "closed" : "open") }} />}
         {wide && <section className="notes__pane" aria-label="Page">{editor || <div className="empty"><FileText size={28} /><p>Select a mindstream or create a new one.</p></div>}</section>}
       </div>
     </main>
@@ -356,6 +361,9 @@ function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBa
   const area = useRef<HTMLTextAreaElement>(null);
   const root = useRef<HTMLElement>(null);
   const [roomy, setRoomy] = useState(false);
+  const noteSplit = useSplit("ws-ms-note", 460, 280, 1000);
+  // "both", or one pane slid away so the other has the whole width.
+  const [layout, setLayout] = useRemembered("ws-ms-layout", "both");
   const [view, setView] = useState<"note" | "board">("note");
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boardSave, setBoardSave] = useState<"saved" | "saving" | "error">("saved");
@@ -386,8 +394,8 @@ function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBa
       <span className={`nview__status is-${status}`} aria-live="polite">{status === "saving" ? "Saving…" : status === "error" ? "Not saved" : "Saved"}</span>
       <button type="button" className="ws-round" aria-label="Page options" onClick={onMenu}><MoreHorizontal size={18} /></button>
     </header>
-    <div className="nview__body">
-    <div className="nview__notepane">
+    <div className="nview__body" style={roomy ? { gridTemplateColumns: layout === "board" ? "0px 10px minmax(0, 1fr)" : layout === "note" ? "minmax(0, 1fr) 10px 0px" : `${noteSplit.size}px 10px minmax(240px, 1fr)` } : undefined}>
+    <div className={`nview__notepane${roomy && layout === "board" ? " is-collapsed" : ""}`}>
     {loading || !loaded ? <div className="nview__scroll"><p className="empty"><Loader2 className="ws-spin" size={18} /></p></div> : <div className="nview__scroll">
       <div className="nview__page">
         <button type="button" className="nview__icon" aria-label="Choose an icon" onClick={() => setPicker(true)}>{loaded.note.icon || <Smile size={26} />}</button>
@@ -401,7 +409,8 @@ function NoteView({ loaded, loading, parent, subpages, saveState, showBack, onBa
       </div>
     </div>}
     </div>
-    <div className="nview__boardpane" aria-label="Board">
+    {roomy && <Divider bind={noteSplit.bind(1)} left={{ label: layout === "board" ? "Show the note" : "Hide the note", collapsed: layout === "board", onToggle: () => setLayout(layout === "board" ? "both" : "board") }} right={{ label: layout === "note" ? "Show the board" : "Hide the board", collapsed: layout === "note", onToggle: () => setLayout(layout === "note" ? "both" : "note") }} />}
+    <div className={`nview__boardpane${roomy && layout === "note" ? " is-collapsed" : ""}`} aria-label="Board">
       {loaded && <StreamBoard noteId={loaded.note.id} title={title} onBoardId={setBoardId} onSaveState={setBoardSave} onError={onError} />}
     </div>
     </div>

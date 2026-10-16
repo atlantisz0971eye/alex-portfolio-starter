@@ -876,3 +876,17 @@
 .nview[data-roomy="true"] .nview__boardpane { border-left: 1px solid var(--line); }
 .nview__bar .ms__switch { margin-left: auto; }
 .nview__bar .ms__convert { margin-left: 0; }
+
+/* Resizable, collapsible panes */
+.notes__list.is-collapsed, .nview__notepane.is-collapsed, .nview__boardpane.is-collapsed { visibility: hidden; overflow: hidden; pointer-events: none; }
+.ms-split { position: relative; z-index: 6; width: 10px; cursor: col-resize; touch-action: none; user-select: none; }
+.ms-split::before { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: var(--line); transition: background .15s, width .15s, left .15s; }
+.ms-split:hover::before, body.is-resizing .ms-split::before { left: 3px; width: 3px; background: var(--accent); opacity: .55; }
+.ms-split__tabs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity .15s; }
+.ms-split:hover .ms-split__tabs, .ms-split:focus-within .ms-split__tabs, body.is-resizing .ms-split__tabs { opacity: 1; }
+.ms-split__tabs button { display: grid; place-items: center; width: 18px; height: 40px; border-radius: 9px; background: var(--float); border: 1px solid var(--line); color: var(--text-2); box-shadow: 0 2px 8px var(--shade); cursor: pointer; }
+.ms-split__tabs button:hover { color: var(--text); background: var(--panel-2); }
+body.is-resizing { cursor: col-resize; user-select: none; }
+body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
+.nview[data-roomy="true"] .nview__boardpane { border-left: 0; }
+@media (pointer: coarse) { .ms-split__tabs { opacity: 1; } }
