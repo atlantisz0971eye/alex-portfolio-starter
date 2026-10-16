@@ -2,7 +2,7 @@
 
 import { addEdge, Background, BackgroundVariant, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, useEdgesState, useNodesState, useReactFlow, type Connection, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ChevronLeft, FileText, Image as ImageIcon, Loader2, ScanText, Sparkles, StickyNote, Trash2 } from "lucide-react";
+import { ChevronLeft, FileText, Image as ImageIcon, Loader2, ScanLine, ScanText, Sparkles, StickyNote, Trash2 } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
@@ -47,7 +47,40 @@ function ImageCard({ id, data, selected }: NodeProps<Node<ImageData, "image">>) 
 const nodeTypes = { text: TextCard, image: ImageCard };
 
 /** Shrinks a photo so it stays well under the request size limit, keeping handwriting legible. */
-async function shrink(file: File) {
+/**
+ * Evens out the lighting on a photographed page: each pixel is divided by the local paper brightness (a heavily
+ * blurred copy of the photo), which removes shadows and turns the paper white while keeping the ink colour.
+ */
+function cleanPage(canvas: HTMLCanvasElement) {
+  const { width, height } = canvas;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  const small = document.createElement("canvas");
+  small.width = Math.max(8, Math.round(width / 24));
+  small.height = Math.max(8, Math.round(height / 24));
+  const smallContext = small.getContext("2d");
+  const paper = document.createElement("canvas");
+  paper.width = width;
+  paper.height = height;
+  const paperContext = paper.getContext("2d");
+  if (!smallContext || !paperContext) return;
+  smallContext.imageSmoothingQuality = "high";
+  smallContext.drawImage(canvas, 0, 0, small.width, small.height);
+  paperContext.imageSmoothingQuality = "high";
+  paperContext.drawImage(small, 0, 0, width, height);
+  const image = context.getImageData(0, 0, width, height);
+  const background = paperContext.getImageData(0, 0, width, height).data;
+  const data = image.data;
+  for (let index = 0; index < data.length; index += 4) {
+    for (let channel = 0; channel < 3; channel += 1) {
+      const ratio = data[index + channel] / Math.max(40, background[index + channel]);
+      data[index + channel] = Math.max(0, Math.min(255, ((ratio - 0.55) / 0.4) * 255));
+    }
+  }
+  context.putImageData(image, 0, 0);
+}
+
+async function shrink(file: File, clean = false) {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
@@ -61,6 +94,7 @@ async function shrink(file: File) {
   context.fillRect(0, 0, width, height);
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
+  if (clean) cleanPage(canvas);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
   if (!blob) throw new Error("Could not read that image.");
   return { blob, width, height };
@@ -91,6 +125,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
   const callbacks = useRef({ onError, onChanged });
   const dirty = useRef(false);
   const file = useRef<HTMLInputElement>(null);
+  const scan = useRef<HTMLInputElement>(null);
   latest.current = { nodes, edges, title };
   callbacks.current = { onError, onChanged };
 
@@ -167,13 +202,13 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
     })]);
   };
 
-  async function onFiles(files: FileList | null) {
+  async function onFiles(files: FileList | null, clean = false) {
     if (!files?.length) return;
     setBusy(true);
     try {
       const added: { name: string; width: number; height: number }[] = [];
       for (const item of [...files].slice(0, 8)) {
-        const { blob, width, height } = await shrink(item);
+        const { blob, width, height } = await shrink(item, clean);
         const result = await parseResponse<{ name: string }>(await fetch(`${endpoint(boardId)}/assets`, { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob }));
         added.push({ name: result.name, width, height });
       }
@@ -183,6 +218,7 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
     } finally {
       setBusy(false);
       if (file.current) file.current.value = "";
+      if (scan.current) scan.current.value = "";
     }
   }
 
@@ -226,15 +262,17 @@ function Inner({ boardId, onBack, onError, onChanged }: { boardId: string; onBac
           <Controls showInteractive={false} position="top-right" />
           <MiniMap pannable zoomable position="bottom-right" className="board__minimap" />
         </ReactFlow>
-        {meta && nodes.length === 0 && <p className="board__empty">An empty board. Add a card, a photo of your notes, or pages from a PDF.</p>}
+        {meta && nodes.length === 0 && <p className="board__empty">An empty board. Tap Scan notes to photograph a page of your notebook, or add a card or PDF pages.</p>}
       </div>
       <div className={`board__tools${editing ? " is-hidden" : ""}`} role="toolbar" aria-label="Add to board">
-        <button type="button" onClick={addText}><StickyNote size={18} /> Card</button>
-        <button type="button" onClick={() => file.current?.click()} disabled={busy}>{busy ? <Loader2 size={18} className="ws-spin" /> : <ImageIcon size={18} />} Photo</button>
-        <button type="button" onClick={() => setPdfOpen(true)}><FileText size={18} /> PDF</button>
-        {selectedCount > 0 && <button type="button" className="board__delete" onClick={removeSelected}><Trash2 size={18} /> Delete</button>}
+        <button type="button" onClick={addText}><StickyNote size={18} /> <span>Card</span></button>
+        <button type="button" className="board__scan" onClick={() => scan.current?.click()} disabled={busy}>{busy ? <Loader2 size={18} className="ws-spin" /> : <ScanLine size={18} />} <span>Scan notes</span></button>
+        <button type="button" onClick={() => file.current?.click()} disabled={busy}><ImageIcon size={18} /> <span>Photo</span></button>
+        <button type="button" onClick={() => setPdfOpen(true)}><FileText size={18} /> <span>PDF</span></button>
+        {selectedCount > 0 && <button type="button" className="board__delete" onClick={removeSelected}><Trash2 size={18} /> <span>Delete</span></button>}
       </div>
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(event) => void onFiles(event.target.files)} />
+      <input ref={scan} type="file" accept="image/*" capture="environment" hidden onChange={(event) => void onFiles(event.target.files, true)} />
       <Sheet open={editId !== null} onClose={() => setEditId(null)} title="Edit card" size="tall">
         {(() => {
           const node = nodes.find((item) => item.id === editId);

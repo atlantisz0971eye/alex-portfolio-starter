@@ -835,3 +835,6 @@
 .board-read__tree li { padding: 10px 14px; border-top: 1px solid var(--line); font-family: var(--serif); font-size: 15px; line-height: 1.45; }
 .board-read__tree li:first-child { border-top: 0; }
 .board-read__tree .is-title { font-weight: 600; font-size: 16px; }
+@media (max-width: 480px) { .board__tools button span { display: none; } .board__tools button.board__scan span { display: inline; } .board__tools button { padding: 0 12px; } }
+.board__tools .board__scan { background: var(--text); color: var(--bg); }
+.board__tools .board__scan:hover { background: var(--text); opacity: .88; }
