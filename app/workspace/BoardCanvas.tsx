@@ -294,6 +294,8 @@ function ReadSheet({ boardId, node, onClose, onError, onAdd }: { boardId: string
   const [step, setStep] = useState<"reading" | "text" | "organizing" | "preview">("reading");
   const [text, setText] = useState("");
   const [result, setResult] = useState<Organized | null>(null);
+  // Gemini returns a draft with the transcript; it is reused as long as the text is not edited.
+  const [draft, setDraft] = useState<{ text: string; result: Organized } | null>(null);
   const id = node?.id;
 
   useEffect(() => {
@@ -304,9 +306,10 @@ function ReadSheet({ boardId, node, onClose, onError, onAdd }: { boardId: string
     setResult(null);
     void (async () => {
       try {
-        const data = await parseResponse<{ text: string }>(await fetch(`${endpoint(boardId)}/recognize`, { method: "POST", headers, body: JSON.stringify({ name: node.data.name }) }));
+        const data = await parseResponse<{ text: string; draft?: Organized | null }>(await fetch(`${endpoint(boardId)}/recognize`, { method: "POST", headers, body: JSON.stringify({ name: node.data.name }) }));
         if (cancelled) return;
         setText(data.text);
+        setDraft(data.draft ? { text: data.text, result: data.draft } : null);
         setStep("text");
       } catch (cause) {
         if (cancelled) return;
@@ -318,6 +321,7 @@ function ReadSheet({ boardId, node, onClose, onError, onAdd }: { boardId: string
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function organize() {
+    if (draft && draft.text === text) { setResult(draft.result); setStep("preview"); return; }
     setStep("organizing");
     try {
       setResult(await parseResponse<Organized>(await fetch(`${endpoint(boardId)}/organize`, { method: "POST", headers, body: JSON.stringify({ text }) })));
@@ -335,7 +339,7 @@ function ReadSheet({ boardId, node, onClose, onError, onAdd }: { boardId: string
   return <Sheet open={!!node} onClose={onClose} title="Read notes" size="tall" primary={primary}>
     {(step === "reading" || step === "organizing") && <p className="board-read__wait"><Loader2 className="ws-spin" size={16} /> {step === "reading" ? "Reading the photo…" : "Organizing with DeepSeek…"}</p>}
     {step === "text" && <div className="board-read">
-      <p className="board-read__hint">Fix any misread words, then organize. This is the text found in the photo.</p>
+      <p className="board-read__hint">Fix any misread words, then organize. Words marked [?] were hard to read.</p>
       <textarea value={text} onChange={(event) => setText(event.target.value)} />
       <p className="board-read__hint"><Sparkles size={13} /> DeepSeek turns this into cards you can review before they are added.</p>
     </div>}

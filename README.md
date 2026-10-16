@@ -91,6 +91,12 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 
 页面图片会发送给 Google 识别；识别后的文字保存在私有存储里，每本书只需识别一次。
 
+## Alex Workspace · Boards（画布）
+
+Boards 是无限画布：文字卡、照片、PDF 页都可以摆在上面，自动保存。**Scan notes** 直接拍纸质笔记（自动去阴影、提亮），**Photo** 从相册导入，**PDF** 从资料库或小文件（≤4 MB）导入页面。选中照片后点 **Read notes**：识别文字（可手动改错字），再用 DeepSeek 整理成层级卡片，预览确认后才加到画布并连线。
+
+识别引擎：设置了 `GEMINI_API_KEY` 时用 Gemini（默认 `gemini-3.8-flash`，可用 `GEMINI_MODEL` 改，例如换成 `gemini-3.5-flash-lite`）直接读图，能处理潦草手写，并顺带给出卡片草稿，不确定的词标 `[?]`；没设置时退回 Google Cloud Vision。Gemini 请使用开通计费的付费层密钥（付费层的数据不会用于改进 Google 产品）。
+
 ### 管理已导入的文件
 
 资料库里每本书封面左上角的 “⋯” 打开文件选项：**重命名**；**Check for scanned pages**（根据已保存的文字重新检查哪些页没有文字，OCR 功能上线前导入的书需要点一次）；**Recognize text on N pages**（对这些页直接启动识别，不用先打开书）；**Open original PDF**；**Re-read the original file**（重新从原文件提取文字，会替换已保存的文字，包括已识别的内容）；**Delete**（永久删除文字、高亮、笔记和原文件，需要二次确认）。

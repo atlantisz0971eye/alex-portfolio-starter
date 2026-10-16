@@ -1,5 +1,6 @@
 import { readAsset, readBoard, validAssetName, validBoardId } from "../../../../../lib/boardStore";
 import { calendarGuard } from "../../../../../lib/calendarGuard";
+import { geminiConfigured, GeminiError, readNotesWithGemini } from "../../../../../lib/gemini";
 import { recognize, VisionError } from "../../../../../lib/vision";
 
 export const runtime = "nodejs";
@@ -17,11 +18,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const asset = await readAsset(id, body.name);
     if (!asset || asset.statusCode !== 200) return Response.json({ error: "not_found" }, { status: 404 });
     const bytes = new Uint8Array(await new Response(asset.stream).arrayBuffer());
+    // Gemini understands messy handwriting and returns a draft card tree too; Google Vision is the fallback.
+    if (geminiConfigured()) {
+      const reading = await readNotesWithGemini(bytes, asset.blob.contentType || "image/jpeg");
+      if (!reading.text.trim()) return Response.json({ error: "no_text_found" }, { status: 422 });
+      return Response.json({ text: reading.text, draft: reading.draft });
+    }
     const [text] = await recognize([bytes]);
     const clean = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
     if (!clean) return Response.json({ error: "no_text_found" }, { status: 422 });
     return Response.json({ text: clean });
   } catch (error) {
+    if (error instanceof GeminiError) return Response.json({ error: error.code }, { status: error.code === "gemini_not_configured" ? 503 : 502 });
     if (error instanceof VisionError) return Response.json({ error: error.code }, { status: error.code === "ocr_not_configured" ? 503 : 502 });
     return Response.json({ error: "ocr_failed" }, { status: 502 });
   }
