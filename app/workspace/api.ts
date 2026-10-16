@@ -34,6 +34,8 @@ export const errors: Record<string, string> = {
   ai_auth: "DeepSeek rejected the API key. Check DEEPSEEK_API_KEY in Vercel.",
   ai_balance: "The DeepSeek account has insufficient balance. Top it up on the DeepSeek platform.",
   ai_request: "DeepSeek rejected the request, likely the model name. Check DEEPSEEK_MODEL.",
+  organize_failed: "DeepSeek could not organize this text. Try again, or shorten the text.",
+  no_text_found: "No text was found in that image.",
   invalid_question: "Ask a slightly longer question.",
 };
 
