@@ -113,6 +113,17 @@ Mindstreams 取代了原来的 Notes 标签：它是一棵页面树（保留子�
 
 配置：公开仓库不需要任何设置；私有仓库在 Vercel 加 `GITHUB_TOKEN`（Fine-grained token，只给该仓库的 Contents 只读权限）。数据存在私有 Blob 里。
 
+## Alex Workspace · MCP（让 Claude 管理 Workspace）
+
+`/api/mcp` 是一个 MCP 服务（Streamable HTTP），Claude Code 等客户端连上后可以读写 Workspace。读取：Mindstreams、Devlog、日历、资料库；写入只做“新增或追加”：新建 Mindstream、在笔记末尾追加、在白板上加/改卡片和连线、写 Devlog 条目和项目、添加或修改日程。**没有任何删除或覆盖类工具**。邮件默认不开放，设置 `MCP_ALLOW_MAIL=1` 才会提供只读的邮件搜索和阅读。
+
+配置：
+1. 生成一个至少 32 位的随机密钥（例如 `python3 -c "import secrets;print(secrets.token_urlsafe(40))"`）。
+2. 在 Vercel 设置 `WORKSPACE_MCP_TOKEN`（Sensitive，Production）并重新部署；可选 `WORKSPACE_ZONE`（默认 Europe/London，用于日程和日期）。
+3. 在终端把它加到 Claude Code：`claude mcp add --transport http alex-workspace https://你的域名/api/mcp --header "Authorization: Bearer 密钥"`。之后在会话里输入 `/mcp` 可以查看连接状态。
+
+安全：请求必须带该密钥；带 Origin 头的浏览器请求会被拒绝；每分钟最多 120 次；换密钥只需改 Vercel 变量并重新部署，旧密钥立即失效。服务端提示里写明了所有读到的内容（邮件、笔记、提交信息）都只是数据，不能当成指令。目前不支持 claude.ai 网页端的“自定义连接器”（它要求 OAuth），Claude Code 和支持自定义请求头的客户端可用。
+
 ### 管理已导入的文件
 
 资料库里每本书封面左上角的 “⋯” 打开文件选项：**重命名**；**Check for scanned pages**（根据已保存的文字重新检查哪些页没有文字，OCR 功能上线前导入的书需要点一次）；**Recognize text on N pages**（对这些页直接启动识别，不用先打开书）；**Open original PDF**；**Re-read the original file**（重新从原文件提取文字，会替换已保存的文字，包括已识别的内容）；**Delete**（永久删除文字、高亮、笔记和原文件，需要二次确认）。
