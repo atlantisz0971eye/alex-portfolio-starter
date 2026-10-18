@@ -30,7 +30,7 @@ const ownWorks = {
     { id: "electromagnetic-decay", title: "Electromagnetic Decay", note: "Interference translated into sound and image.", keywords: ["electromagnetic activity", "ambient sound", "interference", "attenuation", "sonic-visual translation", "infrastructure", "control"], image: "/electromagnetic-decay/hero/hero_01.jpg", href: "/?focus=project-electromagnetic-decay" },
     { id: "dys-utopia", title: "Dys/Utopia", note: "A moving portrait of rumination.", keywords: ["rumination", "parallel thoughts", "stability and collapse", "particles", "melting forms", "mirroring", "self-erasure"], image: "/dys-utopia/hero/hero_01.jpg", href: "/?focus=project-dys-utopia" },
     { id: "bloom-system", title: "Bloom System", note: "A system for connection and growth.", keywords: ["bio-interaction", "feedback loop", "moving-image reconstruction", "geography", "memory", "identity", "regional culture"], image: "/bloom-system/hero/hero_01.jpg", href: "/?focus=project-bloom-system" },
-    { id: "ga1a", title: "Ga1a", note: "Poetry, leaf rubbings and machine translation.", keywords: ["leaf rubbing", "poetry", "interactive archive", "colour and contour", "sound", "disturbed machine translation"], href: "/?focus=gallery-ga1a-poetry-leaf-archive" },
+    { id: "ga1a", title: "Ga1a", note: "Poetry, leaf rubbings and machine translation.", keywords: ["leaf rubbing", "poetry", "interactive archive", "colour and contour", "sound", "disturbed machine translation"], href: "/?focus=development-ga1a-poetry-leaf-archive" },
     { id: "blur", title: "Blur", note: "A 3D moving-image work about the changing boundary between human and machine creativity.", keywords: ["human-machine symbiosis", "artificial intelligence", "artistic intelligence", "blurring boundaries over time", "human and machine creativity", "3D moving image"], image: "https://i.ytimg.com/vi/K5YCTX091Ek/maxresdefault.jpg", href: "/?focus=gallery-blur-2025" },
   ],
   zh: [
@@ -38,7 +38,7 @@ const ownWorks = {
     { id: "electromagnetic-decay", title: "电磁腐烂", note: "将干扰转译为声音与图像。", keywords: ["电磁活动", "环境声音", "信号干扰", "衰减", "声像转译", "人造基础设施", "控制欲望"], image: "/electromagnetic-decay/hero/hero_01.jpg", href: "/?focus=project-electromagnetic-decay" },
     { id: "dys-utopia", title: "Dys/Utopia", note: "一幅关于反刍思维的动态肖像。", keywords: ["反刍思维", "多线思绪", "稳定与崩塌", "粒子", "融化", "镜像", "自我退隐"], image: "/dys-utopia/hero/hero_01.jpg", href: "/?focus=project-dys-utopia" },
     { id: "bloom-system", title: "Bloom System", note: "关于连接与生长的系统。", keywords: ["生物交互", "反馈循环", "动态影像重构", "地理", "记忆", "身份", "地域文化"], image: "/bloom-system/hero/hero_01.jpg", href: "/?focus=project-bloom-system" },
-    { id: "ga1a", title: "Ga1a", note: "诗歌、叶片拓印与机器翻译。", keywords: ["叶片拓印", "诗歌", "互动档案", "色彩与轮廓", "声音", "受扰动的机器翻译"], href: "/?focus=gallery-ga1a-poetry-leaf-archive" },
+    { id: "ga1a", title: "Ga1a", note: "诗歌、叶片拓印与机器翻译。", keywords: ["叶片拓印", "诗歌", "互动档案", "色彩与轮廓", "声音", "受扰动的机器翻译"], href: "/?focus=development-ga1a-poetry-leaf-archive" },
     { id: "blur", title: "Blur", note: "探讨人机共生及人类与机器创造力边界的 3D 动态影像。", keywords: ["人机共生", "artificial intelligence", "artistic intelligence", "随时间模糊的边界", "人与机器的创造力", "3D 动态影像"], image: "https://i.ytimg.com/vi/K5YCTX091Ek/maxresdefault.jpg", href: "/?focus=gallery-blur-2025" },
   ],
 } satisfies Record<Language, OrbitWork[]>;

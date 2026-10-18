@@ -49,8 +49,12 @@ export default function Page() {
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
     if (!focus) return;
-    const kind = focus === "bio-entanglement" ? "bio" : focus.startsWith("project-") ? "project" : focus.startsWith("gallery-") ? "gallery" : null;
+    const kind = focus === "bio-entanglement" ? "bio" : focus.startsWith("project-") ? "project" : focus.startsWith("gallery-") ? "gallery" : focus.startsWith("development-") ? "development" : null;
     if (!kind) return;
+    if (kind === "development") {
+      const timer = window.setTimeout(() => document.getElementById(`dev-${focus.slice("development-".length)}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
+      return () => window.clearTimeout(timer);
+    }
     if (kind === "bio") {
       const timer = window.setTimeout(() => {
         window.dispatchEvent(new CustomEvent("bio:open", { detail: { tab: "entanglement" } }));
@@ -141,7 +145,6 @@ export default function Page() {
       />
 
       <main className="w-full snap-parent">
-        <DevelopmentSection lang={lang} />
         {themes.map((theme) => (
           <ThemeSection
             key={theme.id}
@@ -158,6 +161,7 @@ export default function Page() {
             }}
           />
         ))}
+        <DevelopmentSection lang={lang} />
         <GallerySection lang={lang} />
         <BioSection lang={lang} />
       </main>

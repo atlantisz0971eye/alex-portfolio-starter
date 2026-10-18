@@ -1,4 +1,3 @@
-import { GALLERY_CONTENT } from "./gallery";
 import type { Language } from "../types/project";
 
 export type DevelopmentItem = {
@@ -20,10 +19,10 @@ export type DevelopmentItem = {
 type DevelopmentContent = { title: string; eyebrow: string; intro: string; liveLabel: string; visitLabel: string; items: DevelopmentItem[] };
 
 const NIGHT_URL = "https://night-8looming-jasmine.vercel.app/web/";
-const ga1a = (lang: Language) => GALLERY_CONTENT[lang].items.find((item) => item.slug === "ga1a-poetry-leaf-archive");
+const GA1A_URL = "https://leaf-exhibition.vercel.app/";
 
-// A deep night with a pale jasmine glow, and the green of the leaf archive, to echo the sections around them.
-const NIGHT_FIELD = "radial-gradient(circle at 24% 28%, rgba(238,229,199,.55), transparent 34%), radial-gradient(circle at 78% 70%, rgba(94,86,160,.5), transparent 42%), linear-gradient(145deg, #0b0b1c, #1b1740 55%, #07070f)";
+// A red and black night, and the green of the leaf archive, to echo the sections around them.
+const NIGHT_FIELD = "radial-gradient(circle at 24% 28%, rgba(214,40,40,.62), transparent 36%), radial-gradient(circle at 80% 72%, rgba(122,12,18,.6), transparent 44%), linear-gradient(145deg, #0a0204, #2a0609 55%, #060102)";
 const LEAF_FIELD = "radial-gradient(circle at 72% 24%, rgba(181,203,154,.5), transparent 34%), radial-gradient(circle at 22% 76%, rgba(74,105,69,.55), transparent 42%), linear-gradient(145deg, #0b100a, #1a2a17 55%, #060806)";
 
 export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
@@ -41,7 +40,7 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         subtitle: "Interactive web piece",
         type: "Interactive web piece",
         summary: "Press START and Yasmine will find you. A web piece that follows you through the night, and will not stop talking.",
-        tags: ["Interactive web", "GPS", "Voice"],
+        tags: ["Interactive web", "GPS", "Dream"],
         href: NIGHT_URL,
         host: "night-8looming-jasmine.vercel.app",
         field: NIGHT_FIELD,
@@ -49,13 +48,13 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
       {
         slug: "ga1a-poetry-leaf-archive",
         index: "02",
-        title: ga1a("en")?.title ?? "Ga1a",
-        subtitle: ga1a("en")?.subtitle ?? "Poetry Leaf Archive",
-        type: ga1a("en")?.eyebrow ?? "Interactive web archive",
-        summary: ga1a("en")?.description ?? "An interactive archive where leaf rubbings carry poetry through colour, contour, recorded impact, and disturbed machine translation.",
-        tags: ga1a("en")?.tags ?? ["Poetry", "Leaf Rubbing", "Machine Translation", "Sound"],
-        href: ga1a("en")?.href ?? "https://leaf-language-engine-production.up.railway.app/",
-        host: "leaf-language-engine-production.up.railway.app",
+        title: "Ga1a",
+        subtitle: "Poetry Leaf Archive",
+        type: "Interactive web archive",
+        summary: "An interactive archive where leaf rubbings carry poetry through colour, contour, recorded impact, and disturbed machine translation.",
+        tags: ["Poetry", "Leaf Rubbing", "Machine Translation", "Sound"],
+        href: GA1A_URL,
+        host: "leaf-exhibition.vercel.app",
         field: LEAF_FIELD,
       },
     ],
@@ -74,7 +73,7 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         subtitle: "互动网页作品",
         type: "互动网页作品",
         summary: "按下 START，Yasmine 会找到你。一件在夜里跟随你、说个不停的网页作品。",
-        tags: ["互动网页", "GPS", "声音"],
+        tags: ["互动网页", "GPS", "梦"],
         href: NIGHT_URL,
         host: "night-8looming-jasmine.vercel.app",
         field: NIGHT_FIELD,
@@ -82,13 +81,13 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
       {
         slug: "ga1a-poetry-leaf-archive",
         index: "02",
-        title: ga1a("zh")?.title ?? "Ga1a",
-        subtitle: ga1a("zh")?.subtitle ?? "Poetry Leaf Archive",
-        type: ga1a("zh")?.eyebrow ?? "互动网页档案",
-        summary: ga1a("zh")?.description ?? "一个互动档案：叶片拓印通过色彩、轮廓、录制的撞击声和被扰动的机器翻译承载诗歌。",
-        tags: ga1a("zh")?.tags ?? ["诗歌", "叶片拓印", "机器翻译", "声音"],
-        href: ga1a("zh")?.href ?? "https://leaf-language-engine-production.up.railway.app/",
-        host: "leaf-language-engine-production.up.railway.app",
+        title: "Ga1a",
+        subtitle: "诗歌叶片档案",
+        type: "互动网页档案",
+        summary: "一个将叶片拓印、诗歌、声音、色彩与受扰动的机器翻译并置起来的互动档案。",
+        tags: ["诗歌", "叶片拓印", "机器翻译", "声音"],
+        href: GA1A_URL,
+        host: "leaf-exhibition.vercel.app",
         field: LEAF_FIELD,
       },
     ],

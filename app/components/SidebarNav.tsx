@@ -6,10 +6,10 @@ type NavId = "development" | "tian" | "ren" | "di" | "gallery" | "bio";
 type SidebarNavItem = { id: NavId; icon: string };
 
 const NAV_ITEMS: SidebarNavItem[] = [
-  { id: "development", icon: "●" },
   { id: "tian", icon: "●" },
   { id: "ren", icon: "●" },
   { id: "di", icon: "●" },
+  { id: "development", icon: "●" },
   { id: "gallery", icon: "●" },
   { id: "bio", icon: "A" },
 ];
@@ -28,7 +28,7 @@ const LABELS: Record<NavId, { en: string; zh: string }> = {
 export type SidebarNavProps = { lang: "en" | "zh" };
 
 export default function SidebarNav({ lang }: SidebarNavProps) {
-  const [activeId, setActiveId] = useState<NavId>("development");
+  const [activeId, setActiveId] = useState<NavId>("tian");
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
   useEffect(() => {

@@ -27,9 +27,7 @@ type GalleryContent = {
   items: GalleryItem[];
 };
 
-const GA1A_URL = "https://leaf-language-engine-production.up.railway.app/";
-
-export const GALLERY_CONTENT = {
+export const GALLERY_CONTENT: Record<Language, GalleryContent> = {
   en: {
     title: "Gallery",
     eyebrow: "Independent works",
@@ -41,18 +39,6 @@ export const GALLERY_CONTENT = {
     reserveDescription: "Reserved for the next experiment, study, or collaboration.",
     items: [
       {
-        slug: "ga1a-poetry-leaf-archive",
-        kind: "archive",
-        title: "Ga1a",
-        subtitle: "Poetry Leaf Archive",
-        description:
-          "An interactive archive where leaf rubbings carry poetry through colour, contour, recorded impact, and disturbed machine translation.",
-        href: GA1A_URL,
-        tags: ["Poetry", "Leaf Rubbing", "Machine Translation", "Sound"],
-        eyebrow: "Interactive web archive",
-        index: "01",
-      },
-      {
         slug: "blur-2025",
         kind: "video",
         title: "Blur",
@@ -61,7 +47,7 @@ export const GALLERY_CONTENT = {
         href: "https://www.youtube.com/watch?v=K5YCTX091Ek",
         tags: ["Moving Image", "Video", "2025"],
         eyebrow: "Moving image",
-        index: "02",
+        index: "01",
         year: "2025",
         duration: "03:07",
         thumbnail: "https://i.ytimg.com/vi/K5YCTX091Ek/maxresdefault.jpg",
@@ -75,7 +61,7 @@ export const GALLERY_CONTENT = {
         href: "https://www.youtube.com/watch?v=_7dHfAWTiqk",
         tags: ["Music Video", "Moving Image", "2025"],
         eyebrow: "Music video",
-        index: "03",
+        index: "02",
         year: "2025",
         duration: "03:47",
         thumbnail: "https://i.ytimg.com/vi/_7dHfAWTiqk/maxresdefault.jpg",
@@ -89,7 +75,7 @@ export const GALLERY_CONTENT = {
         href: "https://music.163.com/#/album?id=262508556",
         tags: ["Album", "Music", "NetEase Cloud Music"],
         eyebrow: "Music release",
-        index: "04",
+        index: "03",
         thumbnail: "/gallery/albums/metaphysics.jpg",
       },
       {
@@ -101,7 +87,7 @@ export const GALLERY_CONTENT = {
         href: "https://music.163.com/#/album?id=185024152",
         tags: ["Album", "Music", "NetEase Cloud Music"],
         eyebrow: "Music release",
-        index: "05",
+        index: "04",
         thumbnail: "/gallery/albums/rusty-dream.jpg",
       },
     ],
@@ -117,17 +103,6 @@ export const GALLERY_CONTENT = {
     reserveDescription: "为下一项实验、研究或合作预留。",
     items: [
       {
-        slug: "ga1a-poetry-leaf-archive",
-        kind: "archive",
-        title: "Ga1a",
-        subtitle: "诗歌叶片档案",
-        description: "一个将叶片拓印、诗歌、声音、色彩与受扰动的机器翻译并置起来的互动档案。",
-        href: GA1A_URL,
-        tags: ["诗歌", "叶片拓印", "机器翻译", "声音"],
-        eyebrow: "互动网页档案",
-        index: "01",
-      },
-      {
         slug: "blur-2025",
         kind: "video",
         title: "Blur",
@@ -136,7 +111,7 @@ export const GALLERY_CONTENT = {
         href: "https://www.youtube.com/watch?v=K5YCTX091Ek",
         tags: ["动态影像", "视频", "2025"],
         eyebrow: "动态影像",
-        index: "02",
+        index: "01",
         year: "2025",
         duration: "03:07",
         thumbnail: "https://i.ytimg.com/vi/K5YCTX091Ek/maxresdefault.jpg",
@@ -150,7 +125,7 @@ export const GALLERY_CONTENT = {
         href: "https://www.youtube.com/watch?v=_7dHfAWTiqk",
         tags: ["音乐录影带", "动态影像", "2025"],
         eyebrow: "音乐录影带",
-        index: "03",
+        index: "02",
         year: "2025",
         duration: "03:47",
         thumbnail: "https://i.ytimg.com/vi/_7dHfAWTiqk/maxresdefault.jpg",
@@ -164,7 +139,7 @@ export const GALLERY_CONTENT = {
         href: "https://music.163.com/#/album?id=262508556",
         tags: ["专辑", "音乐", "网易云音乐"],
         eyebrow: "音乐发行",
-        index: "04",
+        index: "03",
         thumbnail: "/gallery/albums/metaphysics.jpg",
       },
       {
@@ -176,9 +151,9 @@ export const GALLERY_CONTENT = {
         href: "https://music.163.com/#/album?id=185024152",
         tags: ["专辑", "音乐", "网易云音乐"],
         eyebrow: "音乐发行",
-        index: "05",
+        index: "04",
         thumbnail: "/gallery/albums/rusty-dream.jpg",
       },
     ],
   },
-} satisfies Record<Language, GalleryContent>;
+};
