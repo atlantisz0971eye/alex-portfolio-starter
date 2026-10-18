@@ -1,6 +1,7 @@
 import { workspaceAuthConfigured, workspaceAuthorized } from "../lib/workspaceAuth";
 import WorkspaceClient from "./WorkspaceClient";
 import "./workspace.css";
+import "./graphic.css";
 
 export const dynamic = "force-dynamic";
 

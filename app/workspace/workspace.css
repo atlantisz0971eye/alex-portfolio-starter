@@ -952,3 +952,10 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 /* A hidden pane must be easy to find again: its pull tab stays fully visible and wider. */
 .ms-split.is-collapsed .ms-split__tabs { opacity: 1; }
 .ms-split.is-collapsed .ms-split__tabs button { width: 22px; height: 56px; color: var(--text); }
+
+/* Seven destinations do not fit with labels on a phone: icons for all, the name only for where you are. */
+@media (max-width: 520px) {
+  .tabbar button { min-width: 0; padding-left: 0; padding-right: 0; }
+  .tabbar button span { display: none; }
+  .tabbar button.is-on span { display: block; max-width: 100%; white-space: nowrap; }
+}

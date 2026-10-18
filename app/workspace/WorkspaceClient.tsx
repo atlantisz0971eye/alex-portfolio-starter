@@ -15,7 +15,7 @@ import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Notes } from "./Notes";
-import { Sidebar, TabBar, ThemeContext, type Tab, type Theme } from "./Shell";
+import { Sidebar, TabBar, ThemeContext, type Skin, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
 
 type Props = { authorized: boolean; configured: boolean };
@@ -98,12 +98,19 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
       root.style.removeProperty("--ws-top");
     };
   }, []);
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [skin, setSkin] = useState<Skin>("graphic");
   useEffect(() => {
-    try { const saved = localStorage.getItem("ws-theme"); if (saved === "dark" || saved === "light") setTheme(saved); else if (window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("dark"); } catch { /* storage unavailable */ }
+    try {
+      const saved = localStorage.getItem("ws-theme");
+      if (saved === "dark" || saved === "light") setTheme(saved); else if (!window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("light");
+      const savedSkin = localStorage.getItem("ws-skin");
+      if (savedSkin === "paper" || savedSkin === "graphic") setSkin(savedSkin);
+    } catch { /* storage unavailable */ }
   }, []);
+  const toggleSkin = () => setSkin((current) => { const next = current === "graphic" ? "paper" : "graphic"; try { localStorage.setItem("ws-skin", next); } catch { /* storage unavailable */ } return next; });
   const toggle = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; try { localStorage.setItem("ws-theme", next); } catch { /* storage unavailable */ } return next; });
-  return <ThemeContext.Provider value={{ theme, toggle }}><div className="ws-root" data-theme={theme}>{authorized ? <App /> : <Login configured={configured} />}</div></ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggle, skin, toggleSkin }}><div className="ws-root" data-theme={theme} data-skin={skin}>{authorized ? <App /> : <Login configured={configured} />}</div></ThemeContext.Provider>;
 }
 
 function App() {

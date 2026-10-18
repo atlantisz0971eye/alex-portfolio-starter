@@ -1,10 +1,17 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Waypoints } from "lucide-react";
 import { createContext, useContext, type ReactNode } from "react";
 
 export type Theme = "light" | "dark";
-export const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({ theme: "light", toggle: () => undefined });
+export type Skin = "graphic" | "paper";
+export const ThemeContext = createContext<{ theme: Theme; toggle: () => void; skin: Skin; toggleSkin: () => void }>({ theme: "light", toggle: () => undefined, skin: "graphic", toggleSkin: () => undefined });
+
+/** Graphic realism (glass, grain, signal colour) or the quieter paper look. */
+export function SkinToggle({ className = "" }: { className?: string }) {
+  const { skin, toggleSkin } = useContext(ThemeContext);
+  return <button type="button" className={className} onClick={toggleSkin} aria-label={skin === "graphic" ? "Switch to the paper look" : "Switch to the graphic look"}><Layers size={15} />{className.includes("sidebar-theme") ? (skin === "graphic" ? " Paper look" : " Graphic look") : ""}</button>;
+}
 
 /** Paper by day, charcoal by night. */
 export function ThemeToggle({ className = "" }: { className?: string }) {
@@ -34,6 +41,7 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
     <div className="sidebar__foot">
       <a href="/">Portfolio</a>
       <ThemeToggle className="sidebar-theme" />
+      <SkinToggle className="sidebar-theme" />
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </div>
   </aside>;
@@ -51,6 +59,7 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
   return <div className="toprow">
     <a href="/" className="ws-text-button">Portfolio</a>
     <ThemeToggle className="ws-text-button" />
+    <SkinToggle className="ws-text-button" />
     <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
   </div>;
 }

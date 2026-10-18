@@ -1,0 +1,325 @@
+/* =====================================================================
+   Graphic realism. One light, a few materials, hard graphic marks.
+   Frosted glass for surfaces, machined keys for controls, a single signal
+   colour for what matters, and small print (labels, indexes, stripes) to
+   carry hierarchy instead of surface decoration.
+   Applies when the root carries data-skin="graphic"; the paper look is untouched.
+   ===================================================================== */
+.ws-root[data-skin="graphic"] {
+  --display: "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --serif: var(--display);
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sig-2: #ff2f7e;
+  --sig-3: #34e0ff;
+  --radius: 3px;
+  font-family: var(--display);
+  -webkit-font-smoothing: antialiased;
+}
+.ws-root[data-skin="graphic"][data-theme="dark"] {
+  --bg: #07080a;
+  --panel: rgba(20, 22, 26, .64);
+  --panel-2: rgba(34, 37, 42, .72);
+  --panel-3: rgba(56, 61, 67, .82);
+  --float: rgba(22, 25, 29, .93);
+  --text: #eef1ea;
+  --text-2: #8f968f;
+  --accent: #d4ff2a;
+  --on-accent: #0b0d06;
+  --hi: #d4ff2a;
+  --mark: #d4ff2a;
+  --danger: #ff5a38;
+  --warn: #ffb21f;
+  --warn-bg: rgba(255, 178, 31, .13);
+  --f1: rgba(238, 241, 234, .05);
+  --f2: rgba(238, 241, 234, .09);
+  --f3: rgba(238, 241, 234, .16);
+  --line: rgba(238, 241, 234, .15);
+  --shade: rgba(0, 0, 0, .62);
+  --scrim: rgba(2, 3, 4, .62);
+  --well: rgba(0, 0, 0, .38);
+  --hl: rgba(255, 255, 255, .16);
+  --edge: rgba(0, 0, 0, .4);
+  --key-top: rgba(255, 255, 255, .15);
+  --key-bottom: rgba(255, 255, 255, .04);
+  --key-drop: rgba(0, 0, 0, .75);
+  --grain: .1;
+  color-scheme: dark;
+}
+.ws-root[data-skin="graphic"][data-theme="light"] {
+  --bg: #dde0da;
+  --panel: rgba(255, 255, 255, .56);
+  --panel-2: rgba(255, 255, 255, .7);
+  --panel-3: rgba(255, 255, 255, .9);
+  --float: rgba(248, 250, 245, .95);
+  --text: #0b0c0a;
+  --text-2: #565c56;
+  --accent: #0b0c0a;
+  --on-accent: #f4f6ef;
+  --hi: #c9f000;
+  --mark: #0b0c0a;
+  --danger: #d8350f;
+  --warn: #a86500;
+  --warn-bg: rgba(168, 101, 0, .12);
+  --f1: rgba(10, 12, 8, .05);
+  --f2: rgba(10, 12, 8, .08);
+  --f3: rgba(10, 12, 8, .14);
+  --line: rgba(10, 12, 8, .2);
+  --shade: rgba(32, 38, 24, .26);
+  --scrim: rgba(12, 14, 10, .42);
+  --well: rgba(10, 12, 8, .07);
+  --hl: rgba(255, 255, 255, .95);
+  --edge: rgba(10, 12, 8, .1);
+  --key-top: rgba(255, 255, 255, .95);
+  --key-bottom: rgba(255, 255, 255, .55);
+  --key-drop: rgba(10, 12, 8, .28);
+  --grain: .07;
+  color-scheme: light;
+}
+
+/* ---- The room: a dark ground with coloured light moving behind the glass, and film grain over everything ---- */
+.ws-root[data-skin="graphic"] { background: var(--bg); }
+.ws-root[data-skin="graphic"]::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 34% at 22% 26%, rgba(212, 255, 42, .24), transparent 70%),
+    radial-gradient(34% 30% at 78% 20%, rgba(52, 224, 255, .2), transparent 70%),
+    radial-gradient(40% 36% at 70% 82%, rgba(255, 47, 126, .18), transparent 72%),
+    radial-gradient(30% 28% at 14% 84%, rgba(120, 90, 255, .16), transparent 72%);
+  animation: gr-drift 80s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.ws-root[data-skin="graphic"][data-theme="light"]::before {
+  background:
+    radial-gradient(38% 34% at 22% 26%, rgba(201, 240, 0, .34), transparent 70%),
+    radial-gradient(34% 30% at 78% 20%, rgba(52, 224, 255, .26), transparent 70%),
+    radial-gradient(40% 36% at 70% 82%, rgba(255, 47, 126, .18), transparent 72%),
+    radial-gradient(30% 28% at 14% 84%, rgba(120, 90, 255, .16), transparent 72%);
+}
+.ws-root[data-skin="graphic"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: var(--grain);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+@keyframes gr-drift {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { transform: translate3d(5%, -4%, 0) rotate(7deg); }
+}
+.ws-root[data-skin="graphic"] ::selection { background: var(--hi); color: #0b0c06; }
+.ws-root[data-skin="graphic"] :focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+.ws-root[data-skin="graphic"] * { scrollbar-width: thin; scrollbar-color: var(--f3) transparent; }
+
+/* ---- Surfaces: frosted glass lit from the top, with a thin edge and a grounded shadow ---- */
+.ws-root[data-skin="graphic"] .ws-card, .ws-root[data-skin="graphic"] .continue, .ws-root[data-skin="graphic"] .dl-entry, .ws-root[data-skin="graphic"] .ca-card, .ws-root[data-skin="graphic"] .ws-message--assistant, .ws-root[data-skin="graphic"] .board-read__tree, .ws-root[data-skin="graphic"] .ef__group, .ws-root[data-skin="graphic"] .ef__scope, .ws-root[data-skin="graphic"] .dl-form input:not([type=file]), .ws-root[data-skin="graphic"] .dl-form select, .ws-root[data-skin="graphic"] .dl-form textarea {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hl) 46%, transparent), transparent 42%), var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(20px) saturate(1.45);
+  backdrop-filter: blur(20px) saturate(1.45);
+  box-shadow: inset 0 1px 0 var(--hl), inset 0 -1px 0 var(--edge), 0 1px 0 var(--edge), 0 24px 46px -20px var(--shade);
+}
+.ws-root[data-skin="graphic"] .ws-card, .ws-root[data-skin="graphic"] .continue, .ws-root[data-skin="graphic"] .dl-entry, .ws-root[data-skin="graphic"] .ca-card { position: relative; }
+/* Registration marks at the corners, the way a printed plate carries them. */
+
+.ws-root[data-skin="graphic"] .ws-card::before, .ws-root[data-skin="graphic"] .continue::before, .ws-root[data-skin="graphic"] .dl-entry::before, .ws-root[data-skin="graphic"] .ca-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  opacity: .9;
+  background:
+    linear-gradient(var(--mark), var(--mark)) left top / 10px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) left top / 1px 10px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) right top / 10px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) right top / 1px 10px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) left bottom / 10px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) left bottom / 1px 10px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) right bottom / 10px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) right bottom / 1px 10px no-repeat;
+}
+.ws-root[data-skin="graphic"] .today__plan { padding: 18px 20px; }
+.ws-root[data-skin="graphic"] .today__plan .ws-markdown { font-family: var(--display); font-size: 15px; line-height: 1.6; }
+.ws-root[data-skin="graphic"] .today__plan .ws-markdown strong { color: var(--text); font-weight: 800; }
+.ws-root[data-skin="graphic"] .dl-entry { border-left: 1px solid var(--line); }
+.ws-root[data-skin="graphic"] .dl-entry::after { content: ""; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px; background: var(--c); box-shadow: 0 0 14px var(--c); }
+.ws-root[data-skin="graphic"] .dl-day__entries { border-left-color: var(--line); }
+.ws-root[data-skin="graphic"] .ca-card--create, .ws-root[data-skin="graphic"] .ca-card--update, .ws-root[data-skin="graphic"] .ca-card--delete { border-left-width: 1px; }
+
+/* ---- Small print carries the hierarchy: mono labels, indexes, stripes ---- */
+.ws-root[data-skin="graphic"] .section-label {
+  display: flex; align-items: center; gap: 9px;
+  margin-top: 26px;
+  padding-top: 0; border-top: 0;
+  font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--text-2);
+}
+.ws-root[data-skin="graphic"] .section-label::before { content: ""; flex: none; width: 8px; height: 8px; background: var(--mark); box-shadow: 0 0 10px color-mix(in srgb, var(--mark) 60%, transparent); }
+.ws-root[data-skin="graphic"] .section-label span { margin-left: auto; font-weight: 600; color: var(--text); }
+.ws-root[data-skin="graphic"] .today__date, .ws-root[data-skin="graphic"] .nview__status, .ws-root[data-skin="graphic"] .board__state, .ws-root[data-skin="graphic"] .dl-note, .ws-root[data-skin="graphic"] .today__based { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .pagetitle { position: relative; margin: 6px 0 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.ws-root[data-skin="graphic"] .pagetitle::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 96px; height: 5px; background: repeating-linear-gradient(135deg, var(--mark) 0 5px, transparent 5px 10px); }
+.ws-root[data-skin="graphic"] .pagetitle h1 { font-family: var(--display); font-size: clamp(38px, 5.4vw, 74px); font-weight: 900; line-height: .88; letter-spacing: -.035em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .nview__title { font-family: var(--display); font-weight: 800; letter-spacing: -.035em; }
+.ws-root[data-skin="graphic"] .today__time { font-family: var(--mono); font-size: 12px; letter-spacing: .02em; }
+.ws-root[data-skin="graphic"] .today__events li, .ws-root[data-skin="graphic"] .today__mail li + li { border-color: var(--line); }
+.ws-root[data-skin="graphic"] .dl-day > time { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .badge-dot { border-radius: 1px; background: var(--danger); box-shadow: 0 0 0 2px var(--bg), 0 0 10px var(--danger); }
+.ws-root[data-skin="graphic"] .mail-dot.is-unread { border-radius: 1px; background: var(--hi); box-shadow: 0 0 8px color-mix(in srgb, var(--hi) 70%, transparent); }
+
+/* ---- Navigation: a lit rail with indexed entries and one signal block for where you are ---- */
+@media (min-width: 900px) {
+  .ws-root[data-skin="graphic"] .sidebar {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--hl) 30%, transparent), transparent 30%), var(--panel);
+    -webkit-backdrop-filter: blur(26px) saturate(1.4);
+    backdrop-filter: blur(26px) saturate(1.4);
+    border-right: 1px solid var(--line);
+    box-shadow: inset -1px 0 0 var(--f1), 24px 0 50px -30px var(--shade);
+  }
+  .ws-root[data-skin="graphic"] .sidebar__brand { padding: 2px 12px 26px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase; color: var(--text-2); }
+  .ws-root[data-skin="graphic"] .sidebar__brand span { display: block; margin: 0 0 4px; font-family: var(--display); font-size: 30px; font-weight: 900; letter-spacing: -.03em; color: var(--text); }
+  .ws-root[data-skin="graphic"] .sidebar__nav { counter-reset: nav; gap: 3px; }
+  .ws-root[data-skin="graphic"] .sidebar__nav button {
+    counter-increment: nav;
+    height: 42px; padding: 0 12px; border-radius: 2px;
+    font-family: var(--display); font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2);
+  }
+  .ws-root[data-skin="graphic"] .sidebar__nav button::before { content: counter(nav, decimal-leading-zero); flex: none; width: 20px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .04em; opacity: .7; }
+  .ws-root[data-skin="graphic"] .sidebar__nav button.is-on {
+    background: var(--hi); color: #0b0c06;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.22), 0 0 30px -8px color-mix(in srgb, var(--hi) 70%, transparent);
+  }
+  .ws-root[data-skin="graphic"] .sidebar__nav button.is-on::before { opacity: 1; }
+  .ws-root[data-skin="graphic"] .sidebar__nav button.is-on svg { color: #0b0c06; }
+  .ws-root[data-skin="graphic"] .sidebar__foot { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+  .ws-root[data-skin="graphic"] .sidebar__foot a, .ws-root[data-skin="graphic"] .sidebar__foot button { border-radius: 2px; }
+}
+.ws-root[data-skin="graphic"] .sidebar__assistant {
+  position: relative; height: 42px; border-radius: 3px;
+  background: linear-gradient(180deg, var(--key-top), var(--key-bottom)), var(--panel-2) !important;
+  border: 1px solid var(--line);
+  color: var(--text) !important;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  box-shadow: inset 0 1px 0 var(--hl), 0 2px 0 var(--key-drop), 0 8px 16px -8px var(--shade);
+}
+.ws-root[data-skin="graphic"] .sidebar__assistant kbd { margin-left: auto; padding: 2px 6px; border: 1px solid var(--line); border-radius: 2px; font-family: var(--mono); font-size: 10px; color: var(--text-2); background: var(--well); }
+.ws-root[data-skin="graphic"] .tabbar {
+  background: var(--float); -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -20px 40px -24px var(--shade);
+}
+.ws-root[data-skin="graphic"] .tabbar button { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .tabbar button.is-on { color: var(--text); box-shadow: inset 0 2px 0 var(--hi); background: linear-gradient(180deg, color-mix(in srgb, var(--hi) 16%, transparent), transparent 70%); }
+
+/* ---- Controls: machined keys that travel when pressed, recessed wells, lit selectors ---- */
+.ws-root[data-skin="graphic"] .ws-pill, .ws-root[data-skin="graphic"] .ws-round, .ws-root[data-skin="graphic"] .mail-chips button, .ws-root[data-skin="graphic"] .mail-chips a, .ws-root[data-skin="graphic"] .ef__cats button, .ws-root[data-skin="graphic"] .ef__days button {
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--key-top), var(--key-bottom)), var(--panel-2) !important;
+  color: var(--text);
+  font-weight: 700; letter-spacing: .06em;
+  box-shadow: inset 0 1px 0 var(--hl), inset 0 -1px 0 var(--edge), 0 2px 0 var(--key-drop), 0 10px 18px -10px var(--shade);
+  transition: transform .09s ease, box-shadow .09s ease, background-color .15s;
+}
+.ws-root[data-skin="graphic"] .ws-pill { text-transform: uppercase; font-size: 12px; min-height: 42px; padding: 0 18px; }
+.ws-root[data-skin="graphic"] .ws-round { width: 42px; height: 42px; }
+.ws-root[data-skin="graphic"] .ws-pill:active, .ws-root[data-skin="graphic"] .ws-round:active, .ws-root[data-skin="graphic"] .mail-chips button:active, .ws-root[data-skin="graphic"] .ef__cats button:active, .ws-root[data-skin="graphic"] .ef__days button:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 var(--hl), inset 0 -1px 0 var(--edge), 0 0 0 var(--key-drop), 0 4px 8px -6px var(--shade);
+}
+.ws-root[data-skin="graphic"] .ws-pill.ws-pill--solid, .ws-root[data-skin="graphic"] .ws-compose button, .ws-root[data-skin="graphic"] .mail-ai__form button, .ws-root[data-skin="graphic"] .ef__days button.is-on {
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 38%, var(--hi)), var(--hi) 55%) !important;
+  color: #0b0c06 !important;
+  border-color: color-mix(in srgb, #000 30%, var(--hi));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), inset 0 -2px 0 rgba(0,0,0,.2), 0 2px 0 color-mix(in srgb, #000 55%, var(--hi)), 0 0 28px -6px color-mix(in srgb, var(--hi) 80%, transparent), 0 12px 18px -10px var(--shade);
+}
+.ws-root[data-skin="graphic"] .ws-pill.ws-pill--solid:active, .ws-root[data-skin="graphic"] .ws-compose button:active { box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.2), 0 0 0 transparent, 0 0 22px -8px color-mix(in srgb, var(--hi) 80%, transparent); }
+.ws-root[data-skin="graphic"] .ws-pill.ws-pill--danger { background: transparent !important; color: var(--danger) !important; border-color: var(--danger); box-shadow: none; }
+.ws-root[data-skin="graphic"] .mail-chips .is-on { background: var(--text) !important; color: var(--bg) !important; }
+.ws-root[data-skin="graphic"] .ws-segment {
+  padding: 3px; border-radius: 3px; border: 1px solid var(--line);
+  background: var(--well);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.45), 0 1px 0 var(--f2);
+}
+.ws-root[data-skin="graphic"] .ws-segment button { border-radius: 2px; font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+.ws-root[data-skin="graphic"] .ws-segment button.is-on {
+  position: relative; color: var(--text);
+  background: linear-gradient(180deg, var(--key-top), var(--key-bottom)), var(--panel-3) !important;
+  box-shadow: inset 0 1px 0 var(--hl), 0 2px 0 var(--key-drop), 0 6px 10px -6px var(--shade);
+}
+.ws-root[data-skin="graphic"] .ws-segment button.is-on::before { content: ""; position: absolute; left: 7px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; background: var(--hi); box-shadow: 0 0 8px var(--hi); }
+.ws-root[data-skin="graphic"] .mail-search, .ws-root[data-skin="graphic"] .ws-compose textarea, .ws-root[data-skin="graphic"] .mail-ai__form input, .ws-root[data-skin="graphic"] .login input, .ws-root[data-skin="graphic"] .ef__title, .ws-root[data-skin="graphic"] .ef__notes, .ws-root[data-skin="graphic"] .ws-note-input {
+  background: var(--well) !important; border: 1px solid var(--line) !important; border-radius: 3px;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 1px 0 var(--f2);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.ws-root[data-skin="graphic"] .mail-search:focus-within, .ws-root[data-skin="graphic"] .ws-compose textarea:focus-visible, .ws-root[data-skin="graphic"] .mail-ai__form input:focus-visible { box-shadow: inset 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px var(--hi), 0 0 18px -4px var(--hi); }
+.ws-root[data-skin="graphic"] .ws-text-button { font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .ef__switch:checked { background: var(--hi); }
+
+/* ---- Layers that float: sheets, toasts, popovers ---- */
+.ws-root[data-skin="graphic"] .ws-sheet {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hl) 38%, transparent), transparent 22%), var(--float) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5);
+  border: 1px solid var(--line); border-top: 2px solid var(--hi); border-radius: 4px 4px 0 0;
+  box-shadow: 0 -30px 70px -20px var(--shade), inset 0 1px 0 var(--hl);
+}
+.ws-root[data-skin="graphic"] .ws-sheet__head h2 { font-size: 13px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .ws-sheet__grab { background: var(--f3); border-radius: 0; width: 36px; height: 3px; }
+.ws-root[data-skin="graphic"] .ws-toast, .ws-root[data-skin="graphic"] .reader-selection, .ws-root[data-skin="graphic"] .reader-popover, .ws-root[data-skin="graphic"] .reader-translate, .ws-root[data-skin="graphic"] .note-toolbar, .ws-root[data-skin="graphic"] .slash-menu {
+  background: var(--float) !important; -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4);
+  border: 1px solid var(--line); border-radius: 3px; box-shadow: 0 18px 44px -12px var(--shade), inset 0 1px 0 var(--hl);
+}
+.ws-root[data-skin="graphic"] .ws-toast { border-left: 3px solid var(--danger); }
+
+/* ---- Mindstreams: the page tree and the board ---- */
+.ws-root[data-skin="graphic"] .ntree__row { border-radius: 2px; }
+.ws-root[data-skin="graphic"] .ntree__row.is-active { background: color-mix(in srgb, var(--hi) 12%, transparent); box-shadow: inset 2px 0 0 var(--hi); }
+.ws-root[data-skin="graphic"] .ntree__title { font-weight: 600; }
+.ws-root[data-skin="graphic"] .notes__list { border-right: 1px solid var(--line); }
+.ws-root[data-skin="graphic"] .ms-split::before { background: var(--line); }
+.ws-root[data-skin="graphic"] .ms-split:hover::before, .ws-root[data-skin="graphic"].is-resizing .ms-split::before { background: var(--hi); opacity: .8; }
+.ws-root[data-skin="graphic"] .ms-split__tabs button { border-radius: 2px; background: var(--float); color: var(--text); }
+.ws-root[data-skin="graphic"] .board { background: transparent; }
+.ws-root[data-skin="graphic"] .board .react-flow { --xy-background-color: transparent; --xy-background-pattern-dots-color: var(--f3); --xy-edge-stroke: var(--text-2); --xy-edge-stroke-selected: var(--hi); background: color-mix(in srgb, var(--bg) 58%, transparent); }
+.ws-root[data-skin="graphic"] .board__tools { border-radius: 3px; background: var(--float); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); box-shadow: 0 18px 40px -12px var(--shade), inset 0 1px 0 var(--hl); }
+.ws-root[data-skin="graphic"] .board__tools button { border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .board__tools .board__scan { background: var(--hi); color: #0b0c06; box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 0 rgba(0,0,0,.2), 0 0 22px -6px var(--hi); }
+.ws-root[data-skin="graphic"] .bnode {
+  border-radius: 3px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hl) 40%, transparent), transparent 40%), var(--panel-2);
+  box-shadow: inset 0 1px 0 var(--hl), 0 14px 26px -12px var(--shade);
+}
+.ws-root[data-skin="graphic"] .bnode.is-selected { border-color: var(--hi); box-shadow: inset 0 1px 0 var(--hl), 0 0 0 1px var(--hi), 0 0 26px -6px var(--hi); }
+.ws-root[data-skin="graphic"] .bnode--text.bnode--sun { background: linear-gradient(180deg, rgba(212,255,42,.2), rgba(212,255,42,.06)), var(--panel-2); border-color: rgba(212,255,42,.5); }
+.ws-root[data-skin="graphic"] .bnode--text.bnode--sky { background: linear-gradient(180deg, rgba(52,224,255,.2), rgba(52,224,255,.06)), var(--panel-2); border-color: rgba(52,224,255,.5); }
+.ws-root[data-skin="graphic"] .bnode--text.bnode--leaf { background: linear-gradient(180deg, rgba(120,255,160,.18), rgba(120,255,160,.05)), var(--panel-2); border-color: rgba(120,255,160,.45); }
+.ws-root[data-skin="graphic"] .bnode--text.bnode--rose { background: linear-gradient(180deg, rgba(255,47,126,.22), rgba(255,47,126,.07)), var(--panel-2); border-color: rgba(255,47,126,.5); }
+.ws-root[data-skin="graphic"] .bnode textarea, .ws-root[data-skin="graphic"] .bnode__text { font-family: var(--display); font-size: 15px; }
+.ws-root[data-skin="graphic"] .bnode__tone { border-radius: 1px; }
+.ws-root[data-skin="graphic"] .bnode__tone.bnode--sun { background: #d4ff2a; } .ws-root[data-skin="graphic"] .bnode__tone.bnode--sky { background: #34e0ff; } .ws-root[data-skin="graphic"] .bnode__tone.bnode--leaf { background: #78ffa0; } .ws-root[data-skin="graphic"] .bnode__tone.bnode--rose { background: #ff2f7e; } .ws-root[data-skin="graphic"] .bnode__tone.bnode--paper { background: var(--panel-3); }
+.ws-root[data-skin="graphic"] .board-read__hint, .ws-root[data-skin="graphic"] .dl-form label span { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+
+/* The page list is a narrow column: its title is set smaller so the whole word fits. */
+.ws-root[data-skin="graphic"] .notes__list .pagetitle h1 { font-size: clamp(22px, 1.9vw, 30px); letter-spacing: -.03em; }
+.ws-root[data-skin="graphic"] .notes__list .pagetitle::after { width: 64px; }
+
+/* ---- Library covers sit on the glass like objects ---- */
+.ws-root[data-skin="graphic"] .cover { border-radius: 2px; box-shadow: inset 0 0 0 1px var(--f2), 0 16px 28px -10px var(--shade); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .ws-root[data-skin="graphic"] .ws-card, .ws-root[data-skin="graphic"] .continue, .ws-root[data-skin="graphic"] .dl-entry, .ws-root[data-skin="graphic"] .ca-card, .ws-root[data-skin="graphic"] .ws-message--assistant, .ws-root[data-skin="graphic"] .board-read__tree, .ws-root[data-skin="graphic"] .ef__group, .ws-root[data-skin="graphic"] .ef__scope, .ws-root[data-skin="graphic"] .dl-form input:not([type=file]), .ws-root[data-skin="graphic"] .dl-form select, .ws-root[data-skin="graphic"] .dl-form textarea, .ws-root[data-skin="graphic"] .sidebar, .ws-root[data-skin="graphic"] .tabbar, .ws-root[data-skin="graphic"] .ws-sheet { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) { .ws-root[data-skin="graphic"]::before { animation: none; } }
+
+/* On a phone the tab bar's small active label is set tighter. */
+@media (max-width: 520px) {
+  .ws-root[data-skin="graphic"] .tabbar button.is-on span { font-size: 8px; letter-spacing: .08em; }
+}
