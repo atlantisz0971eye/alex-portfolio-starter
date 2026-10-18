@@ -2399,39 +2399,14 @@ a {
 .dev-orbit-one { width: min(66vw, 900px); aspect-ratio: 1; left: -22vw; top: -40%; }
 .dev-orbit-two { width: min(40vw, 560px); aspect-ratio: 1; right: -16vw; bottom: -36%; }
 
-.dev-cards {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-  width: 100%;
-}
-@media (min-width: 900px) {
-  .dev-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
-}
-
-.dev-card { min-height: 300px; }
-.dev-card .portfolio-card__media { opacity: .6; filter: blur(2px) saturate(.9); }
-.dev-card:hover .portfolio-card__media { opacity: .92; filter: blur(0) saturate(1); }
-.dev-card__content { min-height: 300px; padding: 24px 26px 18px; }
-.dev-card__index {
-  position: absolute;
-  right: 22px;
-  bottom: 48px;
-  font-size: clamp(64px, 9vw, 120px);
-  font-weight: 200;
-  line-height: 1;
-  letter-spacing: -.04em;
-  color: rgba(255,255,255,.1);
-  pointer-events: none;
-}
 .dev-badge { gap: 6px; }
 .dev-badge i { width: 6px; height: 6px; border-radius: 50%; background: #8fd19e; box-shadow: 0 0 8px rgba(143,209,158,.8); }
-.dev-card__visit { align-self: flex-start; pointer-events: none; }
-.dev-card:hover .dev-card__visit { background: rgba(255,255,255,.16); }
-.dev-card .portfolio-card__summary { margin-top: 20px; font-size: 14px; }
-.dev-card .portfolio-card__hint { margin-top: auto; padding-top: 22px; }
-.dev-card .portfolio-card__tags { margin-bottom: 4px; }
+.dev-quote { display: flex; flex-direction: column; gap: 4px; max-width: 68ch; margin-top: 14px; padding-left: 12px; border-left: 2px solid rgba(255,255,255,.28); font-size: 13px; line-height: 1.55; color: rgba(255,255,255,.9); }
+.dev-quote small { font-size: 11px; line-height: 1.5; color: rgba(255,255,255,.55); letter-spacing: .02em; }
+/* The covers are rendered from the works themselves, so let them show more than the blurred theme backgrounds do. */
+.development-section .portfolio-card__media { opacity: .5; filter: blur(5px) saturate(.9); }
+.development-section .portfolio-glass-card:hover .portfolio-card__media,
+.development-section .portfolio-glass-card.is-open .portfolio-card__media { opacity: .95; filter: blur(0) saturate(1); }
 .development-section .section-content { min-height: 100svh; align-content: center; }
 .development-section .section-head { margin-bottom: 2rem; }
 .development-section .gallery-kicker { margin-bottom: 4px; }
-@media (max-width: 899px) { .dev-card__index { font-size: 72px; bottom: 54px; } }

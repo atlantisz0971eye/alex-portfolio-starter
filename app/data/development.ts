@@ -10,8 +10,12 @@ export type DevelopmentItem = {
   tags: string[];
   href: string;
   host: string;
-  /** Optional poster image in /public; without one, the card paints its own colour field. */
+  /** Cover image in /public, rendered from the project's own material; without one, the card paints its own colour field. */
   poster?: string;
+  /** Where the cover's image sits inside the card. */
+  posterPosition?: string;
+  /** A line taken from the work itself, shown in the opened card. */
+  quote?: { text: string; note?: string };
   /** CSS background for the card's media layer when there is no poster. */
   field: string;
 };
@@ -39,7 +43,10 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         title: "Night, 8looming Jasmine",
         subtitle: "Interactive web piece",
         type: "Interactive web piece",
-        summary: "Press START and Yasmine will find you. A web piece that follows you through the night, and will not stop talking.",
+        summary: "A map-based web piece. Press START and Yasmine finds you; she reads where you are, how much around you is worth talking about (the heat), and will not stop talking.",
+        quote: { text: "It will not stop talking.", note: "Asleep · Heat - · Start / Shut up / Forget" },
+        poster: "/development/night-cover-2.webp",
+        posterPosition: "right center",
         tags: ["Interactive web", "GPS", "Dream"],
         href: NIGHT_URL,
         host: "night-8looming-jasmine.vercel.app",
@@ -53,6 +60,9 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         type: "Interactive web archive",
         summary: "An interactive archive where leaf rubbings carry poetry through colour, contour, recorded impact, and disturbed machine translation.",
         tags: ["Poetry", "Leaf Rubbing", "Machine Translation", "Sound"],
+        quote: { text: "“The trees, though summer, yet do wear their leaves.”", note: "Shakespeare → machine decoding: “Trje treres, thpph sumeer, ytwt do wear their leaves.”" },
+        poster: "/development/ga1a-cover-2.webp",
+        posterPosition: "right center",
         href: GA1A_URL,
         host: "leaf-exhibition.vercel.app",
         field: LEAF_FIELD,
@@ -72,7 +82,10 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         title: "Night, 8looming Jasmine",
         subtitle: "互动网页作品",
         type: "互动网页作品",
-        summary: "按下 START，Yasmine 会找到你。一件在夜里跟随你、说个不停的网页作品。",
+        summary: "一件基于地图的网页作品。按下 START，Yasmine 会找到你；她读取你所在的位置，以及周围有多少值得说的事（热度），然后说个不停。",
+        quote: { text: "It will not stop talking.", note: "Asleep · Heat - · Start / Shut up / Forget" },
+        poster: "/development/night-cover-2.webp",
+        posterPosition: "right center",
         tags: ["互动网页", "GPS", "梦"],
         href: NIGHT_URL,
         host: "night-8looming-jasmine.vercel.app",
@@ -86,6 +99,9 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         type: "互动网页档案",
         summary: "一个将叶片拓印、诗歌、声音、色彩与受扰动的机器翻译并置起来的互动档案。",
         tags: ["诗歌", "叶片拓印", "机器翻译", "声音"],
+        quote: { text: "“The trees, though summer, yet do wear their leaves.”", note: "莎士比亚 → 机器解码：“Trje treres, thpph sumeer, ytwt do wear their leaves.”" },
+        poster: "/development/ga1a-cover-2.webp",
+        posterPosition: "right center",
         href: GA1A_URL,
         host: "leaf-exhibition.vercel.app",
         field: LEAF_FIELD,
