@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-type NavId = "tian" | "ren" | "di" | "gallery" | "bio";
+type NavId = "development" | "tian" | "ren" | "di" | "gallery" | "bio";
 type SidebarNavItem = { id: NavId; icon: string };
 
 const NAV_ITEMS: SidebarNavItem[] = [
+  { id: "development", icon: "●" },
   { id: "tian", icon: "●" },
   { id: "ren", icon: "●" },
   { id: "di", icon: "●" },
@@ -16,6 +17,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
 const DESKTOP_ITEMS = NAV_ITEMS.filter((item) => item.id !== "bio");
 
 const LABELS: Record<NavId, { en: string; zh: string }> = {
+  development: { en: "Development", zh: "项目开发" },
   tian: { en: "Technology", zh: "科技" },
   ren: { en: "Rumination", zh: "反刍" },
   di: { en: "Connection", zh: "连接" },
@@ -26,7 +28,7 @@ const LABELS: Record<NavId, { en: string; zh: string }> = {
 export type SidebarNavProps = { lang: "en" | "zh" };
 
 export default function SidebarNav({ lang }: SidebarNavProps) {
-  const [activeId, setActiveId] = useState<NavId>("tian");
+  const [activeId, setActiveId] = useState<NavId>("development");
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
   useEffect(() => {

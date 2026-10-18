@@ -24,6 +24,17 @@ export function IntroOverlay({ open, onClose, onNavigate }: IntroOverlayProps) {
       </h1>
       <div className="intro-links flex flex-col gap-6 text-2xl md:text-3xl font-light text-white/85" onClick={(e) => e.stopPropagation()}>
         <a
+          href="#development"
+          onClick={(e) => {
+            e.preventDefault();
+            onClose();
+            setTimeout(() => onNavigate("development"), 50);
+          }}
+          className="hover:text-white transition-all duration-200"
+        >
+          ◐ Project Development
+        </a>
+        <a
           href="#tian"
           onClick={(e) => {
             e.preventDefault();

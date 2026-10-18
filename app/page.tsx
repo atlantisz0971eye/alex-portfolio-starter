@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { BioSection } from "./components/BioSection";
+import { DevelopmentSection } from "./components/DevelopmentSection";
 import { GallerySection } from "./components/GallerySection";
 import { HeaderBar } from "./components/HeaderBar";
 import { IntroOverlay } from "./components/IntroOverlay";
@@ -140,6 +141,7 @@ export default function Page() {
       />
 
       <main className="w-full snap-parent">
+        <DevelopmentSection lang={lang} />
         {themes.map((theme) => (
           <ThemeSection
             key={theme.id}

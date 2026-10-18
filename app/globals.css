@@ -2365,3 +2365,73 @@ a {
     transform: translateY(0);
   }
 }
+
+
+/* ---------- Project Development: live, hosted projects at the top of the page ---------- */
+.development-section {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 16% 20%, rgba(120, 128, 200, .14), transparent 32%),
+    radial-gradient(circle at 84% 78%, rgba(151, 180, 119, .11), transparent 34%),
+    linear-gradient(145deg, #090a10 0%, #030304 58%, #08090d 100%);
+}
+
+.dev-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .12;
+  background-image:
+    linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, transparent, black 22%, black 78%, transparent);
+}
+
+.dev-orbit {
+  position: absolute;
+  z-index: -1;
+  border: 1px solid rgba(190, 196, 238, .12);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.dev-orbit-one { width: min(66vw, 900px); aspect-ratio: 1; left: -22vw; top: -40%; }
+.dev-orbit-two { width: min(40vw, 560px); aspect-ratio: 1; right: -16vw; bottom: -36%; }
+
+.dev-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  width: 100%;
+}
+@media (min-width: 900px) {
+  .dev-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+}
+
+.dev-card { min-height: 300px; }
+.dev-card .portfolio-card__media { opacity: .6; filter: blur(2px) saturate(.9); }
+.dev-card:hover .portfolio-card__media { opacity: .92; filter: blur(0) saturate(1); }
+.dev-card__content { min-height: 300px; padding: 24px 26px 18px; }
+.dev-card__index {
+  position: absolute;
+  right: 22px;
+  bottom: 48px;
+  font-size: clamp(64px, 9vw, 120px);
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -.04em;
+  color: rgba(255,255,255,.1);
+  pointer-events: none;
+}
+.dev-badge { gap: 6px; }
+.dev-badge i { width: 6px; height: 6px; border-radius: 50%; background: #8fd19e; box-shadow: 0 0 8px rgba(143,209,158,.8); }
+.dev-card__visit { align-self: flex-start; pointer-events: none; }
+.dev-card:hover .dev-card__visit { background: rgba(255,255,255,.16); }
+.dev-card .portfolio-card__summary { margin-top: 20px; font-size: 14px; }
+.dev-card .portfolio-card__hint { margin-top: auto; padding-top: 22px; }
+.dev-card .portfolio-card__tags { margin-bottom: 4px; }
+.development-section .section-content { min-height: 100svh; align-content: center; }
+.development-section .section-head { margin-bottom: 2rem; }
+.development-section .gallery-kicker { margin-bottom: 4px; }
+@media (max-width: 899px) { .dev-card__index { font-size: 72px; bottom: 54px; } }
