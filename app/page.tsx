@@ -97,10 +97,6 @@ export default function Page() {
     searchOpen: search.searchOpen,
   });
 
-  const navigateToId = (themeId: string) => {
-    document.getElementById(themeId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
       search.setSearchOpen(false);
@@ -124,7 +120,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen text-white relative font-satoshi" onClick={() => search.setSearchOpen(false)}>
-      <IntroOverlay open={intro.isOpen} onClose={intro.close} onNavigate={navigateToId} />
+      <IntroOverlay open={intro.isOpen} onClose={intro.close} />
       <SidebarNav lang={lang} />
 
       <HeaderBar
