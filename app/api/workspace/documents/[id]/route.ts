@@ -1,4 +1,6 @@
 import { get } from "@vercel/blob";
+import { after } from "next/server";
+import { enrichDocument } from "../../../../lib/bookEnrich";
 import { workspaceAuthorized } from "../../../../lib/workspaceAuth";
 import { emptyPages, ExtractError, extractDocument } from "../../../../lib/workspaceExtract";
 import { deleteDocument, readDocument, readDocumentText, workspaceStorageConfigured, writeDocument } from "../../../../lib/workspaceStore";
@@ -33,7 +35,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!document) return Response.json({ error: "not_found" }, { status: 404 });
     const extension = /\.[a-z0-9]{2,4}$/i.exec(document.name)?.[0] ?? "";
     const name = /\.[a-z0-9]{2,4}$/i.test(title) ? title : `${title}${extension}`;
-    const updated = { ...document, name };
+    const updated = { ...document, name, title: title.replace(/\.[a-z0-9]{2,4}$/i, "") };
     await writeDocument(updated);
     return Response.json({ document: updated });
   } catch {
@@ -71,7 +73,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (text.length < 40 && ocrPending.length === 0) return Response.json({ error: "no_extractable_text" }, { status: 422 });
     const updated = { ...document, pageCount, characterCount: text.length, ocrPending: ocrPending.length ? ocrPending : undefined };
     if (!ocrPending.length) delete updated.ocrPending;
+    // The text changed, so chapter offsets read from the old text no longer apply.
+    delete updated.outline;
+    delete updated.outlineSource;
     await writeDocument(updated, text);
+    after(async () => { await enrichDocument(document.id, ["outline"]).catch(() => undefined); });
     return Response.json({ document: updated, emptyPages: ocrPending.length, totalPages: pageCount });
   } catch (error) {
     if (error instanceof ExtractError) return Response.json({ error: error.code }, { status: error.status });

@@ -156,6 +156,21 @@ function App() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // Books imported before titles, covers and contents were read get them once, quietly, one at a time.
+  const enriching = useRef(new Set<string>());
+  useEffect(() => {
+    const next = documents.find((item) => item.mimeType === "application/pdf" && !item.enrichedAt && !enriching.current.has(item.id));
+    if (!next || enriching.current.size >= 4) return;
+    enriching.current.add(next.id);
+    void (async () => {
+      try {
+        const data = await parseResponse<{ document: WorkspaceLibraryItem }>(await fetch(`/api/workspace/documents/${next.id}/enrich`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }));
+        setDocuments((items) => items.map((item) => item.id === next.id ? { ...item, ...data.document, progress: item.progress, progressAt: item.progressAt } : item));
+      } catch { /* it is tried again on the next visit */ }
+    })();
+  }, [documents]);
+
   // Look for new mail now and every few minutes; a new plan lights a dot on Today until it is opened.
   useEffect(() => {
     let stopped = false;
@@ -305,6 +320,8 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, pathname: blob.pathname, name: file.name }),
       }));
+      // The server reads the title, cover and contents of a new book itself; skip the catch-up pass for it.
+      enriching.current.add(data.document.id);
       setDocuments((current) => [{ ...data.document, progress: null, progressAt: null }, ...current]);
       setBook(data);
       if (data.document.ocrPending?.length) { ocrPrompted.current.add(data.document.id); setOcrOpen(true); }

@@ -1,5 +1,6 @@
 import { del, get, list, put } from "@vercel/blob";
 import { deleteTranslations } from "./translationStore";
+import type { Chapter } from "./workspaceOutline";
 
 export type WorkspaceDocument = {
   id: string;
@@ -12,12 +13,21 @@ export type WorkspaceDocument = {
   characterCount: number;
   /** Pages of a scanned PDF that still have no recognized text. */
   ocrPending?: number[];
+  /** The book's real title and author, read from the PDF and its first pages. */
+  title?: string;
+  author?: string;
+  /** Whether a cover image was made from the first page. */
+  cover?: boolean;
+  /** Chapters found by the book's own bookmarks or by reading its contents pages (kept apart from the small metadata). */
+  outline?: Chapter[];
+  outlineSource?: "pdf" | "ai";
+  enrichedAt?: string;
   guide?: string;
   guideCoverage?: "full" | "excerpts";
   messages?: { role: "user" | "assistant"; content: string }[];
 };
 
-type DocumentState = Pick<WorkspaceDocument, "guide" | "guideCoverage" | "messages">;
+type DocumentState = Pick<WorkspaceDocument, "guide" | "guideCoverage" | "messages" | "outline" | "outlineSource">;
 export type WorkspaceDocumentSummary = Omit<WorkspaceDocument, keyof DocumentState>;
 
 const metaPath = (id: string) => `workspace/docs/${id}.json`;
@@ -42,6 +52,10 @@ export type WorkspaceMark = {
 
 export type WorkspaceLibraryItem = WorkspaceDocumentSummary & { progress: number | null; progressAt: string | null };
 const textPath = (id: string) => `workspace/text/${id}.txt`;
+const coverPath = (id: string) => `workspace/covers/${id}.jpg`;
+
+export const writeCover = (id: string, bytes: Uint8Array) => put(coverPath(id), Buffer.from(bytes), { access: "private", allowOverwrite: true, contentType: "image/jpeg" });
+export const readCover = (id: string) => get(coverPath(id), { access: "private", useCache: false });
 
 export function validDocumentId(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(id);
@@ -79,7 +93,7 @@ export async function readDocumentText(id: string) {
 }
 
 export async function writeDocument(document: WorkspaceDocument, text?: string) {
-  const { guide, guideCoverage, messages, ...meta } = document;
+  const { guide, guideCoverage, messages, outline, outlineSource, ...meta } = document;
   if (text !== undefined) {
     await put(textPath(document.id), text, {
       access: "private",
@@ -87,8 +101,8 @@ export async function writeDocument(document: WorkspaceDocument, text?: string) 
       contentType: "text/plain; charset=utf-8",
     });
   }
-  if (guide !== undefined || guideCoverage !== undefined || messages !== undefined) {
-    await put(statePath(document.id), JSON.stringify({ guide, guideCoverage, messages }), {
+  if (guide !== undefined || guideCoverage !== undefined || messages !== undefined || outline !== undefined) {
+    await put(statePath(document.id), JSON.stringify({ guide, guideCoverage, messages, outline, outlineSource }), {
       access: "private",
       allowOverwrite: true,
       contentType: "application/json",
@@ -145,7 +159,7 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
     try {
       const meta = await readMeta(id);
       if (!meta) return null;
-      const { guide, guideCoverage, messages, ...summary } = meta;
+      const { guide, guideCoverage, messages, outline, outlineSource, ...summary } = meta;
       const record = await readProgressRecord(id).catch(() => null);
       return { ...summary, progress: record?.offset ?? null, progressAt: record?.updatedAt ?? null };
     } catch { return null; }
@@ -156,7 +170,7 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
 
 export async function deleteDocument(document: WorkspaceDocument) {
   await deleteTranslations(document.id).catch(() => undefined);
-  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), textPath(document.id), document.filePath]);
+  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), textPath(document.id), coverPath(document.id), document.filePath]);
 }
 
 /** Best-effort removal of everything an interrupted upload may have left behind. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { displayTitle } from "../lib/bookTitle";
 import { BookOpen, ExternalLink, FileSearch, Loader2, RefreshCw, ScanText, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { WorkspaceLibraryItem } from "../lib/workspaceStore";
@@ -19,6 +20,7 @@ type Props = { document: WorkspaceLibraryItem | null; ocr: OcrState; actions: Do
 type Busy = "rename" | "rescan" | "reextract" | "delete" | null;
 
 const stripExtension = (name: string) => name.replace(/\.[^.]+$/, "");
+const shownTitle = (doc: { name: string; title?: string }) => displayTitle(doc);
 
 /** Manage one imported file: rename, re-check for scanned pages, run OCR, re-read the original, or delete. */
 export function DocumentSheet({ document, ocr, actions, onClose }: Props) {
@@ -29,7 +31,7 @@ export function DocumentSheet({ document, ocr, actions, onClose }: Props) {
   const [note, setNote] = useState("");
 
   useEffect(() => {
-    if (document) { setLast(document); setTitle(stripExtension(document.name)); setConfirm(null); setNote(""); }
+    if (document) { setLast(document); setTitle(shownTitle(document)); setConfirm(null); setNote(""); }
   }, [document?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (document) setLast(document); }, [document]);
 
@@ -41,7 +43,7 @@ export function DocumentSheet({ document, ocr, actions, onClose }: Props) {
 
   const mine = shown && ocr && ocr.docId === shown.id ? ocr : null;
   const pending = shown?.ocrPending?.length ?? 0;
-  const changed = shown ? title.trim() !== stripExtension(shown.name) && title.trim().length > 0 : false;
+  const changed = shown ? title.trim() !== shownTitle(shown) && title.trim().length > 0 : false;
 
   return <Sheet open={!!document} onClose={onClose} title="Document" size="tall">
     {shown && <div className="doc">
@@ -74,7 +76,7 @@ export function DocumentSheet({ document, ocr, actions, onClose }: Props) {
           ? <div className="doc__confirm"><p>Read the original file again and replace the saved text? Your reading position stays, highlights may move, and recognized text is lost.</p><div><button type="button" className="ws-pill" disabled={busy !== null} onClick={() => void run("reextract", async () => { await actions.reextract(shown.id); setNote("The file was read again."); })}>{busy === "reextract" ? <Loader2 className="ws-spin" size={14} /> : "Re-read file"}</button><button type="button" className="ws-text-button" onClick={() => setConfirm(null)}>Cancel</button></div></div>
           : <button type="button" disabled={busy !== null} onClick={() => setConfirm("reextract")}><RefreshCw size={18} /> Re-read the original file</button>}
         {confirm === "delete"
-          ? <div className="doc__confirm"><p>Delete “{stripExtension(shown.name)}” and everything saved with it: text, highlights and notes?</p><div><button type="button" className="ws-pill ws-pill--danger" disabled={busy !== null} onClick={() => void run("delete", async () => { await actions.remove(shown.id); onClose(); })}>{busy === "delete" ? <Loader2 className="ws-spin" size={14} /> : "Delete permanently"}</button><button type="button" className="ws-text-button" onClick={() => setConfirm(null)}>Cancel</button></div></div>
+          ? <div className="doc__confirm"><p>Delete “{shownTitle(shown)}” and everything saved with it: text, highlights and notes?</p><div><button type="button" className="ws-pill ws-pill--danger" disabled={busy !== null} onClick={() => void run("delete", async () => { await actions.remove(shown.id); onClose(); })}>{busy === "delete" ? <Loader2 className="ws-spin" size={14} /> : "Delete permanently"}</button><button type="button" className="ws-text-button" onClick={() => setConfirm(null)}>Cancel</button></div></div>
           : <button type="button" className="is-danger" disabled={busy !== null} onClick={() => setConfirm("delete")}><Trash2 size={18} /> Delete</button>}
       </div>
     </div>}

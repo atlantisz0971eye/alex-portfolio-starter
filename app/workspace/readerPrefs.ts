@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 export type ReaderTheme = "black" | "dark" | "sepia" | "white";
 export type ReaderFont = "serif" | "sans" | "mono";
-export type ReaderMode = "page" | "scroll";
+/** "original" shows a PDF exactly as printed. */
+export type ReaderMode = "page" | "scroll" | "original";
 export type ReaderBilingual = "off" | "below";
 
 export type ReaderPrefs = {
@@ -28,7 +29,7 @@ function sanitize(value: Partial<ReaderPrefs> | null): ReaderPrefs {
     font: ["serif", "sans", "mono"].includes(next.font) ? next.font : DEFAULT_PREFS.font,
     fontSize: Math.min(FONT_RANGE.max, Math.max(FONT_RANGE.min, Math.round(Number(next.fontSize)) || DEFAULT_PREFS.fontSize)),
     lineHeight: [1.4, 1.65, 1.9].includes(next.lineHeight) ? next.lineHeight : DEFAULT_PREFS.lineHeight,
-    mode: next.mode === "scroll" ? "scroll" : "page",
+    mode: next.mode === "scroll" ? "scroll" : next.mode === "original" ? "original" : "page",
     bilingual: next.bilingual === "below" ? "below" : "off",
   };
 }

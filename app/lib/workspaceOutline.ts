@@ -1,4 +1,9 @@
-export type Chapter = { title: string; offset: number };
+export type Chapter = {
+  title: string;
+  offset: number;
+  /** The heading is placed before this line without replacing it (the line is real text, not the heading itself). */
+  keep?: boolean;
+};
 
 const SEGMENT_TARGET = 30_000;
 const MIN_CHAPTER = 800;

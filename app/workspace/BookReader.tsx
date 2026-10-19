@@ -1,14 +1,19 @@
 "use client";
 
 import { ChevronLeft, Highlighter, Languages, List, MessageCircle, ScanText, Type } from "lucide-react";
+import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { displayTitle } from "../lib/bookTitle";
 import type { Chapter } from "../lib/workspaceOutline";
 import type { MarkColor, WorkspaceDocument, WorkspaceMark } from "../lib/workspaceStore";
 import { MarkPopover, NoteSheet, renderMarked, TranslateCard, type StreamFn } from "./ReaderExtras";
 import { ContentsSheet, SettingsSheet } from "./ReaderSheets";
 import { isTranslatable, toBlocks } from "./readerText";
 import { useReaderPrefs } from "./readerPrefs";
+import type { PdfSelection } from "./PdfPages";
 import { useTranslations } from "./useTranslations";
+
+const PdfPages = dynamic(() => import("./PdfPages"), { ssr: false });
 
 export type SegmentData = {
   text: string;
@@ -78,18 +83,30 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   const saveTimer = useRef<number | undefined>(undefined);
   const dirty = useRef(false);
   const gesture = useRef<{ x: number; y: number; t: number; active: boolean; dx: number } | null>(null);
+  // The paragraph at the top of the view and how far below the top edge it sits, so scrolling keeps its place
+  // when text above grows (a translation arriving) or the browser forgets the scroll position.
+  const anchorRef = useRef<{ offset: number; delta: number } | null>(null);
 
   const chapterMap = useMemo(() => new Map(segment.chapters.map((chapter) => [chapter.offset, chapter.title])), [segment.chapters]);
-  const blocks = useMemo(() => toBlocks(segment.text, segment.start, isPdf, chapterMap), [segment.text, segment.start, isPdf, chapterMap]);
+  const keepSet = useMemo(() => new Set(segment.chapters.filter((chapter) => chapter.keep).map((chapter) => chapter.offset)), [segment.chapters]);
+  const blocks = useMemo(() => toBlocks(segment.text, segment.start, isPdf, chapterMap, keepSet), [segment.text, segment.start, isPdf, chapterMap, keepSet]);
   const paged = prefs.mode === "page";
-  const bilingual = prefs.bilingual === "below";
+  // A PDF can be shown exactly as printed; words there are translated by selecting them.
+  const original = isPdf && prefs.mode === "original";
+  const bilingual = prefs.bilingual === "below" && !original;
 
   // The first paragraphs of the next section, if it is loaded, so translation can run ahead across the boundary.
   const nextBlocks = useCallback(() => {
     const next = cache.current.get(segment.index + 1);
-    return next ? toBlocks(next.text, next.start, isPdf, new Map(next.chapters.map((chapter) => [chapter.offset, chapter.title]))) : [];
+    return next ? toBlocks(next.text, next.start, isPdf, new Map(next.chapters.map((chapter) => [chapter.offset, chapter.title])), new Set(next.chapters.filter((chapter) => chapter.keep).map((chapter) => chapter.offset))) : [];
   }, [segment.index, isPdf]);
   const translation = useTranslations({ enabled: bilingual, documentId, blocks, offsetRef, nextBlocks });
+  const [originalPage, setOriginalPage] = useState(1);
+  const [originalTotal, setOriginalTotal] = useState(0);
+  const [pageScrub, setPageScrub] = useState<number | null>(null);
+  const [goto, setGoto] = useState<{ seq: number; page: number } | null>(null);
+  const [pdfSelection, setPdfSelection] = useState<PdfSelection | null>(null);
+  const pageTimer = useRef<number | undefined>(undefined);
   const [translationMenu, setTranslationMenu] = useState<{ offset: number; x: number; y: number } | null>(null);
 
   // ---- progress -----------------------------------------------------------
@@ -110,7 +127,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     setOffset(next);
     dirty.current = true;
     window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => flushProgress(), 1500);
+    saveTimer.current = window.setTimeout(() => flushProgress(), 700);
   }, [flushProgress]);
 
   useEffect(() => {
@@ -237,12 +254,24 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       reportOffset(anchor ?? (first >= 0 ? blocks[first].offset : segment.start));
     } else {
       pages.style.cssText = "";
-      const target: Restore = pending.current ?? { kind: "offset", value: offsetRef.current };
       const view = viewRef.current;
-      let index = 0;
-      if (target.kind === "offset") for (let i = 0; i < blocks.length; i += 1) if (blocks[i].offset <= target.value) index = i;
-      if (target.kind === "last") index = blocks.length - 1;
-      view?.scrollTo({ top: target.kind === "first" ? 0 : Math.max(0, (blockEls.current[index]?.offsetTop ?? 0) - 24) });
+      const anchor = anchorRef.current;
+      if (!pending.current && anchor && view) {
+        // Nothing asked to move: keep the paragraph the reader is looking at exactly where it was.
+        const el = blockEls.current[blocks.findIndex((block) => block.heading === undefined && block.offset === anchor.offset)];
+        if (el) {
+          const want = el.offsetTop - anchor.delta;
+          if (Math.abs(view.scrollTop - want) > 1.5) view.scrollTop = want;
+        }
+      } else {
+        const target: Restore = pending.current ?? { kind: "offset", value: offsetRef.current };
+        let index = 0;
+        if (target.kind === "offset") for (let i = 0; i < blocks.length; i += 1) if (blocks[i].offset <= target.value) index = i;
+        if (target.kind === "last") index = blocks.length - 1;
+        view?.scrollTo({ top: target.kind === "first" ? 0 : Math.max(0, (blockEls.current[index]?.offsetTop ?? 0) - 24) });
+        const el = blockEls.current[index];
+        if (el && view) anchorRef.current = { offset: blocks[index].offset, delta: el.offsetTop - view.scrollTop };
+      }
     }
     pending.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,11 +291,26 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
           const el = blockEls.current[i];
           if (el && el.offsetTop + el.offsetHeight > view.scrollTop + 30) { index = i; break; }
         }
-        if (blocks[index]) reportOffset(blocks[index].offset);
+        const el = blockEls.current[index];
+        if (blocks[index] && el) {
+          anchorRef.current = { offset: blocks[index].offset, delta: el.offsetTop - view.scrollTop };
+          reportOffset(blocks[index].offset);
+        }
       });
     };
     view.addEventListener("scroll", onScroll, { passive: true });
-    return () => { view.removeEventListener("scroll", onScroll); cancelAnimationFrame(frame); };
+    // Coming back from another app, a browser may have put the view at the top again; put it back where it was.
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      requestAnimationFrame(() => {
+        const anchor = anchorRef.current;
+        const el = anchor ? blockEls.current[blocks.findIndex((block) => block.heading === undefined && block.offset === anchor.offset)] : null;
+        if (anchor && el && Math.abs(view.scrollTop - (el.offsetTop - anchor.delta)) > 40) view.scrollTop = el.offsetTop - anchor.delta;
+      });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    return () => { view.removeEventListener("scroll", onScroll); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("pageshow", onVisible); cancelAnimationFrame(frame); };
   }, [blocks, paged, reportOffset]);
 
   // ---- segments -------------------------------------------------------------
@@ -306,14 +350,59 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     void fetchSegment(`segment=${next}`).then((data) => cache.current.set(next, data)).catch(() => undefined);
   }, [segment.index, segment.starts.length, page, pageCount, paged, fetchSegment]);
 
+  // Asks the server to read the book's bookmarks or printed contents again, then reloads where the reader is.
+  const [rebuilding, setRebuilding] = useState(false);
+  const rebuildContents = useCallback(async () => {
+    setRebuilding(true);
+    try {
+      const response = await fetch(`/api/workspace/documents/${encodeURIComponent(documentId)}/enrich`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parts: ["outline"] }) });
+      if (!response.ok) throw new Error("rebuild");
+      cache.current.clear();
+      await loadSegment(`offset=${Math.max(0, Math.floor(offsetRef.current))}`, null, { kind: "offset", value: offsetRef.current });
+    } catch {
+      onError("Could not read the contents of this book. Try again in a moment.");
+    } finally {
+      setRebuilding(false);
+    }
+  }, [documentId, loadSegment, onError]);
+
+  // In the original view the position is a page; saving it still means a text offset, found from the page marker.
+  const onOriginalPage = useCallback((page: number, total: number) => {
+    setOriginalPage(page);
+    setOriginalTotal(total);
+    window.clearTimeout(pageTimer.current);
+    pageTimer.current = window.setTimeout(() => {
+      void fetch(`/api/workspace/documents?id=${encodeURIComponent(documentId)}&page=${page}`, { cache: "no-store" })
+        .then((response) => response.ok ? response.json() as Promise<{ offset: number }> : null)
+        .then((data) => { if (data) reportOffset(data.offset); })
+        .catch(() => undefined);
+    }, 600);
+  }, [documentId, reportOffset]);
+
+  const pageOfOffset = useCallback((data: SegmentData, target: number) => {
+    const upTo = data.text.slice(0, Math.max(0, target - data.start));
+    const found = [...upTo.matchAll(/\[Page (\d+)\]/g)];
+    return found.length ? Number(found[found.length - 1][1]) : null;
+  }, []);
+
   const jumpTo = useCallback((target: number) => {
     setSheet(null);
+    if (original) {
+      void (async () => {
+        try {
+          const data = target >= segment.start && target < segment.end ? segment : await fetchSegment(`offset=${Math.max(0, Math.floor(target))}`);
+          const page = pageOfOffset(data, target);
+          if (page) setGoto({ seq: Date.now(), page });
+        } catch { onError("Could not find that place in the PDF."); }
+      })();
+      return;
+    }
     if (target >= segment.start && target < segment.end) {
       restore({ kind: "offset", value: target }, true);
     } else {
       void loadSegment(`offset=${Math.max(0, Math.floor(target))}`, null, { kind: "offset", value: target });
     }
-  }, [loadSegment, restore, segment.end, segment.start]);
+  }, [loadSegment, restore, segment, original, fetchSegment, pageOfOffset, onError]);
 
   const turn = useCallback((delta: 1 | -1) => {
     if (loading) return;
@@ -420,14 +509,14 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     const response = await fetch("/api/workspace/vocabulary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ word, entry: answer, sentence, source: `${book.document.name.replace(/\.[^.]+$/, "")}${currentPageRef.current ? `, p. ${currentPageRef.current}` : ""}` }),
+      body: JSON.stringify({ word, entry: answer, sentence, source: `${displayTitle(book.document)}${currentPageRef.current ? `, p. ${currentPageRef.current}` : ""}` }),
     });
     const data = await response.json().catch(() => ({})) as { duplicate?: boolean };
     if (!response.ok) throw new Error("save failed");
     return data.duplicate ? "duplicate" as const : "saved" as const;
   };
 
-  const clearSelection = () => { window.getSelection()?.removeAllRanges(); setSelection(null); };
+  const clearSelection = () => { window.getSelection()?.removeAllRanges(); setSelection(null); setPdfSelection(null); };
 
   const askAbout = () => {
     if (!selection) return;
@@ -529,7 +618,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   return <div className="reader" onPointerMove={onHover} data-theme={prefs.theme} data-font={prefs.font} data-mode={prefs.mode} data-chrome={chrome ? "on" : "off"} style={style}>
     <header className="reader-bar reader-bar--top">
       <button type="button" className="reader-icon" onClick={() => { flushProgress(true); onBack(offsetRef.current); }} aria-label="Back to library"><ChevronLeft size={22} /><span>Library</span></button>
-      <h1>{book.document.name.replace(/\.[^.]+$/, "")}</h1>
+      <h1>{displayTitle(book.document)}</h1>
       <div className="reader-bar__actions">
         {ocrPending > 0 && <button type="button" className="reader-icon" onClick={onOcr} aria-label="Recognize text"><ScanText size={20} /></button>}
         <button type="button" className="reader-icon" onClick={() => setSheet("contents")} aria-label="Contents"><List size={20} /></button>
@@ -538,10 +627,12 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       </div>
     </header>
 
-    <div className="reader-view" ref={viewRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { gesture.current = null; if (paged) showPage(page, true); }}>
+    {original ? <div className="reader-view reader-view--original">
+      <PdfPages url={`/api/workspace/documents/${documentId}/file`} initialPage={currentPage ?? 1} goto={goto} onPage={onOriginalPage} onSelect={setPdfSelection} onTap={() => { hoverChrome.current = false; setChrome((value) => !value); }} />
+    </div> : <div className="reader-view" ref={viewRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { gesture.current = null; if (paged) showPage(page, true); }}>
       <article className="reader-pages" ref={pagesRef} lang={/[㐀-鿿]/.test(segment.text.slice(0, 400)) ? "zh" : "en"}>
         {blocks.map((block, index) => block.heading !== undefined
-          ? <h2 key={block.offset} className="reader-chapter" ref={(el) => { blockEls.current[index] = el; }}>{block.heading.split(" · ").map((part, i) => i === 0 ? <small key={i}>{part}</small> : <span key={i}>{part}</span>)}</h2>
+          ? <h2 key={`h${block.offset}`} className="reader-chapter" ref={(el) => { blockEls.current[index] = el; }}>{block.heading.split(" · ").map((part, i) => i === 0 ? <small key={i}>{part}</small> : <span key={i}>{part}</span>)}</h2>
           : <Fragment key={block.offset}>
             <p ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{renderMarked(block.text, marksByBlock.get(block.offset) ?? [])}</p>
             {bilingual && translation.translations[block.offset] && <p className="reader-tr" lang="zh-Hans" data-tr-offset={block.offset}>{translation.translations[block.offset]}</p>}
@@ -553,22 +644,31 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
         </div>}
       </article>
       {loading && <div className="reader-loading" aria-live="polite"><span /></div>}
-    </div>
+    </div>}
 
     <footer className="reader-bar reader-bar--bottom">
-      <input type="range" min={0} max={Math.max(1, segment.totalLength - 1)} step={1} value={shown} aria-label="Reading position"
+      {original ? <input type="range" min={1} max={Math.max(2, originalTotal)} step={1} value={pageScrub ?? originalPage} aria-label="Page"
+        onChange={(event) => setPageScrub(Number(event.target.value))}
+        onPointerUp={() => { if (pageScrub !== null) { setGoto({ seq: Date.now(), page: pageScrub }); setPageScrub(null); } }}
+        onKeyUp={() => { if (pageScrub !== null) { setGoto({ seq: Date.now(), page: pageScrub }); setPageScrub(null); } }} />
+      : <input type="range" min={0} max={Math.max(1, segment.totalLength - 1)} step={1} value={shown} aria-label="Reading position"
         onChange={(event) => setScrub(Number(event.target.value))}
         onPointerUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }}
-        onKeyUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }} />
-      <div className="reader-bar__meta"><span>{currentChapter || book.document.name}</span><span>{bilingual && translation.total > 0 && (translation.status === "error" ? <button type="button" className="reader-tr-status is-error" onClick={translation.retry}>Translation paused · Retry</button> : <span className="reader-tr-status">{translation.done < translation.total ? `译 ${translation.done}/${translation.total} · ` : ""}</span>)}{isPdf && currentPage ? `p. ${currentPage} · ` : ""}{percent}%</span></div>
+        onKeyUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }} />}
+      <div className="reader-bar__meta"><span>{currentChapter || displayTitle(book.document)}</span><span>{bilingual && translation.total > 0 && (translation.status === "error" ? <button type="button" className="reader-tr-status is-error" onClick={translation.retry}>Translation paused · Retry</button> : <span className="reader-tr-status">{translation.done < translation.total ? `译 ${translation.done}/${translation.total} · ` : ""}</span>)}{original ? `p. ${pageScrub ?? originalPage} / ${originalTotal || "…"}` : <>{isPdf && currentPage ? `p. ${currentPage} · ` : ""}{percent}%</>}</span></div>
     </footer>
 
-    {!chrome && <div className="reader-folio" aria-hidden="true"><span>{currentChapter}</span><span>{isPdf && currentPage ? currentPage : `${percent}%`}</span></div>}
+    {!chrome && !original && <div className="reader-folio" aria-hidden="true"><span>{currentChapter}</span><span>{isPdf && currentPage ? currentPage : `${percent}%`}</span></div>}
 
     {selection && <div className={`reader-selection is-${selection.dock}`} onPointerDown={(event) => event.preventDefault()}>
       <button type="button" onClick={() => highlight()}><Highlighter size={15} /> Highlight</button>
       <button type="button" onClick={translateSelection}><Languages size={15} /> Translate</button>
       <button type="button" onClick={askAbout}><MessageCircle size={15} /> Ask</button>
+    </div>}
+
+    {pdfSelection && original && <div className={`reader-selection is-${pdfSelection.dock}`} onPointerDown={(event) => event.preventDefault()}>
+      <button type="button" onClick={() => { setTranslating({ text: pdfSelection.text, context: pdfSelection.context }); clearSelection(); }}><Languages size={15} /> Translate</button>
+      <button type="button" onClick={() => { onAssistant("ask", pdfSelection.text, offsetRef.current); clearSelection(); }}><MessageCircle size={15} /> Ask</button>
     </div>}
 
     {translating && <TranslateCard source={translating.text} context={translating.context} documentId={documentId} stream={stream} onSave={(answer) => saveWord(translating.text, answer, translating.context)} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating.text, offsetRef.current); setTranslating(null); }} />}
@@ -588,7 +688,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       </div>
     </>}
 
-    <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} prefs={prefs} update={setPrefs} />
-    <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} marks={marks} onJump={jumpTo} />
+    <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} prefs={prefs} update={setPrefs} pdf={isPdf} />
+    <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} marks={marks} onJump={jumpTo} onRebuild={isPdf ? () => void rebuildContents() : undefined} rebuilding={rebuilding} />
   </div>;
 }

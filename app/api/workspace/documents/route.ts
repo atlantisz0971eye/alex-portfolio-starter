@@ -1,4 +1,6 @@
 import { get } from "@vercel/blob";
+import { after } from "next/server";
+import { enrichDocument } from "../../../lib/bookEnrich";
 import { ExtractError, extractDocument } from "../../../lib/workspaceExtract";
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
 import { buildSegments, detectChapters, segmentIndexFor } from "../../../lib/workspaceOutline";
@@ -18,8 +20,9 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 // Keep the full source in storage; the reader loads one segment at a time.
-function readerWindow(text: string, target: { segment?: number; offset?: number }) {
-  const chapters = detectChapters(text);
+function readerWindow(text: string, target: { segment?: number; offset?: number }, outline?: WorkspaceDocument["outline"]) {
+  // Chapters read from the book's bookmarks or printed contents win over guessing from headings.
+  const chapters = outline && outline.length >= 3 ? outline : detectChapters(text);
   const starts = buildSegments(text, chapters);
   const index = target.segment !== undefined
     ? Math.max(0, Math.min(starts.length - 1, target.segment))
@@ -67,7 +70,7 @@ export async function GET(request: Request) {
     }
     // Without an explicit target, reopen where the reader left off.
     const saved = segment === undefined && offset === undefined ? await readProgress(id).catch(() => null) : null;
-    const window = readerWindow(text ?? "", { segment, offset: offset ?? saved ?? 0 });
+    const window = readerWindow(text ?? "", { segment, offset: offset ?? saved ?? 0 }, document.outline);
     return Response.json({ document, ...window, target: offset ?? saved ?? window.start }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return Response.json({ error: "storage_failed" }, { status: 502 });
@@ -131,6 +134,8 @@ export async function POST(request: Request) {
     } catch {
       return fail("storage_failed", 502);
     }
+    // Title, cover and contents are worked out after the response, so opening the book is not delayed.
+    after(async () => { await enrichDocument(id).catch((error) => console.error("Enrich failed", error instanceof Error ? error.message : error)); });
     return Response.json({ document, ...readerWindow(extractedText, { segment: 0 }), target: 0 }, { status: 201 });
   } catch {
     return fail("processing_failed", 502);

@@ -9,7 +9,7 @@ const nextConfig = {
     unoptimized: true,
   },
   typedRoutes: true,
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "@napi-rs/canvas"],
   outputFileTracingIncludes: {
     "/api/workspace/documents": [
       "./node_modules/pdf-parse/dist/pdf-parse/*/pdf.worker.mjs",
@@ -24,6 +24,11 @@ const nextConfig = {
       "./node_modules/@napi-rs/canvas*/**/*",
     ],
     // OCR renders pages to images, so it needs the same PDF worker and canvas files.
+    "/api/workspace/documents/[id]/enrich": [
+      "./node_modules/pdf-parse/dist/pdf-parse/*/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/@napi-rs/canvas*/**/*",
+    ],
     "/api/workspace/boards/[id]/pdf": [
       "./node_modules/pdf-parse/dist/pdf-parse/*/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",

@@ -2,6 +2,7 @@
 
 import { Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { useMemo, useRef } from "react";
+import { displayTitle } from "../lib/bookTitle";
 import type { WorkspaceLibraryItem } from "../lib/workspaceStore";
 import type { OcrState } from "./OcrSheet";
 import { PageTitle, TopRow } from "./Shell";
@@ -17,15 +18,18 @@ type Props = {
   onSignOut: () => void;
 };
 
-const title = (name: string) => name.replace(/\.[^.]+$/, "");
+const title = (item: WorkspaceLibraryItem) => displayTitle(item);
 const percentOf = (item: WorkspaceLibraryItem) => item.progress ? Math.min(100, Math.round((item.progress / Math.max(1, item.characterCount)) * 100)) : 0;
 
 /** A quiet typographic cover; the hue comes from the title so each book is recognisable. */
 function Cover({ item }: { item: WorkspaceLibraryItem }) {
   let hash = 0;
   for (const char of item.name) hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  return <span className="cover" style={{ background: `linear-gradient(160deg, hsl(${hash} 14% 26%), hsl(${hash} 12% 9%))` }}>
-    <span className="cover__title">{title(item.name)}</span>
+  return <span className={`cover${item.cover ? " cover--image" : ""}`} style={{ background: `linear-gradient(160deg, hsl(${hash} 14% 26%), hsl(${hash} 12% 9%))` }}>
+    {item.cover
+      /* eslint-disable-next-line @next/next/no-img-element */
+      ? <img className="cover__image" src={`/api/workspace/documents/${item.id}/cover`} alt="" loading="lazy" draggable={false} />
+      : <span className="cover__title">{title(item)}</span>}
     <span className="cover__badge">{item.mimeType === "application/pdf" ? "PDF" : "TXT"}</span>
   </span>;
 }
@@ -54,7 +58,7 @@ export function Library({ documents, loading, uploading, ocr, onOpen, onManage, 
             <button type="button" className="continue" onClick={() => onOpen(current.id)}>
               <Cover item={current} />
               <span className="continue__meta">
-                <strong>{title(current.name)}</strong>
+                <strong>{title(current)}</strong>
                 <small>{percentOf(current)}% read{current.pageCount ? ` · ${current.pageCount} pages` : ""}</small>
                 <i><b style={{ width: `${percentOf(current)}%` }} /></i>
               </span>
@@ -66,10 +70,10 @@ export function Library({ documents, loading, uploading, ocr, onOpen, onManage, 
               {documents.map((item) => <li key={item.id} className="tilewrap">
                 <button type="button" className="tile" onClick={() => onOpen(item.id)}>
                   <Cover item={item} />
-                  <span className="tile__title">{title(item.name)}</span>
+                  <span className="tile__title">{title(item)}</span>
                   <small>{ocr?.running && ocr.docId === item.id ? `Recognizing text ${Math.round((ocr.done / Math.max(1, ocr.total)) * 100)}%` : item.ocrPending?.length ? "Scanned · needs text recognition" : percentOf(item) ? `${percentOf(item)}% read` : "New"}{item.pageCount ? ` · ${item.pageCount} pages` : ""}</small>
                 </button>
-                <button type="button" className="tile__more" aria-label={`Options for ${title(item.name)}`} onClick={() => onManage(item.id)}><MoreHorizontal size={18} /></button>
+                <button type="button" className="tile__more" aria-label={`Options for ${title(item)}`} onClick={() => onManage(item.id)}><MoreHorizontal size={18} /></button>
               </li>)}
             </ul>
           </section>

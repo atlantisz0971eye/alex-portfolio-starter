@@ -50,7 +50,7 @@ function splitLong(text: string, offset: number, page: number | null): Block[] {
  * Turns one stored text segment into reading blocks. PDF extraction hard-wraps
  * lines, so `reflow` rejoins them into paragraphs; other formats keep their breaks.
  */
-export function toBlocks(text: string, base: number, reflow: boolean, chapters: Map<number, string>): Block[] {
+export function toBlocks(text: string, base: number, reflow: boolean, chapters: Map<number, string>, keep: Set<number> = new Set()): Block[] {
   const blocks: Block[] = [];
   let page: number | null = null;
   const chunks: { start: number; raw: string }[] = [];
@@ -91,6 +91,8 @@ export function toBlocks(text: string, base: number, reflow: boolean, chapters: 
       if (title !== undefined) {
         flush();
         blocks.push({ offset: base + line.at, page, text: "", heading: title });
+        // A heading found by its title replaces that line; one placed before a body line leaves the line alone.
+        if (keep.has(base + line.at)) { group.push(line); continue; }
         if (title.includes(" · ")) i += 1;
         continue;
       }
