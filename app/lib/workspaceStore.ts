@@ -36,6 +36,7 @@ const metaPath = (id: string) => `workspace/docs/${id}.json`;
 const statePath = (id: string) => `workspace/state/${id}.json`;
 const progressPath = (id: string) => `workspace/progress/${id}.json`;
 const marksPath = (id: string) => `workspace/marks/${id}.json`;
+const bookmarksPath = (id: string) => `workspace/bookmarks/${id}.json`;
 
 export type MarkColor = "yellow" | "green" | "blue" | "pink";
 /** A highlight inside one reading block, anchored by the block's offset in the document text. */
@@ -47,6 +48,19 @@ export type WorkspaceMark = {
   text: string;
   color: MarkColor;
   note?: string;
+  createdAt: string;
+};
+
+/** A saved place in a book: the paragraph at the top of the page when it was set. */
+export type WorkspaceBookmark = {
+  id: string;
+  /** Offset of the paragraph in the document text. */
+  offset: number;
+  /** Source page, for PDFs. */
+  page?: number;
+  chapter?: string;
+  /** The first words of the page, so the bookmark can be recognised in a list. */
+  label: string;
   createdAt: string;
 };
 
@@ -138,6 +152,16 @@ export async function writeMarks(id: string, marks: WorkspaceMark[]) {
   await put(marksPath(id), JSON.stringify(marks), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
+export async function readBookmarks(id: string): Promise<WorkspaceBookmark[]> {
+  if (!validDocumentId(id)) return [];
+  const raw = await readText(bookmarksPath(id));
+  return raw ? JSON.parse(raw) as WorkspaceBookmark[] : [];
+}
+
+export async function writeBookmarks(id: string, bookmarks: WorkspaceBookmark[]) {
+  await put(bookmarksPath(id), JSON.stringify(bookmarks), { access: "private", allowOverwrite: true, contentType: "application/json" });
+}
+
 export async function writeProgress(id: string, offset: number) {
   await put(progressPath(id), JSON.stringify({ offset, updatedAt: new Date().toISOString() }), {
     access: "private",
@@ -170,13 +194,13 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
 
 export async function deleteDocument(document: WorkspaceDocument) {
   await deleteTranslations(document.id).catch(() => undefined);
-  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), textPath(document.id), coverPath(document.id), document.filePath]);
+  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), bookmarksPath(document.id), textPath(document.id), coverPath(document.id), document.filePath]);
 }
 
 /** Best-effort removal of everything an interrupted upload may have left behind. */
 export async function discardUpload(id: string, filePath: string) {
   try {
-    await del([filePath, textPath(id), statePath(id), progressPath(id), marksPath(id), metaPath(id)]);
+    await del([filePath, textPath(id), statePath(id), progressPath(id), marksPath(id), bookmarksPath(id), metaPath(id)]);
   } catch {
     // Nothing more can be done here; the original error is what the caller reports.
   }

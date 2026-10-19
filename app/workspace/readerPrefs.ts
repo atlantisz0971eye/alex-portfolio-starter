@@ -6,7 +6,8 @@ export type ReaderTheme = "black" | "dark" | "sepia" | "white";
 export type ReaderFont = "serif" | "sans" | "mono";
 /** "original" shows a PDF exactly as printed. */
 export type ReaderMode = "page" | "scroll" | "original";
-export type ReaderBilingual = "off" | "below";
+/** "side" puts the Chinese in a facing column when the screen is wide, and under the text otherwise. */
+export type ReaderBilingual = "off" | "below" | "side";
 
 export type ReaderPrefs = {
   theme: ReaderTheme;
@@ -14,7 +15,7 @@ export type ReaderPrefs = {
   fontSize: number;
   lineHeight: number;
   mode: ReaderMode;
-  /** Show a Chinese translation under each paragraph. */
+  /** Show a Chinese translation with each paragraph. */
   bilingual: ReaderBilingual;
 };
 
@@ -30,7 +31,7 @@ function sanitize(value: Partial<ReaderPrefs> | null): ReaderPrefs {
     fontSize: Math.min(FONT_RANGE.max, Math.max(FONT_RANGE.min, Math.round(Number(next.fontSize)) || DEFAULT_PREFS.fontSize)),
     lineHeight: [1.4, 1.65, 1.9].includes(next.lineHeight) ? next.lineHeight : DEFAULT_PREFS.lineHeight,
     mode: next.mode === "scroll" ? "scroll" : next.mode === "original" ? "original" : "page",
-    bilingual: next.bilingual === "below" ? "below" : "off",
+    bilingual: next.bilingual === "below" ? "below" : next.bilingual === "side" ? "side" : "off",
   };
 }
 

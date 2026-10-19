@@ -1,8 +1,8 @@
 "use client";
 
-import { Check } from "lucide-react";
-import { useState } from "react";
-import type { WorkspaceMark } from "../lib/workspaceStore";
+import { Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { WorkspaceBookmark, WorkspaceMark } from "../lib/workspaceStore";
 import type { Chapter } from "../lib/workspaceOutline";
 import { FONT_RANGE, type ReaderFont, type ReaderPrefs, type ReaderTheme } from "./readerPrefs";
 import { Sheet } from "./Sheet";
@@ -42,8 +42,10 @@ export function SettingsSheet({ open, onClose, prefs, update, pdf }: SettingsPro
     </div>
     <div className="ws-segment" role="radiogroup" aria-label="Chinese translation">
       <button type="button" role="radio" aria-checked={prefs.bilingual === "off"} className={prefs.bilingual === "off" ? "is-on" : ""} onClick={() => update({ bilingual: "off" })}>No translation</button>
-      <button type="button" role="radio" aria-checked={prefs.bilingual === "below"} className={prefs.bilingual === "below" ? "is-on" : ""} onClick={() => update({ bilingual: "below" })}>Chinese under text</button>
+      <button type="button" role="radio" aria-checked={prefs.bilingual === "below"} className={prefs.bilingual === "below" ? "is-on" : ""} onClick={() => update({ bilingual: "below" })}>Under text</button>
+      <button type="button" role="radio" aria-checked={prefs.bilingual === "side"} className={prefs.bilingual === "side" ? "is-on" : ""} onClick={() => update({ bilingual: "side" })}>Side by side</button>
     </div>
+    {prefs.bilingual === "side" && <p className="ws-note">Held sideways, English is on the left page and Chinese on the right. Upright, the Chinese sits under each paragraph.</p>}
     <div className="ws-segment" role="radiogroup" aria-label="Reading mode">
       <button type="button" role="radio" aria-checked={prefs.mode === "page"} className={prefs.mode === "page" ? "is-on" : ""} onClick={() => update({ mode: "page" })}>Paged</button>
       <button type="button" role="radio" aria-checked={prefs.mode === "scroll"} className={prefs.mode === "scroll" ? "is-on" : ""} onClick={() => update({ mode: "scroll" })}>Scrolling</button>
@@ -52,19 +54,23 @@ export function SettingsSheet({ open, onClose, prefs, update, pdf }: SettingsPro
   </Sheet>;
 }
 
-type ContentsProps = { open: boolean; onClose: () => void; chapters: Chapter[]; starts: number[]; offset: number; totalLength: number; marks: WorkspaceMark[]; onJump: (offset: number) => void; onRebuild?: () => void; rebuilding?: boolean };
+type ContentsProps = { open: boolean; onClose: () => void; chapters: Chapter[]; starts: number[]; offset: number; totalLength: number; marks: WorkspaceMark[]; bookmarks: WorkspaceBookmark[]; onJump: (offset: number) => void; onJumpBookmark: (bookmark: WorkspaceBookmark) => void; onRemoveBookmark: (id: string) => void; onRebuild?: () => void; rebuilding?: boolean; initialTab?: "contents" | "bookmarks" | "highlights" };
 
-export function ContentsSheet({ open, onClose, chapters, starts, offset, totalLength, marks, onJump, onRebuild, rebuilding }: ContentsProps) {
-  const [tab, setTab] = useState<"contents" | "highlights">("contents");
+export function ContentsSheet({ open, onClose, chapters, starts, offset, totalLength, marks, bookmarks, onJump, onJumpBookmark, onRemoveBookmark, onRebuild, rebuilding, initialTab }: ContentsProps) {
+  const [tab, setTab] = useState<"contents" | "bookmarks" | "highlights">("contents");
+  // Opening the sheet from the bookmark button lands on its list.
+  useEffect(() => { if (open && initialTab) setTab(initialTab); }, [open, initialTab]);
   const items = chapters.length
     ? chapters.map((chapter) => ({ title: chapter.title.replace(" · ", " — "), offset: chapter.offset }))
     : starts.map((start, index) => ({ title: `Section ${index + 1}`, offset: start }));
   let currentIndex = 0;
   items.forEach((item, index) => { if (item.offset <= offset) currentIndex = index; });
+  const sortedBookmarks = [...bookmarks].sort((x, y) => x.offset - y.offset);
   const sortedMarks = [...marks].sort((x, y) => x.blockOffset + x.from - (y.blockOffset + y.from));
-  return <Sheet open={open} onClose={onClose} title={tab === "contents" ? "Contents" : "Highlights"} size="tall">
+  return <Sheet open={open} onClose={onClose} title={tab === "contents" ? "Contents" : tab === "bookmarks" ? "Bookmarks" : "Highlights"} size="tall">
     <div className="ws-segment" role="tablist">
       <button type="button" role="tab" aria-selected={tab === "contents"} className={tab === "contents" ? "is-on" : ""} onClick={() => setTab("contents")}>Contents</button>
+      <button type="button" role="tab" aria-selected={tab === "bookmarks"} className={tab === "bookmarks" ? "is-on" : ""} onClick={() => setTab("bookmarks")}>Bookmarks{bookmarks.length ? ` · ${bookmarks.length}` : ""}</button>
       <button type="button" role="tab" aria-selected={tab === "highlights"} className={tab === "highlights" ? "is-on" : ""} onClick={() => setTab("highlights")}>Highlights{marks.length ? ` · ${marks.length}` : ""}</button>
     </div>
     {tab === "contents" ? <>
@@ -77,7 +83,15 @@ export function ContentsSheet({ open, onClose, chapters, starts, offset, totalLe
           </button>
         </li>)}
       </ol>
-    </> : sortedMarks.length === 0 ? <p className="ws-note">Select text and tap Highlight to save passages here.</p> : <ul className="ws-marks">
+    </> : tab === "bookmarks" ? (sortedBookmarks.length === 0 ? <p className="ws-note">Tap the bookmark in the top bar to keep your place. It will be listed here.</p> : <ul className="ws-bookmarks">
+      {sortedBookmarks.map((item) => <li key={item.id}>
+        <button type="button" className="ws-bookmarks__go" onClick={() => onJumpBookmark(item)}>
+          <span className="ws-bookmarks__where">{[item.chapter, item.page ? `p. ${item.page}` : `${Math.round((item.offset / Math.max(1, totalLength)) * 100)}%`].filter(Boolean).join(" · ")}</span>
+          {item.label && <span className="ws-bookmarks__text">{item.label}</span>}
+        </button>
+        <button type="button" className="ws-bookmarks__remove" aria-label="Remove bookmark" onClick={() => onRemoveBookmark(item.id)}><X size={16} /></button>
+      </li>)}
+    </ul>) : sortedMarks.length === 0 ? <p className="ws-note">Select text and tap Highlight to save passages here.</p> : <ul className="ws-marks">
       {sortedMarks.map((mark) => <li key={mark.id}>
         <button type="button" onClick={() => onJump(mark.blockOffset)}>
           <span className={`ws-marks__text hl-${mark.color}`}>{mark.text.slice(0, 220)}{mark.text.length > 220 ? "…" : ""}</span>

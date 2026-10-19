@@ -977,3 +977,25 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .pdf-text { position: absolute; inset: 0; overflow: hidden; line-height: 1; text-size-adjust: none; -webkit-user-select: text; user-select: text; opacity: 1; }
 .pdf-text span, .pdf-text br { color: transparent; }
 .pdf-text ::selection { background: rgba(60, 130, 255, .38); }
+
+/* Facing pages: English on the left, its Chinese on the right, paragraph by paragraph */
+.reader-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); break-inside: avoid; }
+.reader-pages .reader-row > p, .reader-pages .reader-row__tr { margin: 0; padding-bottom: .85em; }
+.reader-pages .reader-row > p { padding-right: 1.6em; }
+.reader-pages .reader-row__tr { padding-left: 1.6em; border-left: 1px solid color-mix(in srgb, var(--fg) 16%, transparent); }
+.reader-pages .reader-row p.reader-tr { margin: 0; padding: 0; border: 0; break-before: auto; font-size: .9em; }
+.reader-pages .reader-row p.reader-tr--wait { margin-top: .35em; }
+.reader[data-spread="on"] .reader-view { left: max(28px, calc((100% - 1160px) / 2)); right: max(28px, calc((100% - 1160px) / 2)); }
+.reader[data-spread="on"][data-mode="scroll"] .reader-view { left: 0; right: 0; padding-left: max(28px, calc((100% - 1160px) / 2)); padding-right: max(28px, calc((100% - 1160px) / 2)); }
+.reader[data-spread="on"] .reader-folio { left: max(28px, calc((100% - 1160px) / 2)); right: max(28px, calc((100% - 1160px) / 2)); }
+
+/* Bookmarks */
+.reader-ribbon { position: absolute; z-index: 2; top: 0; right: max(22px, calc((100% - 680px) / 2 + 14px)); width: 24px; height: calc(var(--sat) + 38px); padding: 0; border: 0; background: #d8402f; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%); cursor: pointer; }
+.reader[data-spread="on"] .reader-ribbon { right: max(22px, calc((100% - 1160px) / 2 + 14px)); }
+.ws-bookmarks { list-style: none; margin: 0; padding: 0; }
+.ws-bookmarks li { display: flex; align-items: flex-start; gap: 8px; }
+.ws-bookmarks li + li { border-top: 1px solid var(--f1); }
+.ws-bookmarks__go { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; padding: 11px 0; text-align: left; }
+.ws-bookmarks__where { color: var(--text-2); font-size: 13px; }
+.ws-bookmarks__text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 15px; line-height: 1.45; }
+.ws-bookmarks__remove { display: grid; flex: none; place-items: center; width: 40px; height: 44px; color: var(--text-2); }

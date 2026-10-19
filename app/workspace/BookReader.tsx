@@ -1,16 +1,17 @@
 "use client";
 
-import { ChevronLeft, Highlighter, Languages, List, MessageCircle, ScanText, Type } from "lucide-react";
+import { Bookmark, ChevronLeft, Highlighter, Languages, List, MessageCircle, ScanText, Type } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { displayTitle } from "../lib/bookTitle";
 import type { Chapter } from "../lib/workspaceOutline";
-import type { MarkColor, WorkspaceDocument, WorkspaceMark } from "../lib/workspaceStore";
+import type { MarkColor, WorkspaceBookmark, WorkspaceDocument, WorkspaceMark } from "../lib/workspaceStore";
 import { MarkPopover, NoteSheet, renderMarked, TranslateCard, type StreamFn } from "./ReaderExtras";
 import { ContentsSheet, SettingsSheet } from "./ReaderSheets";
 import { isTranslatable, toBlocks } from "./readerText";
 import { useReaderPrefs } from "./readerPrefs";
 import type { PdfSelection } from "./PdfPages";
+import { useBookmarks } from "./useBookmarks";
 import { useTranslations } from "./useTranslations";
 
 const PdfPages = dynamic(() => import("./PdfPages"), { ssr: false });
@@ -55,6 +56,10 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   const [segment, setSegment] = useState<SegmentData>(book);
   const [chrome, setChrome] = useState(false);
   const [sheet, setSheet] = useState<"settings" | "contents" | null>(null);
+  const [contentsTab, setContentsTab] = useState<"contents" | "bookmarks">("contents");
+  // Held sideways on a wide screen, facing pages are possible.
+  const [wide, setWide] = useState(false);
+  const [scrollEnd, setScrollEnd] = useState(0);
   const [page, setPage] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [offset, setOffset] = useState(book.target);
@@ -93,7 +98,9 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   const paged = prefs.mode === "page";
   // A PDF can be shown exactly as printed; words there are translated by selecting them.
   const original = isPdf && prefs.mode === "original";
-  const bilingual = prefs.bilingual === "below" && !original;
+  const bilingual = prefs.bilingual !== "off" && !original;
+  // English on the left page and its Chinese on the right, paragraph by paragraph.
+  const side = prefs.bilingual === "side" && wide && !original;
 
   // The first paragraphs of the next section, if it is loaded, so translation can run ahead across the boundary.
   const nextBlocks = useCallback(() => {
@@ -141,6 +148,14 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     };
   }, [flushProgress]);
 
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 760px) and (orientation: landscape)");
+    const check = () => setWide(query.matches);
+    check();
+    query.addEventListener("change", check);
+    return () => query.removeEventListener("change", check);
+  }, []);
+
   // ---- highlights -----------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +165,8 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, [documentId]);
+
+  const [bookmarks, updateBookmarks] = useBookmarks(documentId, onError);
 
   const updateMarks = useCallback((change: (current: WorkspaceMark[]) => WorkspaceMark[]) => {
     setMarks((current) => {
@@ -275,7 +292,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     }
     pending.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks, size.w, size.h, paged, prefs.fontSize, prefs.font, prefs.lineHeight, bilingual, translation.version]);
+  }, [blocks, size.w, size.h, paged, prefs.fontSize, prefs.font, prefs.lineHeight, bilingual, side, translation.version]);
 
   // Scroll mode tracks the first block in view.
   useEffect(() => {
@@ -283,19 +300,34 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     const view = viewRef.current;
     if (!view) return;
     let frame = 0;
+    // The first paragraph reaching below the top edge; offsets only grow down the page, so a binary search finds it.
+    const firstVisible = () => {
+      const limit = view.scrollTop + 30;
+      let low = 0;
+      let high = blockEls.current.length - 1;
+      let found = 0;
+      while (low <= high) {
+        const middle = (low + high) >> 1;
+        const el = blockEls.current[middle];
+        if (el && el.offsetTop + el.offsetHeight > limit) { found = middle; high = middle - 1; } else low = middle + 1;
+      }
+      return found;
+    };
     const onScroll = () => {
+      // The anchor is kept current on every scroll event, so a translation arriving between frames cannot pull the page back.
+      const index = firstVisible();
+      const el = blockEls.current[index];
+      if (blocks[index] && el) anchorRef.current = { offset: blocks[index].offset, delta: el.offsetTop - view.scrollTop };
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        let index = 0;
-        for (let i = 0; i < blockEls.current.length; i += 1) {
-          const el = blockEls.current[i];
-          if (el && el.offsetTop + el.offsetHeight > view.scrollTop + 30) { index = i; break; }
+        if (blocks[index]) reportOffset(blocks[index].offset);
+        let last = index;
+        for (let i = index; i < blockEls.current.length; i += 1) {
+          const item = blockEls.current[i];
+          if (item && item.offsetTop < view.scrollTop + view.clientHeight) last = i;
+          else break;
         }
-        const el = blockEls.current[index];
-        if (blocks[index] && el) {
-          anchorRef.current = { offset: blocks[index].offset, delta: el.offsetTop - view.scrollTop };
-          reportOffset(blocks[index].offset);
-        }
+        setScrollEnd(blocks[last + 1]?.offset ?? segment.end);
       });
     };
     view.addEventListener("scroll", onScroll, { passive: true });
@@ -311,7 +343,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", onVisible);
     return () => { view.removeEventListener("scroll", onScroll); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("pageshow", onVisible); cancelAnimationFrame(frame); };
-  }, [blocks, paged, reportOffset]);
+  }, [blocks, paged, reportOffset, segment.end]);
 
   // ---- segments -------------------------------------------------------------
   const fetchSegment = useCallback(async (query: string): Promise<SegmentData> => {
@@ -588,6 +620,45 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       .catch(() => onError(`Page ${citation.page} was not found in this book.`));
   }, [citation, documentId, jumpTo, onError]);
 
+  // ---- bookmarks ------------------------------------------------------------
+  // The stretch of text on screen: a bookmark inside it marks this page.
+  const viewStart = useMemo(() => {
+    if (!paged) return offset;
+    const index = blockPages.current.findIndex((value) => value === page);
+    return index >= 0 && blocks[index] ? Math.min(offset, blocks[index].offset) : offset;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged, offset, page, blocks, pageCount]);
+  const viewEnd = useMemo(() => {
+    if (!paged) return Math.max(scrollEnd, offset + 1);
+    const index = blockPages.current.findIndex((value) => value > page);
+    return index >= 0 && blocks[index] ? blocks[index].offset : segment.end;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged, scrollEnd, offset, page, blocks, segment.end, pageCount]);
+  const bookmarked = original ? bookmarks.some((item) => item.page === originalPage) : bookmarks.some((item) => item.offset >= viewStart && item.offset < viewEnd);
+
+  const toggleBookmark = () => {
+    if (bookmarked) {
+      updateBookmarks((current) => current.filter((item) => original ? item.page !== originalPage : !(item.offset >= viewStart && item.offset < viewEnd)));
+      return;
+    }
+    const here = offsetRef.current;
+    const label = original ? "" : (blocks.find((block) => block.text && block.offset >= here)?.text ?? "").replace(/\s+/g, " ").slice(0, 110);
+    const created: WorkspaceBookmark = {
+      id: crypto.randomUUID(),
+      offset: Math.max(0, Math.floor(here)),
+      page: (original ? originalPage : currentPageRef.current) ?? undefined,
+      chapter: currentChapter || undefined,
+      label,
+      createdAt: new Date().toISOString(),
+    };
+    updateBookmarks((current) => [...current, created]);
+  };
+
+  const jumpBookmark = (item: WorkspaceBookmark) => {
+    if (original && item.page) { setSheet(null); setGoto({ seq: Date.now(), page: item.page }); return; }
+    jumpTo(item.offset);
+  };
+
   // ---- display --------------------------------------------------------------
   const currentChapter = useMemo(() => {
     let title = "";
@@ -615,13 +686,14 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     else if (!near && chrome && hoverChrome.current) { hoverChrome.current = false; setChrome(false); }
   };
 
-  return <div className="reader" onPointerMove={onHover} data-theme={prefs.theme} data-font={prefs.font} data-mode={prefs.mode} data-chrome={chrome ? "on" : "off"} style={style}>
+  return <div className="reader" onPointerMove={onHover} data-theme={prefs.theme} data-font={prefs.font} data-mode={prefs.mode} data-spread={side ? "on" : "off"} data-chrome={chrome ? "on" : "off"} style={style}>
     <header className="reader-bar reader-bar--top">
       <button type="button" className="reader-icon" onClick={() => { flushProgress(true); onBack(offsetRef.current); }} aria-label="Back to library"><ChevronLeft size={22} /><span>Library</span></button>
       <h1>{displayTitle(book.document)}</h1>
       <div className="reader-bar__actions">
         {ocrPending > 0 && <button type="button" className="reader-icon" onClick={onOcr} aria-label="Recognize text"><ScanText size={20} /></button>}
-        <button type="button" className="reader-icon" onClick={() => setSheet("contents")} aria-label="Contents"><List size={20} /></button>
+        <button type="button" className="reader-icon" onClick={() => { setContentsTab("contents"); setSheet("contents"); }} aria-label="Contents"><List size={20} /></button>
+        <button type="button" className="reader-icon" onClick={toggleBookmark} aria-label={bookmarked ? "Remove bookmark" : "Add bookmark"} aria-pressed={bookmarked}><Bookmark size={20} fill={bookmarked ? "currentColor" : "none"} /></button>
         <button type="button" className="reader-icon" onClick={() => setSheet("settings")} aria-label="Appearance"><Type size={20} /></button>
         <button type="button" className="reader-icon" onClick={() => onAssistant("open", undefined, offsetRef.current)} aria-label="Ask DeepSeek"><MessageCircle size={20} /></button>
       </div>
@@ -633,6 +705,14 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       <article className="reader-pages" ref={pagesRef} lang={/[㐀-鿿]/.test(segment.text.slice(0, 400)) ? "zh" : "en"}>
         {blocks.map((block, index) => block.heading !== undefined
           ? <h2 key={`h${block.offset}`} className="reader-chapter" ref={(el) => { blockEls.current[index] = el; }}>{block.heading.split(" · ").map((part, i) => i === 0 ? <small key={i}>{part}</small> : <span key={i}>{part}</span>)}</h2>
+          : side ? <div key={block.offset} className="reader-row">
+            <p ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{renderMarked(block.text, marksByBlock.get(block.offset) ?? [])}</p>
+            <div className="reader-row__tr">
+              {translation.translations[block.offset]
+                ? <p className="reader-tr" lang="zh-Hans" data-tr-offset={block.offset}>{translation.translations[block.offset]}</p>
+                : translation.queued.has(block.offset) && <p className="reader-tr reader-tr--wait" aria-hidden="true" />}
+            </div>
+          </div>
           : <Fragment key={block.offset}>
             <p ref={(el) => { blockEls.current[index] = el; }} className={isPdf ? "" : "reader-pre"}>{renderMarked(block.text, marksByBlock.get(block.offset) ?? [])}</p>
             {bilingual && translation.translations[block.offset] && <p className="reader-tr" lang="zh-Hans" data-tr-offset={block.offset}>{translation.translations[block.offset]}</p>}
@@ -657,6 +737,8 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
         onKeyUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }} />}
       <div className="reader-bar__meta"><span>{currentChapter || displayTitle(book.document)}</span><span>{bilingual && translation.total > 0 && (translation.status === "error" ? <button type="button" className="reader-tr-status is-error" onClick={translation.retry}>Translation paused · Retry</button> : <span className="reader-tr-status">{translation.done < translation.total ? `译 ${translation.done}/${translation.total} · ` : ""}</span>)}{original ? `p. ${pageScrub ?? originalPage} / ${originalTotal || "…"}` : <>{isPdf && currentPage ? `p. ${currentPage} · ` : ""}{percent}%</>}</span></div>
     </footer>
+
+    {bookmarked && <button type="button" className="reader-ribbon" aria-label="Bookmarks" onClick={() => { setContentsTab("bookmarks"); setSheet("contents"); }} />}
 
     {!chrome && !original && <div className="reader-folio" aria-hidden="true"><span>{currentChapter}</span><span>{isPdf && currentPage ? currentPage : `${percent}%`}</span></div>}
 
@@ -689,6 +771,6 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     </>}
 
     <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} prefs={prefs} update={setPrefs} pdf={isPdf} />
-    <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} marks={marks} onJump={jumpTo} onRebuild={isPdf ? () => void rebuildContents() : undefined} rebuilding={rebuilding} />
+    <ContentsSheet open={sheet === "contents"} onClose={() => setSheet(null)} chapters={segment.chapters} starts={segment.starts} offset={offset} totalLength={segment.totalLength} marks={marks} bookmarks={bookmarks} initialTab={contentsTab} onJump={jumpTo} onJumpBookmark={jumpBookmark} onRemoveBookmark={(id) => updateBookmarks((current) => current.filter((item) => item.id !== id))} onRebuild={isPdf ? () => void rebuildContents() : undefined} rebuilding={rebuilding} />
   </div>;
 }
