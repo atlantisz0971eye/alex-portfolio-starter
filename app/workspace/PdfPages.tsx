@@ -60,7 +60,11 @@ export default function PdfPages({ url, initialPage, goto, onPage, onSelect, onT
     void (async () => {
       try {
         const lib = await loadPdfjs();
-        const loaded = await lib.getDocument({ url, withCredentials: true, isEvalSupported: false } as never).promise;
+        // Scanned books draw their pages from JPEG 2000 and JBIG2 images, which need the decoders and data served from /public.
+        const loaded = await lib.getDocument({
+          url, withCredentials: true, isEvalSupported: false,
+          wasmUrl: "/pdfjs/wasm/", cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", iccUrl: "/pdfjs/iccs/",
+        } as never).promise;
         if (cancelled) { void loaded.destroy(); return; }
         opened = loaded;
         const first = await loaded.getPage(1);
@@ -222,8 +226,9 @@ function PdfPage({ doc, pdfjs, page, width, height, live, onSize }: PageProps) {
         }
         await render.promise;
         if (!cancelled) setReady(true);
-      } catch {
+      } catch (error) {
         // A cancelled render rejects; anything else leaves the page blank until it is scrolled back into view.
+        if (!cancelled && !/cancel/i.test(String((error as Error)?.name ?? error))) console.error(`Page ${page} could not be drawn`, error);
       }
     })();
     return () => {

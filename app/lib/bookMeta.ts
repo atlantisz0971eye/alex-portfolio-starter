@@ -143,7 +143,7 @@ export function chaptersFromPages(text: string, entries: { title: string; page: 
 }
 
 const TOC_SYSTEM = `你读一本书目录页的文字（从 PDF 提取，排版可能错乱）。只输出 JSON：{"entries":[{"number":"章节编号，没有就是空字符串","title":"标题","page":印刷页码整数}]}
-要求：只列出目录里的主条目：前言/导言、各章、各部分、结语、附录、注释、参考文献、索引等；不要列副标题、小节、插图清单。按目录顺序。page 是目录里印的阿拉伯数字页码；罗马数字页码的条目跳过。标题保持原文。`;
+要求：只列出目录里的主条目：前言/导言、各章、各部分、结语、附录、注释、参考文献、索引等；不要列副标题、小节。目录列表结束后出现的内容（例如插图清单、图注、正文）不是目录条目，不要列。按目录顺序。page 是目录里印的阿拉伯数字页码；目录里没有印页码（OCR 常丢掉页码）就给 null；罗马数字页码的条目也给 null。标题保持原文，不要自己编造目录里没有的标题。`;
 
 /** The text following a "Contents" heading near the start of the book. */
 function tocWindow(text: string) {
@@ -152,8 +152,11 @@ function tocWindow(text: string) {
   for (const match of candidates) {
     const start = match.index ?? 0;
     const window = text.slice(start, start + 9000);
-    const numbered = window.split("\n").filter((line) => /\b\d{1,3}\s*$/.test(line.trim())).length;
-    if (numbered >= 5) return { start, end: start + 9000, text: window };
+    const lines = window.split("\n").map((line) => line.trim()).filter(Boolean);
+    const numbered = lines.filter((line) => /\b\d{1,3}\s*$/.test(line)).length;
+    // Scanned books often lose the page numbers, leaving a plain list of short title lines.
+    const titles = lines.slice(1, 40).filter((line) => line.length <= 70 && !/\[Page/.test(line) && !/[.,;]$/.test(line)).length;
+    if (numbered >= 5 || titles >= 8) return { start, end: start + 9000, text: window };
   }
   return null;
 }
@@ -164,8 +167,8 @@ export async function chaptersFromContents(text: string): Promise<Chapter[]> {
   if (!toc) return [];
   const parsed = json(await quickDeepSeek(TOC_SYSTEM, toc.text, 2500, 50_000));
   const entries = (Array.isArray(parsed?.entries) ? parsed.entries : []).map((item) => item as { number?: unknown; title?: unknown; page?: unknown })
-    .filter((item) => typeof item.title === "string" && item.title.trim() && Number.isInteger(item.page))
-    .map((item) => ({ title: String(item.title).trim(), number: item.number ? String(item.number).trim() : "", page: Number(item.page) }));
+    .filter((item) => typeof item.title === "string" && item.title.trim())
+    .map((item) => ({ title: String(item.title).trim(), number: item.number ? String(item.number).trim() : "", page: Number.isInteger(item.page) ? Number(item.page) : null }));
   if (entries.length < 3) return [];
 
   const spans = pageSpans(text).filter((span) => span.start > toc.start + 200);
@@ -175,15 +178,17 @@ export async function chaptersFromContents(text: string): Promise<Chapter[]> {
   let shift: number | null = null;
   for (const entry of entries) {
     const label = entry.number && /^\d+$/.test(entry.number) ? `Chapter ${entry.number}` : "";
-    const near = shift === null ? [] : [0, 1, -1, 2, -2].map((step) => byNum.get(entry.page + (shift as number) + step));
-    const order: PageSpan[] = shift !== null ? near.filter((span): span is PageSpan => !!span) : spans;
+    // With a printed page number the chapter is looked for near it; without one, anywhere after the previous chapter.
+    const entryPage = entry.page;
+    const near = shift === null || entryPage === null ? [] : [0, 1, -1, 2, -2].map((step) => byNum.get(entryPage + (shift as number) + step));
+    const order: PageSpan[] = shift !== null && entryPage !== null ? near.filter((span): span is PageSpan => !!span) : spans;
     for (const span of order) {
       if (span.end <= last) continue;
       const located = locateOnPage(text, span, entry.title);
       if (!located || located.offset <= last) continue;
       out.push({ ...located, title: located.title.includes(" · ") ? located.title : label ? `${label} · ${entry.title}` : entry.title });
       last = located.offset;
-      if (shift === null) shift = span.num - entry.page;
+      if (shift === null && entryPage !== null) shift = span.num - entryPage;
       break;
     }
   }

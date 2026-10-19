@@ -3,6 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import { ArrowLeft, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ENRICH_VERSION } from "../lib/bookTitle";
 import type { WorkspaceDocument, WorkspaceLibraryItem } from "../lib/workspaceStore";
 import { AssistantSheet, type AssistantIntent } from "./AssistantSheet";
 import BookReader, { type OpenedBook } from "./BookReader";
@@ -160,7 +161,7 @@ function App() {
   // Books imported before titles, covers and contents were read get them once, quietly, one at a time.
   const enriching = useRef(new Set<string>());
   useEffect(() => {
-    const next = documents.find((item) => item.mimeType === "application/pdf" && !item.enrichedAt && !enriching.current.has(item.id));
+    const next = documents.find((item) => item.mimeType === "application/pdf" && (!item.enrichedAt || (item.enrichVersion ?? 1) < ENRICH_VERSION) && !enriching.current.has(item.id));
     if (!next || enriching.current.size >= 4) return;
     enriching.current.add(next.id);
     void (async () => {

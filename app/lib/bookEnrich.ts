@@ -1,3 +1,4 @@
+import { ENRICH_VERSION } from "./bookTitle";
 import { bookInfoWithAi, chaptersFromContents, chaptersFromPages, makeCover, readPdfInfo } from "./bookMeta";
 import { readDocument, readDocumentText, readOriginalFile, writeCover, writeDocument, type WorkspaceDocument } from "./workspaceStore";
 
@@ -41,6 +42,7 @@ export async function enrichDocument(id: string, parts: EnrichPart[] = ["info", 
     else { delete next.outline; delete next.outlineSource; }
   }
   next.enrichedAt = new Date().toISOString();
+  next.enrichVersion = ENRICH_VERSION;
   await writeDocument(next);
   return next;
 }

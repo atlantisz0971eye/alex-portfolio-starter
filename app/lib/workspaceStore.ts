@@ -22,6 +22,8 @@ export type WorkspaceDocument = {
   outline?: Chapter[];
   outlineSource?: "pdf" | "ai";
   enrichedAt?: string;
+  /** Which version of the title/cover/contents reading produced the above, so better readers can run again. */
+  enrichVersion?: number;
   guide?: string;
   guideCoverage?: "full" | "excerpts";
   messages?: { role: "user" | "assistant"; content: string }[];
