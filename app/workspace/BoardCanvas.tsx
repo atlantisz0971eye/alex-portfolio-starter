@@ -1,11 +1,11 @@
 "use client";
 
-import { Background, BackgroundVariant, ConnectionLineType, ConnectionMode, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, reconnectEdge, useEdgesState, useNodesState, useReactFlow, ViewportPortal, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
+import { Background, BackgroundVariant, ConnectionLineType, ConnectionMode, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, reconnectEdge, SelectionMode, useEdgesState, useNodesState, useReactFlow, ViewportPortal, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toPng, toSvg } from "html-to-image";
-import { BoxSelect, Download, FileText, Group as GroupIcon, Image as ImageIcon, Loader2, Magnet, Maximize, Redo2, ScanLine, ScanText, Shapes as ShapesIcon, Sparkles, StickyNote, Trash2, Undo2, Workflow } from "lucide-react";
+import { BoxSelect, Download, FileText, Group as GroupIcon, Image as ImageIcon, LayoutGrid, Loader2, Magnet, Maximize, Redo2, ScanLine, ScanText, Shapes as ShapesIcon, Sparkles, StickyNote, Trash2, Undo2, Workflow } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { alignBoxes, BLOCK_SIZE, DEFAULT_LINK, distributeBoxes, GRID, layoutGraph, SHAPES, snap as snapTo, TONES, type Align, type LinkData, type Shape } from "../lib/boardDiagram";
+import { alignBoxes, BLOCK_SIZE, DEFAULT_LINK, distributeBoxes, GRID, layoutGraph, portsFor, SHAPES, snap as snapTo, tidyGraph, TONES, type Align, type LinkData, type Shape } from "../lib/boardDiagram";
 import { layoutOrganized } from "../lib/boardLayout";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
@@ -114,6 +114,32 @@ const SHAPE_SIZE: Record<Shape, { width: number; height: number }> = {
 };
 const sizeOf = (node: Node) => ({ width: node.width ?? node.measured?.width ?? BLOCK_SIZE.width, height: node.height ?? node.measured?.height ?? BLOCK_SIZE.height });
 
+const absoluteIn = (list: Node[], node: Node) => {
+  let x = node.position.x;
+  let y = node.position.y;
+  for (let parent = node.parentId, hops = 0; parent && hops < 12; hops += 1) {
+    const holder = list.find((item) => item.id === parent);
+    if (!holder) break;
+    x += holder.position.x;
+    y += holder.position.y;
+    parent = holder.parentId;
+  }
+  return { x, y };
+};
+
+/** After items move, connectors between blocks leave from the sides that now face each other. */
+function retarget(list: Node[], links: Edge[], moved: Set<string>) {
+  const portable = (node?: Node) => node?.type === "block" || node?.type === "group";
+  return links.map((edge) => {
+    if (edge.type !== "link") return edge;
+    const from = list.find((node) => node.id === edge.source);
+    const to = list.find((node) => node.id === edge.target);
+    if (!portable(from) || !portable(to) || (!moved.has(edge.source) && !moved.has(edge.target))) return edge;
+    const ports = portsFor({ ...absoluteIn(list, from!), ...sizeOf(from!) }, { ...absoluteIn(list, to!), ...sizeOf(to!) });
+    return { ...edge, sourceHandle: ports.source, targetHandle: ports.target };
+  });
+}
+
 /** Containers must come before what they hold, or the editor cannot place the children. */
 function ordered<T extends Node>(list: T[]): T[] {
   const byId = new Map(list.map((node) => [node.id, node]));
@@ -143,6 +169,7 @@ function withDescendants(list: Node[], ids: Iterable<string>) {
 
 type History = { stack: string[]; index: number; at: number; restoring: boolean; last: string };
 const SNAP_KEY = "ws-board-snap";
+const MARQUEE_KEY = "ws-board-marquee";
 /**
  * The exporter copies computed styles, but not the CSS variables the shapes and connectors are painted with. Pins the
  * resolved colours onto every drawn SVG element for the duration of an export and returns the way back.
@@ -178,10 +205,17 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
   const [readId, setReadId] = useState<string | null>(null);
   // Phones get a text sheet instead of typing on the canvas, where the keyboard fights the zoomed viewport.
   const [touch, setTouch] = useState(false);
-  useEffect(() => { setTouch(window.matchMedia("(pointer: coarse)").matches); }, []);
+  const [marquee, setMarquee] = useState(false);
+  // With a mouse, dragging on empty canvas selects; with a finger it pans. Either can be switched from the toolbar.
+  useEffect(() => {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    setTouch(coarse);
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(MARQUEE_KEY); } catch { /* ignore */ }
+    setMarquee(saved ? saved === "on" : !coarse);
+  }, []);
   const [snap, setSnap] = useState(true);
   useEffect(() => { try { if (localStorage.getItem(SNAP_KEY) === "off") setSnap(false); } catch { /* ignore */ } }, []);
-  const [marquee, setMarquee] = useState(false);
   const [menu, setMenu] = useState<"shapes" | "layout" | "export" | null>(null);
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const [connecting, setConnecting] = useState(false);
@@ -528,9 +562,37 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
 
   const autoLayout = (direction: "LR" | "TB") => {
     setMenu(null);
-    const placed = layoutGraph(latest.current.nodes.map((node) => ({ id: node.id, parentId: node.parentId, ...sizeOf(node) })), latest.current.edges, direction);
-    setNodes((current) => current.map((node) => placed.has(node.id) ? { ...node, position: placed.get(node.id)! } : node));
+    const list = latest.current.nodes;
+    const placed = layoutGraph(list.map((node) => ({ id: node.id, parentId: node.parentId, ...sizeOf(node) })), latest.current.edges, direction);
+    const moved = list.map((node) => placed.has(node.id) ? { ...node, position: placed.get(node.id)! } : node);
+    setNodes(moved);
+    setEdges(retarget(moved, latest.current.edges, withDescendants(list, placed.keys())));
     window.setTimeout(() => void flow.fitView({ padding: 0.2, maxZoom: 1, duration: 400 }), 80);
+  };
+
+  /** One click: lines connected items up along their connections and packs the rest into neat rows. */
+  const tidy = () => {
+    setMenu(null);
+    const list = latest.current.nodes;
+    const picked = list.filter((node) => node.selected);
+    const parentId = picked.length > 1 ? picked[0].parentId : undefined;
+    const scope = picked.length > 1 ? picked.filter((node) => node.parentId === parentId) : list.filter((node) => !node.parentId);
+    if (scope.length < 2) return;
+    const placed = tidyGraph(
+      list.map((node) => ({ id: node.id, parentId: node.parentId, ...sizeOf(node) })),
+      scope.map((node) => ({ id: node.id, ...sizeOf(node), x: node.position.x, y: node.position.y })),
+      latest.current.edges, "LR",
+    );
+    let moved = list.map((node) => placed.has(node.id) ? { ...node, position: placed.get(node.id)! } : node);
+    if (parentId) {
+      // A container grows to hold what was tidied inside it.
+      const inside = moved.filter((node) => placed.has(node.id));
+      const need = { width: Math.max(...inside.map((node) => node.position.x + sizeOf(node).width)) + 40, height: Math.max(...inside.map((node) => node.position.y + sizeOf(node).height)) + 40 };
+      moved = moved.map((node) => node.id === parentId ? { ...node, width: Math.max(sizeOf(node).width, need.width), height: Math.max(sizeOf(node).height, need.height) } : node);
+    }
+    setNodes(moved);
+    setEdges(retarget(moved, latest.current.edges, withDescendants(list, placed.keys())));
+    if (!parentId && picked.length < 2) window.setTimeout(() => void flow.fitView({ padding: 0.15, maxZoom: 1, duration: 400 }), 80);
   };
 
   // ---- copy, paste, duplicate -----------------------------------------------------------------------------------
@@ -629,7 +691,7 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChangeWithGuides} onEdgesChange={onEdgesChange} onConnect={onConnect} onReconnect={onReconnect}
           onNodeDragStop={onNodeDragStop} onConnectStart={() => setConnecting(true)} onConnectEnd={() => setConnecting(false)}
           connectionMode={ConnectionMode.Loose} connectionLineType={ConnectionLineType.SmoothStep} snapToGrid={snap} snapGrid={[GRID, GRID]} elevateNodesOnSelect={false}
-          selectionOnDrag={marquee} panOnDrag={marquee ? [1, 2] : true} multiSelectionKeyCode={["Meta", "Control", "Shift"]}
+          selectionOnDrag={marquee} selectionMode={SelectionMode.Partial} panOnDrag={marquee ? [1, 2] : true} panOnScroll={marquee && !touch} multiSelectionKeyCode={["Meta", "Control", "Shift"]}
           colorMode={theme} minZoom={0.1} maxZoom={2.5} zoomOnDoubleClick={false} connectionRadius={32} deleteKeyCode={["Backspace", "Delete"]} proOptions={{ hideAttribution: true }}>
           <Background variant={BackgroundVariant.Dots} gap={snap ? GRID * 3 : 22} size={1.4} />
           <Controls showInteractive={false} position="bottom-left" />
@@ -644,8 +706,9 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
           <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!historyState.undo} onClick={undo}><Undo2 size={17} /></button>
           <button type="button" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!historyState.redo} onClick={redo}><Redo2 size={17} /></button>
           <i />
+          <button type="button" className="board__tidy" aria-label="Tidy up" title="Tidy up: line up connected items and pack the rest into rows (selected items only, if several are selected)" onClick={tidy}><LayoutGrid size={17} /> <span>Tidy</span></button>
           <button type="button" aria-label="Snap and guides" aria-pressed={snap} title="Snap to grid and alignment guides" className={snap ? "is-on" : ""} onClick={toggleSnap}><Magnet size={17} /></button>
-          <button type="button" aria-label="Select several by dragging" aria-pressed={marquee} title="Drag to select several (otherwise hold Shift)" className={marquee ? "is-on" : ""} onClick={() => setMarquee((value) => !value)}><BoxSelect size={17} /></button>
+          <button type="button" aria-label="Drag to select" aria-pressed={marquee} title={marquee ? "Dragging on empty canvas selects. Pan with Space + drag, right-drag or scroll. Click to switch to panning." : "Dragging pans. Click to make dragging select several items."} className={marquee ? "is-on" : ""} onClick={() => setMarquee((value) => { try { localStorage.setItem(MARQUEE_KEY, value ? "off" : "on"); } catch { /* ignore */ } return !value; })}><BoxSelect size={17} /></button>
           <button type="button" aria-label="Auto layout" title="Auto layout" aria-expanded={menu === "layout"} onClick={() => setMenu(menu === "layout" ? null : "layout")}><Workflow size={17} /></button>
           <button type="button" aria-label="Fit to screen" title="Fit to screen" onClick={() => void flow.fitView({ padding: 0.2, maxZoom: 1, duration: 300 })}><Maximize size={17} /></button>
           <button type="button" aria-label="Export picture" title="Export picture" aria-expanded={menu === "export"} onClick={() => setMenu(menu === "export" ? null : "export")}><Download size={17} /></button>
@@ -659,7 +722,7 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
           </div>}
         </div>
         {panelOpen && <BoardInspector key={selectionKey} nodes={selectedNodes} edges={selectedEdges} focusName={focusName} onNode={patch} onSize={resize} onEdge={patchEdge} onReverse={reverse}
-          onAlign={align} onDistribute={distribute} onMatch={match} onGroup={addGroup} onUngroup={ungroup} onDuplicate={duplicate} onDelete={removeSelected} onClose={() => setDismissed(selectionKey)} />}
+          onTidy={tidy} onAlign={align} onDistribute={distribute} onMatch={match} onGroup={addGroup} onUngroup={ungroup} onDuplicate={duplicate} onDelete={removeSelected} onClose={() => setDismissed(selectionKey)} />}
       </div>
       {menu === "shapes" && <div className="board__shapes" role="menu" aria-label="Shapes">
         {SHAPES.map((shape) => <button key={shape.id} type="button" role="menuitem" onClick={() => addBlock(shape.id)}><span className={`bglyph bglyph--${shape.id}`} aria-hidden="true" /><strong>{shape.label}</strong><small>{shape.hint}</small></button>)}

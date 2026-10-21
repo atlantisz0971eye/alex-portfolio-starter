@@ -1,7 +1,7 @@
 "use client";
 
 import type { Edge, Node } from "@xyflow/react";
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceBetween, AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceBetween, ArrowLeftRight, Copy, Group, Trash2, Ungroup, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceBetween, AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceBetween, ArrowLeftRight, Copy, Group, LayoutGrid, Trash2, Ungroup, X } from "lucide-react";
 import { colorOf, EDGE_COLORS, MARKERS, SHAPES, TONES, type Align, type LinkData, type Marker, type Route, type Shape, DEFAULT_LINK } from "../lib/boardDiagram";
 
 type Props = {
@@ -13,6 +13,7 @@ type Props = {
   onSize: (id: string, size: { width?: number; height?: number }) => void;
   onEdge: (id: string, patch: Partial<LinkData>) => void;
   onReverse: (id: string) => void;
+  onTidy: () => void;
   onAlign: (how: Align) => void;
   onDistribute: (axis: "x" | "y") => void;
   onMatch: (dimension: "width" | "height") => void;
@@ -52,7 +53,7 @@ const ROUTES: Choice<Route>[] = [{ id: "step", label: "Right angle" }, { id: "st
 const LINES: Choice<LinkData["line"]>[] = [{ id: "solid", label: "Solid" }, { id: "dashed", label: "Dashed" }, { id: "dotted", label: "Dotted" }];
 const WIDTHS: Choice<"1" | "2" | "3">[] = [{ id: "1", label: "Thin" }, { id: "2", label: "Medium" }, { id: "3", label: "Thick" }];
 
-export function BoardInspector({ nodes, edges, focusName, onNode, onSize, onEdge, onReverse, onAlign, onDistribute, onMatch, onGroup, onUngroup, onDuplicate, onDelete, onClose }: Props) {
+export function BoardInspector({ nodes, edges, focusName, onNode, onSize, onEdge, onReverse, onTidy, onAlign, onDistribute, onMatch, onGroup, onUngroup, onDuplicate, onDelete, onClose }: Props) {
   const header = (title: string) => <header className="binsp__head"><strong>{title}</strong><button type="button" aria-label="Close panel" onClick={onClose}><X size={16} /></button></header>;
 
   if (nodes.length === 0 && edges.length === 1) {
@@ -137,6 +138,7 @@ export function BoardInspector({ nodes, edges, focusName, onNode, onSize, onEdge
         <button type="button" title="Same height" onClick={() => onMatch("height")}>H =</button>
       </div>
       <div className="binsp__actions">
+        <button type="button" onClick={onTidy}><LayoutGrid size={15} /> Tidy</button>
         <button type="button" onClick={onGroup}><Group size={15} /> Group</button>
         <button type="button" onClick={onDuplicate}><Copy size={15} /> Duplicate</button>
         <button type="button" className="is-danger" onClick={onDelete}><Trash2 size={15} /> Delete</button>

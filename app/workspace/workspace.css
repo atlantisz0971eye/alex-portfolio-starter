@@ -1070,3 +1070,5 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 @media (max-width: 520px) { .board__tools { left: 6px; right: 6px; transform: none; justify-content: safe center; overflow-x: auto; scrollbar-width: none; } .board__tools::-webkit-scrollbar { display: none; } .board__tools button { flex: none; } }
 /* React Flow styles its own "group" node type; the container draws itself. */
 .board .react-flow__node.react-flow__node-group { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font-size: inherit; }
+.board__bar2 button.board__tidy { display: inline-flex; width: auto; gap: 6px; padding: 0 10px; font-size: 13px; font-weight: 600; }
+@media (max-width: 700px) { .board__bar2 button.board__tidy span { display: none; } .board__bar2 button.board__tidy { width: 34px; padding: 0; justify-content: center; } }

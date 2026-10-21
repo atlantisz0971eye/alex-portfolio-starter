@@ -132,3 +132,82 @@ export function distributeBoxes(boxes: (Box & { id: string })[], axis: "x" | "y"
 }
 
 export const snap = (value: number, grid = GRID) => Math.round(value / grid) * grid;
+
+type TidyNode = { id: string; width: number; height: number; parentId?: string; x: number; y: number };
+
+/**
+ * One-click tidy: connected items are laid out in layers along their connections, loose items are packed into a
+ * grid, and everything is snapped to the grid and placed in rows without overlapping. `scope` holds the items to
+ * arrange (all with the same parent); items nested inside a scope item travel with it. Returns new positions.
+ */
+export function tidyGraph(all: LayoutNode[], scope: TidyNode[], edges: LayoutEdge[], direction: "LR" | "TB" = "LR") {
+  const byId = new Map(all.map((node) => [node.id, node]));
+  const inScope = new Set(scope.map((node) => node.id));
+  const owner = (id: string): string | null => {
+    let current = byId.get(id);
+    for (let hops = 0; current && hops < 12; hops += 1) {
+      if (inScope.has(current.id)) return current.id;
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return null;
+  };
+  // Connected groups of items, found by following the connections between them.
+  const parent = new Map(scope.map((node) => [node.id, node.id]));
+  const find = (id: string): string => { let root = id; while (parent.get(root) !== root) root = parent.get(root)!; parent.set(id, root); return root; };
+  const links: LayoutEdge[] = [];
+  for (const edge of edges) {
+    const from = owner(edge.source);
+    const to = owner(edge.target);
+    if (!from || !to || from === to) continue;
+    links.push({ source: from, target: to });
+    parent.set(find(from), find(to));
+  }
+  const buckets = new Map<string, TidyNode[]>();
+  for (const node of scope) buckets.set(find(node.id), [...(buckets.get(find(node.id)) ?? []), node]);
+
+  type Piece = { ids: string[]; width: number; height: number; at: Map<string, { x: number; y: number }>; loose: boolean; order: number };
+  const pieces: Piece[] = [];
+  for (const members of buckets.values()) {
+    if (members.length === 1) {
+      const only = members[0];
+      pieces.push({ ids: [only.id], width: only.width, height: only.height, at: new Map([[only.id, { x: 0, y: 0 }]]), loose: true, order: only.y });
+      continue;
+    }
+    const ids = new Set(members.map((node) => node.id));
+    const placed = layoutGraph(members.map((node) => ({ id: node.id, width: node.width, height: node.height })), links.filter((edge) => ids.has(edge.source) && ids.has(edge.target)), direction);
+    const left = Math.min(...members.map((node) => placed.get(node.id)?.x ?? 0));
+    const top = Math.min(...members.map((node) => placed.get(node.id)?.y ?? 0));
+    const at = new Map(members.map((node) => [node.id, { x: (placed.get(node.id)?.x ?? 0) - left, y: (placed.get(node.id)?.y ?? 0) - top }]));
+    pieces.push({
+      ids: members.map((node) => node.id), at, loose: false, order: Math.min(...members.map((node) => node.y)),
+      width: Math.max(...members.map((node) => (at.get(node.id)!.x) + node.width)), height: Math.max(...members.map((node) => (at.get(node.id)!.y) + node.height)),
+    });
+  }
+  // Connected pieces first (biggest first), then loose items in their rough reading order.
+  const connected = pieces.filter((piece) => !piece.loose).sort((a, b) => b.width * b.height - a.width * a.height);
+  const loose = pieces.filter((piece) => piece.loose).sort((a, b) => Math.round(a.order / 240) - Math.round(b.order / 240) || (scope.find((n) => n.id === a.ids[0])!.x - scope.find((n) => n.id === b.ids[0])!.x));
+  const ordered = [...connected, ...loose];
+  const area = ordered.reduce((sum, piece) => sum + (piece.width + 48) * (piece.height + 48), 0);
+  const rowWidth = Math.max(Math.max(...ordered.map((piece) => piece.width)), Math.min(2400, Math.max(900, Math.sqrt(area) * 1.5)));
+
+  const originX = Math.min(...scope.map((node) => node.x));
+  const originY = Math.min(...scope.map((node) => node.y));
+  const out = new Map<string, { x: number; y: number }>();
+  const gap = 48;
+  let cursorX = 0;
+  let cursorY = 0;
+  let rowHeight = 0;
+  let sawLoose = false;
+  for (const piece of ordered) {
+    // Loose items start on a fresh row, apart from the connected diagrams above them.
+    if (piece.loose && !sawLoose) { sawLoose = true; if (cursorX > 0) { cursorY += rowHeight + gap; cursorX = 0; rowHeight = 0; } }
+    if (cursorX > 0 && cursorX + piece.width > rowWidth) { cursorY += rowHeight + gap; cursorX = 0; rowHeight = 0; }
+    for (const id of piece.ids) {
+      const at = piece.at.get(id)!;
+      out.set(id, { x: snap(originX + cursorX + at.x), y: snap(originY + cursorY + at.y) });
+    }
+    cursorX += piece.width + gap;
+    rowHeight = Math.max(rowHeight, piece.height);
+  }
+  return out;
+}
