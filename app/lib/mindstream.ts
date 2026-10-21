@@ -1,13 +1,18 @@
 import { quickDeepSeek } from "./workspaceDeepSeek";
 
-type CardNode = { id?: unknown; type?: unknown; data?: { text?: unknown } };
+type CardNode = { id?: unknown; type?: unknown; data?: { text?: unknown; kicker?: unknown; body?: unknown } };
 type CardEdge = { source?: unknown; target?: unknown };
 
 /** Turns a board into an indented outline: connected cards nest under their parent, the rest are listed as loose cards. */
 export function outlineOfBoard(nodes: unknown[], edges: unknown[]) {
   const cards = new Map<string, string>();
   for (const node of nodes as CardNode[]) {
-    if (node.type === "text" && typeof node.id === "string" && typeof node.data?.text === "string" && node.data.text.trim()) cards.set(node.id, node.data.text.trim());
+    if ((node.type === "text" || node.type === "block") && typeof node.id === "string" && typeof node.data?.text === "string" && node.data.text.trim()) {
+      // A diagram block reads as its stereotype, name and details.
+      const kicker = typeof node.data.kicker === "string" && node.data.kicker.trim() ? `«${node.data.kicker.trim()}» ` : "";
+      const body = typeof node.data.body === "string" && node.data.body.trim() ? ` — ${node.data.body.trim().replace(/\s*\n\s*/g, "; ")}` : "";
+      cards.set(node.id, `${kicker}${node.data.text.trim()}${body}`);
+    }
   }
   const children = new Map<string, string[]>();
   const hasParent = new Set<string>();

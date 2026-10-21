@@ -1,24 +1,26 @@
 "use client";
 
-import { addEdge, Background, BackgroundVariant, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, useEdgesState, useNodesState, useReactFlow, type Connection, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { Background, BackgroundVariant, ConnectionLineType, ConnectionMode, Controls, Handle, MiniMap, NodeResizer, Position, ReactFlow, ReactFlowProvider, reconnectEdge, useEdgesState, useNodesState, useReactFlow, ViewportPortal, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { FileText, Image as ImageIcon, Loader2, ScanLine, ScanText, Sparkles, StickyNote, Trash2 } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { toPng, toSvg } from "html-to-image";
+import { BoxSelect, Download, FileText, Group as GroupIcon, Image as ImageIcon, Loader2, Magnet, Maximize, Redo2, ScanLine, ScanText, Shapes as ShapesIcon, Sparkles, StickyNote, Trash2, Undo2, Workflow } from "lucide-react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { alignBoxes, BLOCK_SIZE, DEFAULT_LINK, distributeBoxes, GRID, layoutGraph, SHAPES, snap as snapTo, TONES, type Align, type LinkData, type Shape } from "../lib/boardDiagram";
 import { layoutOrganized } from "../lib/boardLayout";
 import type { BoardMeta } from "../lib/boardStore";
 import { parseResponse } from "./api";
+import { BoardInspector } from "./BoardInspector";
+import { BoardContext, type TextData } from "./boardContext";
+import { BlockNode, GroupNode, LinkEdge, type BlockNodeType, type GroupNodeType } from "./boardNodes";
 import { Sheet } from "./Sheet";
 import { MINDSTREAM_CHANGED, registerFlush, type ChangedDetail } from "./mindstreamBus";
 import { ThemeContext } from "./Shell";
 
-type TextData = { text: string; tone: string };
 type ImageData = { name: string; ratio: number };
-type BoardNode = Node<TextData, "text"> | Node<ImageData, "image">;
+type BoardNode = Node<TextData, "text"> | Node<ImageData, "image"> | BlockNodeType | GroupNodeType;
 type Organized = { title: string; items: { text: string; parent: number | null }[] };
 type Doc = { id: string; name: string; mimeType: string; pageCount: number | null };
 
-const TONES = ["paper", "sun", "sky", "leaf", "rose"];
-const BoardContext = createContext<{ boardId: string; touch: boolean; update: (id: string, data: Partial<TextData>) => void; edit: (id: string) => void; read: (id: string) => void }>({ boardId: "", touch: false, update: () => undefined, edit: () => undefined, read: () => undefined });
 const headers = { "Content-Type": "application/json" };
 const endpoint = (id: string) => `/api/workspace/boards/${id}`;
 
@@ -46,7 +48,8 @@ function ImageCard({ id, data, selected }: NodeProps<Node<ImageData, "image">>) 
   </div>;
 }
 
-const nodeTypes = { text: TextCard, image: ImageCard };
+const nodeTypes = { text: TextCard, image: ImageCard, block: BlockNode, group: GroupNode };
+const edgeTypes = { link: LinkEdge };
 
 /** Shrinks a photo so it stays well under the request size limit, keeping handwriting legible. */
 /**
@@ -102,8 +105,62 @@ export async function shrink(file: File, clean = false) {
   return { blob, width, height };
 }
 
-const persist = (nodes: BoardNode[]) => nodes.map(({ id, type, position, data, width, height, style }) => ({ id, type, position, data, width, height, style }));
-const persistEdges = (edges: Edge[]) => edges.map(({ id, source, target }) => ({ id, source, target }));
+const persist = (nodes: BoardNode[]) => nodes.map(({ id, type, position, data, width, height, style, parentId, extent, zIndex }) => ({ id, type, position, data, width, height, style, parentId, extent, zIndex }));
+const persistEdges = (edges: Edge[]) => edges.map(({ id, source, target, sourceHandle, targetHandle, type, data }) => ({ id, source, target, sourceHandle, targetHandle, type, data }));
+
+const SHAPE_SIZE: Record<Shape, { width: number; height: number }> = {
+  rect: { width: 184, height: 88 }, round: { width: 176, height: 72 }, diamond: { width: 152, height: 104 }, cylinder: { width: 144, height: 96 },
+  ellipse: { width: 152, height: 72 }, hex: { width: 176, height: 88 }, slant: { width: 176, height: 72 },
+};
+const sizeOf = (node: Node) => ({ width: node.width ?? node.measured?.width ?? BLOCK_SIZE.width, height: node.height ?? node.measured?.height ?? BLOCK_SIZE.height });
+
+/** Containers must come before what they hold, or the editor cannot place the children. */
+function ordered<T extends Node>(list: T[]): T[] {
+  const byId = new Map(list.map((node) => [node.id, node]));
+  const out: T[] = [];
+  const seen = new Set<string>();
+  const visit = (node: T) => {
+    if (seen.has(node.id)) return;
+    seen.add(node.id);
+    const parent = node.parentId ? byId.get(node.parentId) : undefined;
+    if (parent) visit(parent);
+    out.push(node);
+  };
+  list.forEach(visit);
+  return out;
+}
+
+/** The ids and everything nested inside them. */
+function withDescendants(list: Node[], ids: Iterable<string>) {
+  const all = new Set(ids);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const node of list) if (node.parentId && all.has(node.parentId) && !all.has(node.id)) { all.add(node.id); grew = true; }
+  }
+  return all;
+}
+
+type History = { stack: string[]; index: number; at: number; restoring: boolean; last: string };
+const SNAP_KEY = "ws-board-snap";
+/**
+ * The exporter copies computed styles, but not the CSS variables the shapes and connectors are painted with. Pins the
+ * resolved colours onto every drawn SVG element for the duration of an export and returns the way back.
+ */
+function freezePaint(root: Element) {
+  const saved: [Element, string | null][] = [];
+  root.querySelectorAll("path, rect, ellipse, polygon, circle, line, polyline").forEach((el) => {
+    const computed = getComputedStyle(el);
+    saved.push([el, el.getAttribute("style")]);
+    const style = (el as SVGElement).style;
+    style.fill = computed.fill;
+    style.stroke = computed.stroke;
+    style.strokeWidth = computed.strokeWidth;
+    style.strokeDasharray = computed.strokeDasharray;
+  });
+  return () => saved.forEach(([el, css]) => { if (css === null) el.removeAttribute("style"); else el.setAttribute("style", css); });
+}
+const download = (url: string, name: string) => { const link = document.createElement("a"); link.download = name; link.href = url; link.click(); };
 
 type CanvasProps = { boardId: string; title: string; onTitle: (title: string) => void; onSaveState: (state: "saved" | "saving" | "error") => void; onBack: () => void; onError: (message: string) => void; onChanged: () => void };
 
@@ -122,6 +179,15 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
   // Phones get a text sheet instead of typing on the canvas, where the keyboard fights the zoomed viewport.
   const [touch, setTouch] = useState(false);
   useEffect(() => { setTouch(window.matchMedia("(pointer: coarse)").matches); }, []);
+  const [snap, setSnap] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem(SNAP_KEY) === "off") setSnap(false); } catch { /* ignore */ } }, []);
+  const [marquee, setMarquee] = useState(false);
+  const [menu, setMenu] = useState<"shapes" | "layout" | "export" | null>(null);
+  const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
+  const [connecting, setConnecting] = useState(false);
+  const [dismissed, setDismissed] = useState("");
+  const [focusName, setFocusName] = useState(false);
+  const [historyState, setHistoryState] = useState({ undo: false, redo: false });
   const loaded = useRef(false);
   const timer = useRef<number | undefined>(undefined);
   const latest = useRef({ nodes, edges, title });
@@ -130,8 +196,13 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
   const lastSaved = useRef<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const scan = useRef<HTMLInputElement>(null);
+  const history = useRef<History>({ stack: [], index: -1, at: 0, restoring: false, last: "" });
+  const clipboard = useRef<{ nodes: BoardNode[]; edges: Edge[]; pasted: number } | null>(null);
   latest.current = { nodes, edges, title };
   callbacks.current = { onError, onChanged };
+
+  const flagHistory = () => setHistoryState({ undo: history.current.index > 0, redo: history.current.index < history.current.stack.length - 1 });
+  const snapshot = (list: BoardNode[], links: Edge[]) => JSON.stringify([persist(list), persistEdges(links)]);
 
   /** Loads the board from the server. A reload (after the assistant changed it) keeps the current view. */
   const load = useCallback(async (first: boolean) => {
@@ -139,8 +210,11 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
       const data = await parseResponse<{ board: BoardMeta; content: { nodes: BoardNode[]; edges: Edge[] } }>(await fetch(endpoint(boardId), { cache: "no-store" }));
       setMeta(data.board);
       onTitle(data.board.title);
-      setNodes(data.content.nodes);
+      const loadedNodes = ordered(data.content.nodes);
+      setNodes(loadedNodes);
       setEdges(data.content.edges);
+      history.current = { stack: [snapshot(loadedNodes, data.content.edges)], index: 0, at: 0, restoring: false, last: snapshot(loadedNodes, data.content.edges) };
+      flagHistory();
       dirty.current = false;
       lastSaved.current = null;
       if (first) window.setTimeout(() => { loaded.current = true; void flow.fitView({ padding: 0.3, maxZoom: 1 }); }, 50);
@@ -176,7 +250,8 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
   }, [boardId]);
 
   // Autosave after a pause. Selection and measuring also change the node list, so only meaningful edits count.
-  const signature = useMemo(() => JSON.stringify([persist(nodes), persistEdges(edges), title]), [nodes, edges, title]);
+  const graphSignature = useMemo(() => snapshot(nodes, edges), [nodes, edges]); // eslint-disable-line react-hooks/exhaustive-deps
+  const signature = useMemo(() => `${graphSignature}${JSON.stringify(title)}`, [graphSignature, title]);
   useEffect(() => {
     if (!loaded.current) return;
     if (lastSaved.current === null) { lastSaved.current = signature; return; }
@@ -191,18 +266,99 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
   useEffect(() => registerFlush(async () => { window.clearTimeout(timer.current); await save(); }), [save]);
   useEffect(() => { onSaveState(saveState); }, [saveState]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Undo history: every change settles into a snapshot; a burst of edits (typing, dragging) counts as one step.
+  useEffect(() => {
+    const h = history.current;
+    if (!loaded.current || !h.stack.length || graphSignature === h.last) return;
+    h.last = graphSignature;
+    if (h.restoring) { h.restoring = false; return; }
+    const now = Date.now();
+    h.stack = h.stack.slice(0, h.index + 1);
+    if (now - h.at < 700 && h.index > 0) h.stack[h.index] = graphSignature;
+    else { h.stack.push(graphSignature); h.index = h.stack.length - 1; }
+    if (h.stack.length > 120) { h.stack.shift(); h.index -= 1; }
+    h.at = now;
+    flagHistory();
+  }, [graphSignature]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const goTo = (index: number) => {
+    const h = history.current;
+    if (index < 0 || index >= h.stack.length) return;
+    const [savedNodes, savedEdges] = JSON.parse(h.stack[index]) as [BoardNode[], Edge[]];
+    h.index = index;
+    h.at = 0;
+    h.restoring = h.stack[index] !== h.last;
+    setNodes(ordered(savedNodes));
+    setEdges(savedEdges);
+    flagHistory();
+  };
+  const undo = () => goTo(history.current.index - 1);
+  const redo = () => goTo(history.current.index + 1);
+
   const center = () => {
     const box = document.querySelector(".board__canvas")?.getBoundingClientRect();
     return flow.screenToFlowPosition({ x: (box?.left ?? 0) + (box?.width ?? 600) / 2, y: (box?.top ?? 0) + (box?.height ?? 400) / 2 });
   };
   const spread = (index: number) => ({ x: (index % 4) * 24, y: (index % 4) * 24 });
   const deselect = (list: BoardNode[]) => list.map((node) => ({ ...node, selected: false }));
+  const absOf = (id: string) => flow.getInternalNode(id)?.internals.positionAbsolute ?? { x: 0, y: 0 };
+  const selectedNodes = nodes.filter((node) => node.selected);
+  const selectedEdges = edges.filter((edge) => edge.selected);
+  const selectionKey = [...selectedNodes.map((node) => node.id), ...selectedEdges.map((edge) => edge.id)].join(",");
 
   const addText = () => {
     const at = center();
     const id = crypto.randomUUID();
     setNodes((current) => [...deselect(current), { id, type: "text", position: { x: at.x - 110 + spread(current.length).x, y: at.y - 60 + spread(current.length).y }, width: 220, height: 130, data: { text: "", tone: "paper" }, selected: true }]);
     if (touch) setEditId(id);
+    setMenu(null);
+  };
+
+  const addBlock = (shape: Shape) => {
+    const at = center();
+    const size = SHAPE_SIZE[shape];
+    const id = crypto.randomUUID();
+    setNodes((current) => [...deselect(current), { id, type: "block", position: { x: snapTo(at.x - size.width / 2 + spread(current.length).x), y: snapTo(at.y - size.height / 2 + spread(current.length).y) }, ...size, data: { text: "", kicker: "", body: "", shape, tone: "paper" }, selected: true } as BoardNode]);
+    setFocusName(true);
+    setMenu(null);
+  };
+
+  /** Wraps the selected items in a subsystem container; with nothing selected, adds an empty one. */
+  const addGroup = () => {
+    const picked = latest.current.nodes.filter((node) => node.selected);
+    const parentId = picked[0]?.parentId;
+    const wrapped = picked.filter((node) => node.parentId === parentId);
+    const id = crypto.randomUUID();
+    const parentAbs = parentId ? absOf(parentId) : { x: 0, y: 0 };
+    if (!wrapped.length) {
+      const at = center();
+      setNodes((current) => ordered([...deselect(current), { id, type: "group", position: { x: snapTo(at.x - 200), y: snapTo(at.y - 130) }, width: 400, height: 260, zIndex: -1, data: { text: "", tone: "paper", dashed: true }, selected: true } as BoardNode]));
+      setFocusName(true);
+      setMenu(null);
+      return;
+    }
+    const boxes = wrapped.map((node) => ({ ...absOf(node.id), ...sizeOf(node) }));
+    const left = Math.min(...boxes.map((box) => box.x)) - 40;
+    const top = Math.min(...boxes.map((box) => box.y)) - 56;
+    const right = Math.max(...boxes.map((box) => box.x + box.width)) + 40;
+    const bottom = Math.max(...boxes.map((box) => box.y + box.height)) + 40;
+    const ids = new Set(wrapped.map((node) => node.id));
+    setNodes((current) => ordered([
+      ...current.map((node) => ids.has(node.id) ? { ...node, parentId: id, selected: false, position: { x: absOf(node.id).x - left, y: absOf(node.id).y - top } } : { ...node, selected: false }),
+      { id, type: "group", position: { x: snapTo(left) - parentAbs.x, y: snapTo(top) - parentAbs.y }, width: snapTo(right - left), height: snapTo(bottom - top), zIndex: -1, ...(parentId ? { parentId } : {}), data: { text: "", tone: "paper", dashed: true }, selected: true } as BoardNode,
+    ]));
+    setFocusName(true);
+  };
+
+  const ungroup = (id: string) => {
+    setNodes((current) => {
+      const group = current.find((node) => node.id === id);
+      if (!group) return current;
+      return ordered(current.filter((node) => node.id !== id).map((node) => node.parentId === id
+        ? { ...node, parentId: group.parentId, position: { x: node.position.x + group.position.x, y: node.position.y + group.position.y }, selected: true }
+        : { ...node, selected: false }));
+    });
+    setEdges((current) => current.filter((edge) => edge.source !== id && edge.target !== id));
   };
 
   const addImages = (items: { name: string; width: number; height: number }[]) => {
@@ -242,28 +398,281 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
   };
 
   const update = useCallback((id: string, data: Partial<TextData>) => setNodes((current) => current.map((node) => node.id === id && node.type === "text" ? { ...node, data: { ...node.data, ...data } } : node)), [setNodes]);
-  const onConnect = useCallback((connection: Connection) => setEdges((current) => addEdge(connection, current)), [setEdges]);
-  const selectedCount = nodes.filter((node) => node.selected).length + edges.filter((edge) => edge.selected).length;
+  const patch = useCallback((id: string, data: Record<string, unknown>) => setNodes((current) => current.map((node) => node.id === id ? { ...node, data: { ...node.data, ...data } } as BoardNode : node)), [setNodes]);
+  const patchEdge = (id: string, data: Partial<LinkData>) => setEdges((current) => current.map((edge) => edge.id === id ? { ...edge, data: { ...DEFAULT_LINK, ...(edge.data as Partial<LinkData> | undefined), ...data } } : edge));
+  const resize = (id: string, size: { width?: number; height?: number }) => setNodes((current) => current.map((node) => node.id === id ? { ...node, ...size } : node));
+  const reverse = (id: string) => setEdges((current) => current.map((edge) => edge.id === id ? { ...edge, source: edge.target, target: edge.source, sourceHandle: edge.targetHandle, targetHandle: edge.sourceHandle } : edge));
+
+  const onConnect = useCallback((connection: Connection) => setEdges((current) => [
+    ...current.map((edge) => ({ ...edge, selected: false })),
+    { id: crypto.randomUUID(), source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle, targetHandle: connection.targetHandle, type: "link", data: { ...DEFAULT_LINK }, selected: true },
+  ]), [setEdges]);
+  const onReconnect = useCallback((previous: Edge, connection: Connection) => setEdges((current) => reconnectEdge(previous, connection, current, { shouldReplaceId: false })), [setEdges]);
+
   const removeSelected = () => {
-    setNodes((current) => current.filter((node) => !node.selected));
-    setEdges((current) => current.filter((edge) => !edge.selected && !nodes.some((node) => node.selected && (node.id === edge.source || node.id === edge.target))));
+    const gone = withDescendants(latest.current.nodes, latest.current.nodes.filter((node) => node.selected).map((node) => node.id));
+    setNodes((current) => current.filter((node) => !gone.has(node.id)));
+    setEdges((current) => current.filter((edge) => !edge.selected && !gone.has(edge.source) && !gone.has(edge.target)));
   };
 
-  return <BoardContext.Provider value={{ boardId, touch, update, edit: setEditId, read: setReadId }}>
-    <div className="board" onFocus={(event) => setEditing(event.target instanceof HTMLTextAreaElement)} onBlur={() => setEditing(false)}>
+  // ---- precision: alignment guides, snapping and dragging into containers -------------------------------------
+  const onNodesChangeWithGuides = (changes: NodeChange<BoardNode>[]) => {
+    const moving = changes.filter((change) => change.type === "position" && change.dragging && change.position);
+    if (moving.length === 1 && snap) {
+      const change = moving[0] as Extract<NodeChange<BoardNode>, { type: "position" }>;
+      const node = latest.current.nodes.find((item) => item.id === change.id);
+      if (node && change.position) {
+        const offset = node.parentId ? absOf(node.parentId) : { x: 0, y: 0 };
+        const { width, height } = sizeOf(node);
+        let x = change.position.x + offset.x;
+        let y = change.position.y + offset.y;
+        const skip = withDescendants(latest.current.nodes, [node.id]);
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (const other of latest.current.nodes) {
+          if (skip.has(other.id) || other.type === "group") continue;
+          const at = absOf(other.id);
+          const box = sizeOf(other);
+          xs.push(at.x, at.x + box.width / 2, at.x + box.width);
+          ys.push(at.y, at.y + box.height / 2, at.y + box.height);
+        }
+        const reach = 6 / Math.max(0.2, flow.getViewport().zoom);
+        const guide = { x: [] as number[], y: [] as number[] };
+        const fit = (value: number, size: number, targets: number[], line: number[]) => {
+          let best: { move: number; at: number } | null = null;
+          for (const own of [0, size / 2, size]) for (const target of targets) {
+            const move = target - (value + own);
+            if (Math.abs(move) <= reach && (!best || Math.abs(move) < Math.abs(best.move))) best = { move, at: target };
+          }
+          if (best) { line.push(best.at); return value + best.move; }
+          return value;
+        };
+        x = fit(x, width, xs, guide.x);
+        y = fit(y, height, ys, guide.y);
+        change.position = { x: x - offset.x, y: y - offset.y };
+        setGuides((current) => current.x.join() === guide.x.join() && current.y.join() === guide.y.join() ? current : guide);
+      }
+    } else if (guides.x.length || guides.y.length) {
+      setGuides({ x: [], y: [] });
+    }
+    onNodesChange(changes);
+  };
+
+  /** After a drag, a block lands in the smallest container it sits in, or leaves one it no longer sits in. */
+  const onNodeDragStop = (_event: unknown, _node: unknown, dragged: BoardNode[]) => {
+    setGuides({ x: [], y: [] });
+    setNodes((current) => {
+      const moved = new Set(dragged.map((node) => node.id));
+      let next = current;
+      for (const item of dragged) {
+        const node = next.find((candidate) => candidate.id === item.id);
+        if (!node || (node.parentId && moved.has(node.parentId))) continue;
+        const at = absOf(node.id);
+        const box = sizeOf(node);
+        const middle = { x: at.x + box.width / 2, y: at.y + box.height / 2 };
+        const inside = withDescendants(next, [node.id]);
+        let best: BoardNode | null = null;
+        let bestArea = Infinity;
+        for (const group of next) {
+          if (group.type !== "group" || inside.has(group.id)) continue;
+          const gAt = absOf(group.id);
+          const gBox = sizeOf(group);
+          if (middle.x >= gAt.x && middle.x <= gAt.x + gBox.width && middle.y >= gAt.y && middle.y <= gAt.y + gBox.height && gBox.width * gBox.height < bestArea) { best = group; bestArea = gBox.width * gBox.height; }
+        }
+        if ((best?.id ?? undefined) === node.parentId) continue;
+        const base = best ? absOf(best.id) : { x: 0, y: 0 };
+        next = next.map((candidate) => candidate.id === node.id ? { ...candidate, parentId: best?.id, position: { x: at.x - base.x, y: at.y - base.y } } as BoardNode : candidate);
+      }
+      return next === current ? current : ordered(next);
+    });
+  };
+
+  // ---- arranging ----------------------------------------------------------------------------------------------
+  /** Selected items that are not already moving with a selected container. */
+  const topSelected = () => {
+    const list = latest.current.nodes;
+    const ids = new Set(list.filter((node) => node.selected).map((node) => node.id));
+    const hasSelectedAncestor = (node: BoardNode) => {
+      for (let parent = node.parentId, hops = 0; parent && hops < 12; hops += 1) {
+        if (ids.has(parent)) return true;
+        parent = list.find((item) => item.id === parent)?.parentId;
+      }
+      return false;
+    };
+    return list.filter((node) => ids.has(node.id) && !hasSelectedAncestor(node));
+  };
+  const moveAbsolute = (positions: Map<string, { x?: number; y?: number }>) => setNodes((current) => current.map((node) => {
+    const to = positions.get(node.id);
+    if (!to) return node;
+    const base = node.parentId ? absOf(node.parentId) : { x: 0, y: 0 };
+    const at = absOf(node.id);
+    return { ...node, position: { x: (to.x ?? at.x) - base.x, y: (to.y ?? at.y) - base.y } };
+  }));
+  const boxesOf = () => topSelected().map((node) => ({ id: node.id, ...absOf(node.id), ...sizeOf(node) }));
+  const align = (how: Align) => { const boxes = boxesOf(); if (boxes.length > 1) moveAbsolute(alignBoxes(boxes, how)); };
+  const distribute = (axis: "x" | "y") => { const boxes = boxesOf(); if (boxes.length > 2) moveAbsolute(new Map([...distributeBoxes(boxes, axis)].map(([id, value]) => [id, { [axis]: value }]))); };
+  const match = (dimension: "width" | "height") => {
+    const picked = topSelected();
+    const first = picked[0];
+    if (!first) return;
+    const value = sizeOf(first)[dimension];
+    const ids = new Set(picked.map((node) => node.id));
+    setNodes((current) => current.map((node) => ids.has(node.id) ? { ...node, [dimension]: value } : node));
+  };
+
+  const nudge = (dx: number, dy: number) => {
+    const ids = new Set(topSelected().map((node) => node.id));
+    if (!ids.size) return;
+    setNodes((current) => current.map((node) => ids.has(node.id) ? { ...node, position: { x: node.position.x + dx, y: node.position.y + dy } } : node));
+  };
+
+  const autoLayout = (direction: "LR" | "TB") => {
+    setMenu(null);
+    const placed = layoutGraph(latest.current.nodes.map((node) => ({ id: node.id, parentId: node.parentId, ...sizeOf(node) })), latest.current.edges, direction);
+    setNodes((current) => current.map((node) => placed.has(node.id) ? { ...node, position: placed.get(node.id)! } : node));
+    window.setTimeout(() => void flow.fitView({ padding: 0.2, maxZoom: 1, duration: 400 }), 80);
+  };
+
+  // ---- copy, paste, duplicate -----------------------------------------------------------------------------------
+  const cloneOf = (source: BoardNode[], links: Edge[], offset: number) => {
+    const ids = withDescendants(source, source.filter((node) => node.selected).map((node) => node.id));
+    const picked = source.filter((node) => ids.has(node.id));
+    const map = new Map(picked.map((node) => [node.id, crypto.randomUUID()]));
+    const copies = picked.map((node) => {
+      const inside = !!node.parentId && map.has(node.parentId);
+      return { ...node, id: map.get(node.id)!, selected: true, parentId: inside ? map.get(node.parentId!) : node.parentId, position: inside ? node.position : { x: node.position.x + offset, y: node.position.y + offset } } as BoardNode;
+    });
+    const edgeCopies = links.filter((edge) => map.has(edge.source) && map.has(edge.target)).map((edge) => ({ ...edge, id: crypto.randomUUID(), source: map.get(edge.source)!, target: map.get(edge.target)!, selected: false }));
+    return { copies, edgeCopies };
+  };
+  const duplicate = () => {
+    const { copies, edgeCopies } = cloneOf(latest.current.nodes, latest.current.edges, 24);
+    if (!copies.length) return;
+    setNodes((current) => ordered([...deselect(current), ...copies]));
+    setEdges((current) => [...current, ...edgeCopies]);
+  };
+  const copy = () => {
+    const picked = latest.current.nodes.filter((node) => node.selected);
+    if (picked.length) clipboard.current = { nodes: latest.current.nodes, edges: latest.current.edges, pasted: 0 };
+  };
+  const paste = () => {
+    const held = clipboard.current;
+    if (!held) return;
+    held.pasted += 1;
+    const { copies, edgeCopies } = cloneOf(held.nodes, held.edges, 24 * held.pasted);
+    setNodes((current) => ordered([...deselect(current), ...copies]));
+    setEdges((current) => [...current, ...edgeCopies]);
+  };
+
+  // ---- picture of the diagram -----------------------------------------------------------------------------------
+  const exportImage = async (kind: "png" | "svg") => {
+    setMenu(null);
+    const bounds = flow.getNodesBounds(latest.current.nodes);
+    const element = document.querySelector<HTMLElement>(".board__canvas .react-flow__viewport");
+    if (!element || !latest.current.nodes.length) return onError("There is nothing to export yet.");
+    const pad = 48;
+    const width = Math.min(4000, Math.ceil(bounds.width + pad * 2));
+    const height = Math.min(4000, Math.ceil(bounds.height + pad * 2));
+    const options = {
+      width, height, pixelRatio: kind === "png" ? 2 : 1,
+      backgroundColor: getComputedStyle(document.querySelector(".board") ?? document.body).getPropertyValue("--bg").trim() || "#ffffff",
+      style: { width: `${width}px`, height: `${height}px`, transform: `translate(${pad - bounds.x}px, ${pad - bounds.y}px) scale(1)` },
+      filter: (node: HTMLElement) => !node.classList?.contains("board__guide"),
+    };
+    const thaw = freezePaint(element);
+    try {
+      const make = kind === "png" ? toPng : toSvg;
+      // Web fonts live in cross-origin stylesheets that cannot be read back, so embedding them only stalls the export.
+      const url = await make(element, { ...options, skipFonts: true });
+      download(url, `${(latest.current.title || "diagram").replace(/[^\w一-龥-]+/g, "-").slice(0, 60)}.${kind}`);
+    } catch {
+      onError("Could not make the picture. Try again.");
+    } finally {
+      thaw();
+    }
+  };
+
+  // ---- keyboard ---------------------------------------------------------------------------------------------------
+  const keys = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  keys.current = (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target?.closest("input, textarea, select, [contenteditable='true']") || editId !== null || readId !== null || pdfOpen) return;
+    const mod = event.metaKey || event.ctrlKey;
+    const key = event.key.toLowerCase();
+    if (mod && key === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
+    else if (mod && key === "y") { event.preventDefault(); redo(); }
+    else if (mod && key === "d") { event.preventDefault(); duplicate(); }
+    else if (mod && key === "c") copy();
+    else if (mod && key === "v") { if (clipboard.current) { event.preventDefault(); paste(); } }
+    else if (mod && key === "a") { event.preventDefault(); setNodes((current) => current.map((node) => ({ ...node, selected: true }))); }
+    else if (mod && key === "g") { event.preventDefault(); if (event.shiftKey) { const group = latest.current.nodes.find((node) => node.selected && node.type === "group"); if (group) ungroup(group.id); } else addGroup(); }
+    else if (key.startsWith("arrow") && !mod && latest.current.nodes.some((node) => node.selected)) {
+      event.preventDefault();
+      const step = event.shiftKey ? GRID * 4 : GRID;
+      nudge(key === "arrowleft" ? -step : key === "arrowright" ? step : 0, key === "arrowup" ? -step : key === "arrowdown" ? step : 0);
+    } else if (key === "escape") { setNodes((current) => deselect(current)); setEdges((current) => current.map((edge) => ({ ...edge, selected: false }))); setMenu(null); }
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => keys.current(event);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => { setFocusName(false); }, [selectionKey]);
+
+  const selectedCount = selectedNodes.length + selectedEdges.length;
+  const panelOpen = selectedCount > 0 && dismissed !== selectionKey;
+  const toggleSnap = () => setSnap((value) => { try { localStorage.setItem(SNAP_KEY, value ? "off" : "on"); } catch { /* ignore */ } return !value; });
+
+  return <BoardContext.Provider value={{ boardId, touch, update, patch, edit: setEditId, read: setReadId }}>
+    <div className={`board${connecting ? " is-connecting" : ""}`} onFocus={(event) => setEditing(event.target instanceof HTMLTextAreaElement)} onBlur={() => setEditing(false)}>
       <div className="board__canvas">
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} colorMode={theme} minZoom={0.1} maxZoom={2.5} zoomOnDoubleClick={false} connectionRadius={32} deleteKeyCode={["Backspace", "Delete"]} proOptions={{ hideAttribution: true }}>
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} />
-          <Controls showInteractive={false} position="top-right" />
+        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChangeWithGuides} onEdgesChange={onEdgesChange} onConnect={onConnect} onReconnect={onReconnect}
+          onNodeDragStop={onNodeDragStop} onConnectStart={() => setConnecting(true)} onConnectEnd={() => setConnecting(false)}
+          connectionMode={ConnectionMode.Loose} connectionLineType={ConnectionLineType.SmoothStep} snapToGrid={snap} snapGrid={[GRID, GRID]} elevateNodesOnSelect={false}
+          selectionOnDrag={marquee} panOnDrag={marquee ? [1, 2] : true} multiSelectionKeyCode={["Meta", "Control", "Shift"]}
+          colorMode={theme} minZoom={0.1} maxZoom={2.5} zoomOnDoubleClick={false} connectionRadius={32} deleteKeyCode={["Backspace", "Delete"]} proOptions={{ hideAttribution: true }}>
+          <Background variant={BackgroundVariant.Dots} gap={snap ? GRID * 3 : 22} size={1.4} />
+          <Controls showInteractive={false} position="bottom-left" />
           <MiniMap pannable zoomable position="bottom-right" className="board__minimap" />
+          <ViewportPortal>
+            {guides.x.map((x) => <div key={`x${x}`} className="board__guide board__guide--x" style={{ transform: `translate(${x}px, -50000px)` }} />)}
+            {guides.y.map((y) => <div key={`y${y}`} className="board__guide board__guide--y" style={{ transform: `translate(-50000px, ${y}px)` }} />)}
+          </ViewportPortal>
         </ReactFlow>
-        {meta && nodes.length === 0 && <p className="board__empty">An empty board. Tap Scan notes to photograph a page of your notebook, or add a card or PDF pages.</p>}
+        {meta && nodes.length === 0 && <p className="board__empty">An empty board. Add a block to start a diagram, or a card for notes. Scan notes photographs a notebook page.</p>}
+        <div className="board__bar2" role="toolbar" aria-label="Diagram tools">
+          <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!historyState.undo} onClick={undo}><Undo2 size={17} /></button>
+          <button type="button" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!historyState.redo} onClick={redo}><Redo2 size={17} /></button>
+          <i />
+          <button type="button" aria-label="Snap and guides" aria-pressed={snap} title="Snap to grid and alignment guides" className={snap ? "is-on" : ""} onClick={toggleSnap}><Magnet size={17} /></button>
+          <button type="button" aria-label="Select several by dragging" aria-pressed={marquee} title="Drag to select several (otherwise hold Shift)" className={marquee ? "is-on" : ""} onClick={() => setMarquee((value) => !value)}><BoxSelect size={17} /></button>
+          <button type="button" aria-label="Auto layout" title="Auto layout" aria-expanded={menu === "layout"} onClick={() => setMenu(menu === "layout" ? null : "layout")}><Workflow size={17} /></button>
+          <button type="button" aria-label="Fit to screen" title="Fit to screen" onClick={() => void flow.fitView({ padding: 0.2, maxZoom: 1, duration: 300 })}><Maximize size={17} /></button>
+          <button type="button" aria-label="Export picture" title="Export picture" aria-expanded={menu === "export"} onClick={() => setMenu(menu === "export" ? null : "export")}><Download size={17} /></button>
+          {menu === "layout" && <div className="board__menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => autoLayout("LR")}>Left to right</button>
+            <button type="button" role="menuitem" onClick={() => autoLayout("TB")}>Top to bottom</button>
+          </div>}
+          {menu === "export" && <div className="board__menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => void exportImage("png")}>PNG image</button>
+            <button type="button" role="menuitem" onClick={() => void exportImage("svg")}>SVG vector</button>
+          </div>}
+        </div>
+        {panelOpen && <BoardInspector key={selectionKey} nodes={selectedNodes} edges={selectedEdges} focusName={focusName} onNode={patch} onSize={resize} onEdge={patchEdge} onReverse={reverse}
+          onAlign={align} onDistribute={distribute} onMatch={match} onGroup={addGroup} onUngroup={ungroup} onDuplicate={duplicate} onDelete={removeSelected} onClose={() => setDismissed(selectionKey)} />}
       </div>
+      {menu === "shapes" && <div className="board__shapes" role="menu" aria-label="Shapes">
+        {SHAPES.map((shape) => <button key={shape.id} type="button" role="menuitem" onClick={() => addBlock(shape.id)}><span className={`bglyph bglyph--${shape.id}`} aria-hidden="true" /><strong>{shape.label}</strong><small>{shape.hint}</small></button>)}
+        <button type="button" role="menuitem" onClick={() => addGroup()}><span className="bglyph bglyph--group" aria-hidden="true" /><strong>{selectedNodes.length > 1 ? "Group selection" : "Container"}</strong><small>Subsystem boundary</small></button>
+        <button type="button" role="menuitem" onClick={addText}><span className="bglyph bglyph--card" aria-hidden="true" /><strong>Note card</strong><small>Free text</small></button>
+      </div>}
       <div className={`board__tools${editing ? " is-hidden" : ""}`} role="toolbar" aria-label="Add to board">
+        <button type="button" className="board__shape" aria-expanded={menu === "shapes"} onClick={() => setMenu(menu === "shapes" ? null : "shapes")}><ShapesIcon size={18} /> <span>Shapes</span></button>
         <button type="button" onClick={addText}><StickyNote size={18} /> <span>Card</span></button>
         <button type="button" className="board__scan" onClick={() => scan.current?.click()} disabled={busy}>{busy ? <Loader2 size={18} className="ws-spin" /> : <ScanLine size={18} />} <span>Scan notes</span></button>
         <button type="button" onClick={() => file.current?.click()} disabled={busy}><ImageIcon size={18} /> <span>Photo</span></button>
         <button type="button" onClick={() => setPdfOpen(true)}><FileText size={18} /> <span>PDF</span></button>
+        {selectedNodes.length > 1 && <button type="button" onClick={addGroup}><GroupIcon size={18} /> <span>Group</span></button>}
         {selectedCount > 0 && <button type="button" className="board__delete" onClick={removeSelected}><Trash2 size={18} /> <span>Delete</span></button>}
       </div>
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(event) => void onFiles(event.target.files)} />

@@ -323,3 +323,19 @@
 @media (max-width: 520px) {
   .ws-root[data-skin="graphic"] .tabbar button.is-on span { font-size: 8px; letter-spacing: .08em; }
 }
+
+/* Diagram blocks and containers in the graphic skin: neon outlines on glass */
+.ws-root[data-skin="graphic"] .bnode--block { --shape-fill: var(--panel-2); --shape-stroke: var(--text-2); }
+.ws-root[data-skin="graphic"] .bnode--block.is-selected { --shape-stroke: var(--hi); }
+.ws-root[data-skin="graphic"] .bnode--block.bnode--sun { --shape-fill: rgba(212,255,42,.14); --shape-stroke: rgba(212,255,42,.75); }
+.ws-root[data-skin="graphic"] .bnode--block.bnode--sky { --shape-fill: rgba(52,224,255,.14); --shape-stroke: rgba(52,224,255,.75); }
+.ws-root[data-skin="graphic"] .bnode--block.bnode--leaf { --shape-fill: rgba(120,255,160,.13); --shape-stroke: rgba(120,255,160,.7); }
+.ws-root[data-skin="graphic"] .bnode--block.bnode--rose { --shape-fill: rgba(255,47,126,.15); --shape-stroke: rgba(255,47,126,.75); }
+.ws-root[data-skin="graphic"] .bnode--block.bnode--sun.is-selected, .ws-root[data-skin="graphic"] .bnode--block.bnode--sky.is-selected, .ws-root[data-skin="graphic"] .bnode--block.bnode--leaf.is-selected, .ws-root[data-skin="graphic"] .bnode--block.bnode--rose.is-selected { --shape-stroke: var(--hi); }
+.ws-root[data-skin="graphic"] .bblock { font-family: var(--display); } .ws-root[data-skin="graphic"] .bblock__kicker, .ws-root[data-skin="graphic"] .bgroup__title { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.ws-root[data-skin="graphic"] .bnode--group { border-radius: 3px; } .ws-root[data-skin="graphic"] .bnode--group.is-selected { border-color: var(--hi); }
+.ws-root[data-skin="graphic"] .blabel { border-radius: 2px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; }
+.ws-root[data-skin="graphic"] .board__bar2, .ws-root[data-skin="graphic"] .binsp, .ws-root[data-skin="graphic"] .board__shapes, .ws-root[data-skin="graphic"] .board__menu { border-radius: 3px; background: var(--float); box-shadow: 0 18px 40px -12px var(--shade), inset 0 1px 0 var(--hl); }
+.ws-root[data-skin="graphic"] .board__bar2 button, .ws-root[data-skin="graphic"] .binsp button, .ws-root[data-skin="graphic"] .binsp input, .ws-root[data-skin="graphic"] .binsp select, .ws-root[data-skin="graphic"] .binsp textarea { border-radius: 2px; }
+.ws-root[data-skin="graphic"] .board__guide { background: var(--hi); }
+.ws-root[data-skin="graphic"] .binsp__seg button.is-on { background: var(--hi); color: #0b0c06; border-color: var(--hi); }

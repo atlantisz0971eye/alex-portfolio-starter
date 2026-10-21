@@ -13,6 +13,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@floating-ui/dom": "^1.8.0",
     "@fontsource/satoshi": "file:packages/fontsource-satoshi",
     "@tailwindcss/typography": "^0.5.19",
@@ -25,6 +26,7 @@
     "@tiptap/suggestion": "^3.32.0",
     "@vercel/blob": "^2.8.2",
     "@xyflow/react": "^12.12.0",
+    "html-to-image": "^1.11.13",
     "lucide-react": "0.446.0",
     "next": "^15.5.24",
     "pdf-parse": "^2.4.5",

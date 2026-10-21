@@ -44,7 +44,7 @@ export const TOOLS: ToolSpec[] = [
   fn("mindstream_list", "List the user's mindstreams. A mindstream is a board of cards plus the one note paired with it.", {}),
   fn("mindstream_read", "Read one mindstream in full: its note text and its board as an outline where every card has an id. Use this before reviewing or editing a mindstream.", { id: { type: "string", description: "Mindstream id from mindstream_list or the system prompt" } }, ["id"]),
   fn("mindstream_edit_note", "Propose changing the note of a mindstream: append new Markdown, or replace the whole note with a corrected version. Nothing changes until the user confirms.", { id: { type: "string" }, mode: { type: "string", enum: ["append", "replace"] }, markdown: { type: "string" }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "mode", "markdown"]),
-  fn("mindstream_edit_board", "Propose changes to the cards of a mindstream board. Each change is one of: {op:'add', text, parentId?} {op:'update', cardId, text} {op:'delete', cardId} {op:'link', from, to}. Use card ids from mindstream_read. Nothing changes until the user confirms.", { id: { type: "string" }, ops: { type: "array", items: { type: "object" } }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "ops"]),
+  fn("mindstream_edit_board", "Propose changes to the board of a mindstream. Operations: {op:'add', text, parentId?, ref?, shape?, kicker?, body?} adds a sticky card, or a diagram BLOCK when shape/kicker/body is given (shape: rect|round|diamond|cylinder|ellipse|hex|slant; kicker is a stereotype such as subsystem or ECU; body is properties, one per line). {op:'group', text, contains:[ids or refs], ref?} draws a labelled container around blocks. {op:'update', cardId, text?, kicker?, body?, shape?}. {op:'delete', cardId}. {op:'link', from, to, label?, color?: ink|blue|green|amber|red|violet, line?: solid|dashed|dotted, start?/end?: none|arrow|open|diamond|diamondFill|dot|bar}. Give each new item a short `ref` so later links and groups in the same batch can point at it; existing items use ids from mindstream_read. A batch that creates several blocks is laid out automatically, left to right. For a systems diagram: one block per component, a link per interface with a label saying what flows, and groups for subsystem boundaries. Nothing changes until the user confirms.", { id: { type: "string" }, ops: { type: "array", items: { type: "object" } }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "ops"]),
   fn("library_list", "List the documents in the user's reading library with reading progress.", {}),
   fn("library_search", "Find the passages of one library document that are most relevant to a query. Write the query in the document's language.", { documentId: { type: "string" }, query: { type: "string" } }, ["documentId", "query"]),
 ];
@@ -224,16 +224,22 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         const boardId = await resolveBoardId(args.id);
         const stream = await readMindstream(boardId);
         const known = new Map(stream.withIds.split("\n").map((line) => line.match(/\[([0-9a-f-]{36})\]\s*(.*)$/)).filter((m): m is RegExpMatchArray => !!m).map((m) => [m[1], m[2]]));
-        const ops = (Array.isArray(args.ops) ? args.ops : []).slice(0, 40).filter((op): op is BoardOp => {
+        // Things created earlier in the same batch can be referred to by their `ref` before they have an id.
+        const refText = new Map<string, string>();
+        const exists = (id: unknown) => typeof id === "string" && (known.has(id) || refText.has(id));
+        const ops: BoardOp[] = [];
+        for (const op of (Array.isArray(args.ops) ? args.ops : []).slice(0, 60)) {
           const o = op as Record<string, unknown>;
-          if (o?.op === "add") return typeof o.text === "string" && !!o.text.trim() && (!o.parentId || known.has(String(o.parentId)));
-          if (o?.op === "update") return typeof o.text === "string" && !!o.text.trim() && known.has(String(o.cardId));
-          if (o?.op === "delete") return known.has(String(o.cardId));
-          if (o?.op === "link") return known.has(String(o.from)) && known.has(String(o.to));
-          return false;
-        });
+          const named = (value: unknown) => typeof value === "string" && !!value.trim();
+          if (o?.op === "add" && named(o.text) && (!o.parentId || exists(o.parentId))) { if (named(o.ref)) refText.set(String(o.ref), String(o.text)); ops.push(o as BoardOp); }
+          else if (o?.op === "group" && named(o.text) && Array.isArray(o.contains) && o.contains.length && o.contains.every(exists)) { if (named(o.ref)) refText.set(String(o.ref), String(o.text)); ops.push(o as BoardOp); }
+          else if (o?.op === "update" && known.has(String(o.cardId)) && (named(o.text) || named(o.kicker) || named(o.body) || named(o.shape))) ops.push(o as BoardOp);
+          else if (o?.op === "delete" && known.has(String(o.cardId))) ops.push(o as BoardOp);
+          else if (o?.op === "link" && exists(o.from) && exists(o.to)) ops.push(o as BoardOp);
+        }
         if (!ops.length) return "Error: none of those changes refer to cards that exist. Use ids from mindstream_read.";
-        const lines = ops.map((op) => op.op === "add" ? `+ ${op.text}${op.parentId ? ` (under “${known.get(op.parentId)}”)` : ""}` : op.op === "update" ? `✎ “${known.get(op.cardId)}” → ${op.text}` : op.op === "delete" ? `− ${known.get(op.cardId)}` : `⟷ “${known.get(op.from)}” → “${known.get(op.to)}”`);
+        const name = (id: string) => known.get(id) ?? refText.get(id) ?? id;
+        const lines = ops.map((op) => op.op === "add" ? `+ ${op.kicker ? `«${op.kicker}» ` : ""}${op.text}${op.parentId ? ` (under “${name(op.parentId)}”)` : ""}` : op.op === "group" ? `▣ ${op.text} ⊃ ${op.contains.map(name).join(", ")}` : op.op === "update" ? `✎ “${name(op.cardId)}” → ${[op.text, op.kicker ? `«${op.kicker}»` : "", op.body].filter(Boolean).join(" · ")}` : op.op === "delete" ? `− ${name(op.cardId)}` : `⟷ “${name(op.from)}” → “${name(op.to)}”${op.label ? ` (${op.label})` : ""}`);
         ctx.proposals.push({ op: "ms_board", conflicts: [], ms: { boardId, title: stream.title, ops, lines, why: typeof args.why === "string" ? args.why.slice(0, 200) : undefined } });
         return `Proposed ${ops.length} change(s) to the board of "${stream.title}". Awaiting the user's confirmation.`;
       }

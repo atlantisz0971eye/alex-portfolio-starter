@@ -45,9 +45,9 @@ const TOOLS: Tool[] = [
     await applyNoteEdit(await resolveBoardId(str(args.id, 60)), "append", str(args.markdown, 40_000));
     return "Added to the end of the note.";
   } },
-  { name: "mindstream_edit_cards", readOnly: false, description: "Change the cards on a mindstream's board. Operations: {op:'add', text, parentId?}, {op:'update', cardId, text}, {op:'link', from, to}. Card ids come from mindstream_read. Cards cannot be deleted here.", inputSchema: obj({ id: { type: "string" }, ops: { type: "array", items: { type: "object" } } }, ["id", "ops"]), run: async (args) => {
-    const ops = (Array.isArray(args.ops) ? args.ops : []).filter((op): op is BoardOp => !!op && typeof op === "object" && ["add", "update", "link"].includes(String((op as Json).op)));
-    if (!ops.length) throw new BoardError("Give at least one add, update or link operation.");
+  { name: "mindstream_edit_cards", readOnly: false, description: "Change the cards and diagram blocks on a mindstream's board. Operations: {op:'add', text, parentId?, ref?, shape?, kicker?, body?} (a sticky card, or a diagram block when shape/kicker/body is given; shape rect|round|diamond|cylinder|ellipse|hex|slant), {op:'group', text, contains:[ids or refs], ref?} (a labelled container), {op:'update', cardId, text?, kicker?, body?, shape?}, {op:'link', from, to, label?, color?, line?, start?, end?} (color ink|blue|green|amber|red|violet; line solid|dashed|dotted; markers none|arrow|open|diamond|diamondFill|dot|bar). Give new items a `ref` so later operations in the same batch can refer to them; a batch of several blocks is laid out automatically. Card ids come from mindstream_read. Cards cannot be deleted here.", inputSchema: obj({ id: { type: "string" }, ops: { type: "array", items: { type: "object" } } }, ["id", "ops"]), run: async (args) => {
+    const ops = (Array.isArray(args.ops) ? args.ops : []).filter((op): op is BoardOp => !!op && typeof op === "object" && ["add", "group", "update", "link"].includes(String((op as Json).op)));
+    if (!ops.length) throw new BoardError("Give at least one add, group, update or link operation.");
     const { changed } = await applyBoardOps(await resolveBoardId(str(args.id, 60)), ops);
     return `Applied ${changed} change(s) to the board.`;
   } },
