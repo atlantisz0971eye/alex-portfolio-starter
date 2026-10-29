@@ -1,5 +1,6 @@
 import { del, get, list, put } from "@vercel/blob";
 import { deleteTranslations } from "./translationStore";
+import { scopeRoot } from "./workspaceScope";
 import type { Chapter } from "./workspaceOutline";
 
 export type WorkspaceDocument = {
@@ -32,13 +33,25 @@ export type WorkspaceDocument = {
 type DocumentState = Pick<WorkspaceDocument, "guide" | "guideCoverage" | "messages" | "outline" | "outlineSource">;
 export type WorkspaceDocumentSummary = Omit<WorkspaceDocument, keyof DocumentState>;
 
-const metaPath = (id: string) => `workspace/docs/${id}.json`;
 // Guides and chats grow with use, so they live apart from the small metadata
 // record that the library list reads for every document.
-const statePath = (id: string) => `workspace/state/${id}.json`;
-const progressPath = (id: string) => `workspace/progress/${id}.json`;
-const marksPath = (id: string) => `workspace/marks/${id}.json`;
-const bookmarksPath = (id: string) => `workspace/bookmarks/${id}.json`;
+/** Every path belongs to the signed-in person: the owner keeps `workspace/`, members get `workspace/users/<id>/`. */
+const paths = (root: string) => ({
+  root,
+  docs: `${root}docs/`,
+  meta: (id: string) => `${root}docs/${id}.json`,
+  state: (id: string) => `${root}state/${id}.json`,
+  progress: (id: string) => `${root}progress/${id}.json`,
+  marks: (id: string) => `${root}marks/${id}.json`,
+  bookmarks: (id: string) => `${root}bookmarks/${id}.json`,
+  text: (id: string) => `${root}text/${id}.txt`,
+  cover: (id: string) => `${root}covers/${id}.jpg`,
+});
+const P = async () => paths(await scopeRoot());
+/** A stored file path is only trusted when it sits inside the signed-in person's folder. */
+export async function ownsPath(pathname: string) {
+  return pathname.startsWith((await scopeRoot())) && !pathname.includes("..");
+}
 
 export type MarkColor = "yellow" | "green" | "blue" | "pink";
 /** A highlight inside one reading block, anchored by the block's offset in the document text. */
@@ -67,11 +80,9 @@ export type WorkspaceBookmark = {
 };
 
 export type WorkspaceLibraryItem = WorkspaceDocumentSummary & { progress: number | null; progressAt: string | null };
-const textPath = (id: string) => `workspace/text/${id}.txt`;
-const coverPath = (id: string) => `workspace/covers/${id}.jpg`;
 
-export const writeCover = (id: string, bytes: Uint8Array) => put(coverPath(id), Buffer.from(bytes), { access: "private", allowOverwrite: true, contentType: "image/jpeg" });
-export const readCover = (id: string) => get(coverPath(id), { access: "private", useCache: false });
+export const writeCover = async (id: string, bytes: Uint8Array) => put((await P()).cover(id), Buffer.from(bytes), { access: "private", allowOverwrite: true, contentType: "image/jpeg" });
+export const readCover = async (id: string) => get((await P()).cover(id), { access: "private", useCache: false });
 
 export function validDocumentId(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(id);
@@ -89,7 +100,7 @@ async function readText(path: string) {
 
 async function readMeta(id: string): Promise<WorkspaceDocument | null> {
   if (!validDocumentId(id)) return null;
-  const raw = await readText(metaPath(id));
+  const raw = await readText((await P()).meta(id));
   if (!raw) return null;
   const value = JSON.parse(raw) as WorkspaceDocument;
   return value.id === id ? value : null;
@@ -98,33 +109,34 @@ async function readMeta(id: string): Promise<WorkspaceDocument | null> {
 export async function readDocument(id: string): Promise<WorkspaceDocument | null> {
   const meta = await readMeta(id);
   if (!meta) return null;
-  const raw = await readText(statePath(id));
+  const raw = await readText((await P()).state(id));
   // Documents saved before the split still carry guide/messages in the metadata.
   return raw ? { ...meta, ...(JSON.parse(raw) as DocumentState) } : meta;
 }
 
 export async function readDocumentText(id: string) {
   if (!validDocumentId(id)) return null;
-  return readText(textPath(id));
+  return readText((await P()).text(id));
 }
 
 export async function writeDocument(document: WorkspaceDocument, text?: string) {
   const { guide, guideCoverage, messages, outline, outlineSource, ...meta } = document;
+  const p = await P();
   if (text !== undefined) {
-    await put(textPath(document.id), text, {
+    await put(p.text(document.id), text, {
       access: "private",
       allowOverwrite: true,
       contentType: "text/plain; charset=utf-8",
     });
   }
   if (guide !== undefined || guideCoverage !== undefined || messages !== undefined || outline !== undefined) {
-    await put(statePath(document.id), JSON.stringify({ guide, guideCoverage, messages, outline, outlineSource }), {
+    await put(p.state(document.id), JSON.stringify({ guide, guideCoverage, messages, outline, outlineSource }), {
       access: "private",
       allowOverwrite: true,
       contentType: "application/json",
     });
   }
-  await put(metaPath(document.id), JSON.stringify(meta), {
+  await put(p.meta(document.id), JSON.stringify(meta), {
     access: "private",
     allowOverwrite: true,
     contentType: "application/json",
@@ -133,7 +145,7 @@ export async function writeDocument(document: WorkspaceDocument, text?: string) 
 
 export async function readProgressRecord(id: string): Promise<{ offset: number; updatedAt: string | null } | null> {
   if (!validDocumentId(id)) return null;
-  const raw = await readText(progressPath(id));
+  const raw = await readText((await P()).progress(id));
   if (!raw) return null;
   const value = JSON.parse(raw) as { offset?: unknown; updatedAt?: unknown };
   if (typeof value.offset !== "number" || !Number.isFinite(value.offset) || value.offset < 0) return null;
@@ -146,26 +158,26 @@ export async function readProgress(id: string): Promise<number | null> {
 
 export async function readMarks(id: string): Promise<WorkspaceMark[]> {
   if (!validDocumentId(id)) return [];
-  const raw = await readText(marksPath(id));
+  const raw = await readText((await P()).marks(id));
   return raw ? JSON.parse(raw) as WorkspaceMark[] : [];
 }
 
 export async function writeMarks(id: string, marks: WorkspaceMark[]) {
-  await put(marksPath(id), JSON.stringify(marks), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put((await P()).marks(id), JSON.stringify(marks), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
 export async function readBookmarks(id: string): Promise<WorkspaceBookmark[]> {
   if (!validDocumentId(id)) return [];
-  const raw = await readText(bookmarksPath(id));
+  const raw = await readText((await P()).bookmarks(id));
   return raw ? JSON.parse(raw) as WorkspaceBookmark[] : [];
 }
 
 export async function writeBookmarks(id: string, bookmarks: WorkspaceBookmark[]) {
-  await put(bookmarksPath(id), JSON.stringify(bookmarks), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put((await P()).bookmarks(id), JSON.stringify(bookmarks), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
 export async function writeProgress(id: string, offset: number) {
-  await put(progressPath(id), JSON.stringify({ offset, updatedAt: new Date().toISOString() }), {
+  await put((await P()).progress(id), JSON.stringify({ offset, updatedAt: new Date().toISOString() }), {
     access: "private",
     allowOverwrite: true,
     contentType: "application/json",
@@ -173,15 +185,16 @@ export async function writeProgress(id: string, offset: number) {
 }
 
 export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
+  const p = await P();
   const blobs: { pathname: string }[] = [];
   let cursor: string | undefined;
   do {
-    const page = await list({ prefix: "workspace/docs/", limit: 100, cursor });
+    const page = await list({ prefix: p.docs, limit: 100, cursor });
     blobs.push(...page.blobs);
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
   const documents = await Promise.all(blobs.map(async (blob) => {
-    const id = blob.pathname.slice("workspace/docs/".length).replace(/\.json$/, "");
+    const id = blob.pathname.slice(p.docs.length).replace(/\.json$/, "");
     try {
       const meta = await readMeta(id);
       if (!meta) return null;
@@ -196,18 +209,23 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
 
 export async function deleteDocument(document: WorkspaceDocument) {
   await deleteTranslations(document.id).catch(() => undefined);
-  await del([metaPath(document.id), statePath(document.id), progressPath(document.id), marksPath(document.id), bookmarksPath(document.id), textPath(document.id), coverPath(document.id), document.filePath]);
+  const p = await P();
+  const files = [p.meta(document.id), p.state(document.id), p.progress(document.id), p.marks(document.id), p.bookmarks(document.id), p.text(document.id), p.cover(document.id)];
+  if (await ownsPath(document.filePath)) files.push(document.filePath);
+  await del(files);
 }
 
 /** Best-effort removal of everything an interrupted upload may have left behind. */
 export async function discardUpload(id: string, filePath: string) {
   try {
-    await del([filePath, textPath(id), statePath(id), progressPath(id), marksPath(id), bookmarksPath(id), metaPath(id)]);
+    const p = await P();
+    await del([...(await ownsPath(filePath) ? [filePath] : []), p.text(id), p.state(id), p.progress(id), p.marks(id), p.bookmarks(id), p.meta(id)]);
   } catch {
     // Nothing more can be done here; the original error is what the caller reports.
   }
 }
 
 export async function readOriginalFile(document: WorkspaceDocument) {
+  if (!(await ownsPath(document.filePath))) return null;
   return get(document.filePath, { access: "private", useCache: false });
 }

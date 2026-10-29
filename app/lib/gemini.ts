@@ -1,7 +1,8 @@
+import { chargeAi, QuotaError } from "./aiQuota";
 import type { Organized } from "./boardOrganize";
 
 export class GeminiError extends Error {
-  constructor(readonly code: "gemini_not_configured" | "gemini_forbidden" | "gemini_billing" | "gemini_failed") {
+  constructor(readonly code: "gemini_not_configured" | "gemini_forbidden" | "gemini_billing" | "gemini_failed" | "ai_quota") {
     super(code);
   }
 }
@@ -25,6 +26,7 @@ export type NotesReading = { text: string; draft: Organized | null };
 export async function readNotesWithGemini(image: Uint8Array, mime: string): Promise<NotesReading> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new GeminiError("gemini_not_configured");
+  try { await chargeAi(); } catch (error) { if (error instanceof QuotaError) throw new GeminiError("ai_quota"); throw error; }
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL())}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },

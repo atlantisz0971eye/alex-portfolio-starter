@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import {
   createWorkspaceSession,
-  verifyAccessKey,
+  identifyAccessKey,
   WORKSPACE_COOKIE,
   workspaceAuthConfigured,
   workspaceCookieOptions,
+  workspaceUser,
 } from "../../../lib/workspaceAuth";
+import { publicUser } from "../../../lib/workspaceScope";
 
 export const runtime = "nodejs";
 
@@ -28,14 +30,21 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
-  if (typeof body.accessKey !== "string" || body.accessKey.length > 256 || !verifyAccessKey(body.accessKey)) {
+  const user = typeof body.accessKey === "string" && body.accessKey.length <= 256 ? await identifyAccessKey(body.accessKey) : null;
+  if (!user) {
     failures.set(ip, { count: (state?.until && state.until > now ? state.count : 0) + 1, until: now + 15 * 60_000 });
     return NextResponse.json({ error: "invalid_access_key" }, { status: 401 });
   }
   failures.delete(ip);
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(WORKSPACE_COOKIE, createWorkspaceSession(), workspaceCookieOptions());
+  const response = NextResponse.json({ ok: true, user: publicUser(user) });
+  response.cookies.set(WORKSPACE_COOKIE, createWorkspaceSession(user), workspaceCookieOptions());
   return response;
+}
+
+export async function GET() {
+  const user = await workspaceUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  return NextResponse.json({ user: publicUser(user) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function DELETE() {

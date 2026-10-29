@@ -1,4 +1,4 @@
-import { workspaceAuthorized } from "./workspaceAuth";
+import { workspaceUser } from "./workspaceAuth";
 import { googleConfigured } from "./gmail";
 import { mailKeyConfigured } from "./mailCrypto";
 import { readAccounts, type MailAccount } from "./mailStore";
@@ -20,7 +20,9 @@ export function mailMissing() {
 
 /** Common checks for the mail endpoints; returns a response to send when access is denied. */
 export async function mailGuard(): Promise<Response | null> {
-  if (!(await workspaceAuthorized())) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const user = await workspaceUser();
+  if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+  if (!user.features.mail) return Response.json({ error: "member_feature_off" }, { status: 403 });
   if (!workspaceStorageConfigured()) return Response.json({ error: "storage_not_configured" }, { status: 503 });
   if (!mailConfigured()) return Response.json({ error: "mail_not_configured" }, { status: 503 });
   return null;

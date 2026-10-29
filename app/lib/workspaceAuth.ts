@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { findMember, findMemberByKey, ownerUser, type WorkspaceUser } from "./workspaceUsers";
 
 export const WORKSPACE_COOKIE = "alex_workspace_session";
 const SESSION_AGE_SECONDS = 30 * 24 * 60 * 60;
@@ -22,20 +23,23 @@ function equal(a: string, b: string) {
   return left.length === right.length && timingSafeEqual(new Uint8Array(left), new Uint8Array(right));
 }
 
-export function verifyAccessKey(value: string) {
+/** Who holds this key: the owner (the key in the environment) or a member created on the admin page. */
+export async function identifyAccessKey(value: string): Promise<WorkspaceUser | null> {
   const config = secrets();
-  return !!config && equal(value, config.accessKey);
+  if (!config) return null;
+  if (equal(value, config.accessKey)) return ownerUser();
+  return findMemberByKey(value);
 }
 
-function signature(expiresAt: string, secret: string) {
-  return createHmac("sha256", secret).update(`alex-workspace:${expiresAt}`).digest("base64url");
-}
+const sign = (payload: string, secret: string) => createHmac("sha256", secret).update(`alex-workspace:${payload}`).digest("base64url");
 
-export function createWorkspaceSession() {
+/** `userId.version.expires.signature`: the signature covers who the session is for and which sign-out generation it belongs to. */
+export function createWorkspaceSession(user: WorkspaceUser) {
   const config = secrets();
   if (!config) throw new Error("Workspace access is not configured");
   const expiresAt = String(Math.floor(Date.now() / 1000) + SESSION_AGE_SECONDS);
-  return `${expiresAt}.${signature(expiresAt, config.sessionSecret)}`;
+  const payload = `${user.id}.${user.version}.${expiresAt}`;
+  return `${payload}.${sign(payload, config.sessionSecret)}`;
 }
 
 export function workspaceCookieOptions() {
@@ -48,16 +52,32 @@ export function workspaceCookieOptions() {
   };
 }
 
-export async function workspaceAuthorized() {
+/**
+ * The person behind this request's session cookie, or null. A member must still exist, be enabled and not have been
+ * signed out since the cookie was made. Sessions issued before members existed (`expires.signature`) belong to the owner.
+ */
+export async function workspaceUser(): Promise<WorkspaceUser | null> {
   const config = secrets();
   const value = (await cookies()).get(WORKSPACE_COOKIE)?.value;
-  if (!config || !value) return false;
-  const [expiresAt, provided, extra] = value.split(".");
-  if (extra || !expiresAt || !provided || !/^\d+$/.test(expiresAt)) return false;
-  const expiry = Number(expiresAt);
+  if (!config || !value) return null;
+  const parts = value.split(".");
   const now = Math.floor(Date.now() / 1000);
-  if (!Number.isSafeInteger(expiry) || expiry <= now || expiry > now + SESSION_AGE_SECONDS) return false;
-  return equal(provided, signature(expiresAt, config.sessionSecret));
+  const live = (expiresAt: string) => /^\d+$/.test(expiresAt) && Number(expiresAt) > now && Number(expiresAt) <= now + SESSION_AGE_SECONDS;
+
+  if (parts.length === 2) {
+    const [expiresAt, provided] = parts;
+    return live(expiresAt) && equal(provided, sign(expiresAt, config.sessionSecret)) ? ownerUser() : null;
+  }
+  if (parts.length !== 4) return null;
+  const [id, version, expiresAt, provided] = parts;
+  if (!live(expiresAt) || !/^\d+$/.test(version) || !equal(provided, sign(`${id}.${version}.${expiresAt}`, config.sessionSecret))) return null;
+  if (id === "owner") return ownerUser();
+  const member = await findMember(id);
+  return member && !member.disabled && member.version === Number(version) ? member : null;
+}
+
+export async function workspaceAuthorized() {
+  return (await workspaceUser()) !== null;
 }
 
 /** Signs a short-lived value (such as an OAuth state) with the session secret. */

@@ -1072,3 +1072,16 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .board .react-flow__node.react-flow__node-group { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font-size: inherit; }
 .board__bar2 button.board__tidy { display: inline-flex; width: auto; gap: 6px; padding: 0 10px; font-size: 13px; font-weight: 600; }
 @media (max-width: 700px) { .board__bar2 button.board__tidy span { display: none; } .board__bar2 button.board__tidy { width: 34px; padding: 0; justify-content: center; } }
+
+/* Members: the owner's page for handing out keys */
+.mem { display: flex; flex-direction: column; gap: 14px; }
+.mem__add { display: flex; gap: 8px; } .mem__add input { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); font-size: 16px; outline: 0; }
+.mem__issued { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--accent); border-radius: 14px; background: var(--panel); } .mem__issued code { padding: 10px 12px; border-radius: 10px; background: var(--panel-2); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px; word-break: break-all; user-select: all; } .mem__issued p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.45; }
+.mem__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.mem__list li { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); } .mem__list li.is-off { opacity: .6; }
+.mem__list header { display: flex; align-items: center; justify-content: space-between; } .mem__list header strong { font-size: 16px; } .mem__list header small { display: block; margin-top: 2px; color: var(--text-2); font-size: 12px; }
+.mem__tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--f2); color: var(--text-2); font-size: 11px; }
+.mem__stats { margin: 0; color: var(--text-2); font-size: 13px; }
+.mem__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 14px; } .mem__controls label { display: flex; align-items: center; gap: 8px; } .mem__controls input[type="number"] { width: 84px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); font-size: 14px; }
+.mem__row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; } .mem__row .ws-text-button { min-height: 36px; font-size: 14px; } .mem__danger { color: var(--danger) !important; }
+@media (max-width: 520px) { .mem__controls { grid-template-columns: 1fr; } }

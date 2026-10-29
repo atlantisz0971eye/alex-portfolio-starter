@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { enrichDocument } from "../../../lib/bookEnrich";
 import { ExtractError, extractDocument } from "../../../lib/workspaceExtract";
 import { workspaceAuthorized } from "../../../lib/workspaceAuth";
+import { currentUser, runAs, scopeRoot } from "../../../lib/workspaceScope";
 import { buildSegments, detectChapters, segmentIndexFor } from "../../../lib/workspaceOutline";
 import {
   discardUpload,
@@ -90,7 +91,8 @@ export async function POST(request: Request) {
   const id = asText(body.id);
   const pathname = asText(body.pathname);
   const name = asText(body.name).slice(0, 180);
-  if (!validDocumentId(id) || !pathname.startsWith(`workspace/files/${id}/`) || !name) {
+  const root = await scopeRoot();
+  if (!validDocumentId(id) || !pathname.startsWith(`${root}files/${id}/`) || pathname.includes("..") || !name) {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
   // From here the upload exists in storage, so every failure must remove it.
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
       name,
       mimeType: extension === "pdf" ? "application/pdf" : "text/plain",
       filePath: pathname,
-      textPath: `workspace/text/${id}.txt`,
+      textPath: `${root}text/${id}.txt`,
       createdAt: new Date().toISOString(),
       pageCount,
       characterCount: extractedText.length,
@@ -135,7 +137,9 @@ export async function POST(request: Request) {
       return fail("storage_failed", 502);
     }
     // Title, cover and contents are worked out after the response, so opening the book is not delayed.
-    after(async () => { await enrichDocument(id).catch((error) => console.error("Enrich failed", error instanceof Error ? error.message : error)); });
+    // Background work has no cookie, so it carries the signed-in person with it.
+    const me = await currentUser();
+    after(() => runAs(me, async () => { await enrichDocument(id).catch((error) => console.error("Enrich failed", error instanceof Error ? error.message : error)); }));
     return Response.json({ document, ...readerWindow(extractedText, { segment: 0 }), target: 0 }, { status: 201 });
   } catch {
     return fail("processing_failed", 502);

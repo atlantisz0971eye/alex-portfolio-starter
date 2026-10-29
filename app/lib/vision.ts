@@ -1,7 +1,8 @@
 /** Google Cloud Vision text detection for page images. */
+import { chargeAi, QuotaError } from "./aiQuota";
 
 export class VisionError extends Error {
-  constructor(readonly code: "ocr_not_configured" | "ocr_forbidden" | "ocr_failed") {
+  constructor(readonly code: "ocr_not_configured" | "ocr_forbidden" | "ocr_failed" | "ai_quota") {
     super(code);
   }
 }
@@ -14,6 +15,7 @@ type VisionResponse = { responses?: { fullTextAnnotation?: { text?: string }; er
 export async function recognize(images: Uint8Array[]): Promise<string[]> {
   const key = process.env.GOOGLE_VISION_API_KEY;
   if (!key) throw new VisionError("ocr_not_configured");
+  try { await chargeAi(images.length); } catch (error) { if (error instanceof QuotaError) throw new VisionError("ai_quota"); throw error; }
   const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(key)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

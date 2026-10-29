@@ -57,6 +57,17 @@ app/
 
 本地开发时把这些值放在未提交的 `.env.local`。访问密钥和 Blob 令牌都不得以 `NEXT_PUBLIC_` 开头。配置缺失时，Workspace 会保持锁定或提示资料库尚未连接。私人文档只存入 Private Blob Store，并由已登录的服务端接口读取；会话使用 HttpOnly Cookie。第一版登录限流是函数实例内的兜底措施，发布前还应在 Vercel Firewall 为 `/api/workspace/session` 和 `/api/workspace/assistant` 配置跨实例限流。
 
+## Alex Workspace · 多人使用
+
+`WORKSPACE_ACCESS_KEY` 是站主（owner）的密钥，站主的数据仍在原来的 `workspace/` 下，无需迁移。站主登录后，侧栏的 **Members** 可以给朋友各发一把密钥：每个人只输入自己的密钥就进入各自独立的空间（笔记、画板、资料库、日历、Devlog、邮箱连接都互不相通，存放在 `workspace/users/<id>/`）。密钥只在创建时显示一次，服务器只保存哈希；可随时停用、换新密钥、全端登出，或删除成员并清除其全部数据。
+
+- **AI 共用站主的密钥**，每人有每日 AI 调用上限（默认 300 次）和资料数量上限，站主不受限。
+- **邮箱各人自己连**：成员默认可连接自己的 Gmail。Google OAuth 应用处于 Testing 状态时，需要在 Google Cloud 的 OAuth 同意屏幕里把朋友的 Gmail 加为测试用户（最多 100 人）。邮箱令牌加密后存在各自的文件夹里；也可以在成员卡片里关闭某人的邮件功能。
+- **GitHub 同步只属于站主**：站主的 `GITHUB_TOKEN` 能读私有仓库，成员不能使用。
+- **MCP**：站主用 `WORKSPACE_MCP_TOKEN`；成员可用自己的访问密钥作为 Bearer 令牌，只能看到自己的空间，也看不到邮件工具。
+- 站主在技术上能读到成员存放在 Blob 里的文件，所以只邀请信任的人。可选环境变量 `WORKSPACE_OWNER_NAME`（侧栏显示的名字，默认 Alex）。
+- 站主的会话沿用旧登录；更换 `WORKSPACE_SESSION_SECRET` 会让所有人重新登录。
+
 ## Alex Workspace · 邮件（Gmail 只读）
 
 Workspace 顶部的 **Mail** 标签用于查看和搜索最多两个 Gmail 账号。授权范围只有 `gmail.readonly`：不能发信、删除或修改邮件。邮件正文只作为纯文本显示，不加载远程图片；只有点击 “Summarize” 或提问时，那一封邮件的文字才会发送给 DeepSeek。刷新令牌用 AES-256-GCM 加密后存入 Private Blob Store，没有 `MAIL_TOKEN_KEY` 就无法解开。

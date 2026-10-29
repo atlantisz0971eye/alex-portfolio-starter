@@ -1,6 +1,7 @@
 import { del, get, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { jsonToText, markdownToDoc, type JSONNode } from "./notesText";
+import { scopeRoot } from "./workspaceScope";
 
 export type NoteMeta = {
   id: string;
@@ -18,8 +19,9 @@ export type NoteMeta = {
 };
 type IndexEntry = NoteMeta & { text: string };
 
-const INDEX = "workspace/notes/index.json";
-const pagePath = (id: string) => `workspace/notes/pages/${id}.json`;
+// Notes live in the signed-in person's own folder.
+const indexPath = async () => `${await scopeRoot()}notes/index.json`;
+const pagePath = async (id: string) => `${await scopeRoot()}notes/pages/${id}.json`;
 const MAX_CONTENT = 900_000;
 const MAX_NOTES = 3000;
 export const EMPTY_DOC: JSONNode = { type: "doc", content: [{ type: "paragraph" }] };
@@ -35,12 +37,12 @@ async function readText(path: string) {
 }
 
 async function readIndex(): Promise<IndexEntry[]> {
-  const raw = await readText(INDEX);
+  const raw = await readText(await indexPath());
   return raw ? (JSON.parse(raw) as { notes: IndexEntry[] }).notes : [];
 }
 
 async function writeIndex(notes: IndexEntry[]) {
-  await put(INDEX, JSON.stringify({ notes }), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put(await indexPath(), JSON.stringify({ notes }), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
 export const validNoteId = (id: string) => /^[0-9a-f-]{36}$/.test(id);
@@ -64,7 +66,7 @@ export async function readNote(id: string): Promise<{ note: NoteMeta; content: J
   if (!validNoteId(id)) return null;
   const entry = (await readIndex()).find((item) => item.id === id);
   if (!entry) return null;
-  const raw = await readText(pagePath(id));
+  const raw = await readText(await pagePath(id));
   return { note: strip(entry), content: raw ? JSON.parse(raw) as JSONNode : EMPTY_DOC };
 }
 
@@ -88,7 +90,7 @@ export async function createNote(input: { parentId?: string | null; title?: stri
     createdAt: now, updatedAt: now, ...describe(content),
     ...(input.kind ? { kind: input.kind } : {}),
   };
-  await put(pagePath(entry.id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put(await pagePath(entry.id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
   await writeIndex([...notes, entry]);
   return strip(entry);
 }
@@ -113,7 +115,7 @@ export async function updateNote(id: string, patch: NotePatch) {
   if (patch.content !== undefined) {
     const content = checkContent(patch.content);
     entry = { ...entry, ...describe(content) };
-    await put(pagePath(id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
+    await put(await pagePath(id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
   }
   entry.updatedAt = new Date().toISOString();
   notes[index] = entry;
@@ -146,7 +148,7 @@ export async function deleteForever(id: string) {
   const ids = new Set([id, ...descendants(notes, id)]);
   if (!notes.some((item) => item.id === id)) throw new NoteError("That note no longer exists.");
   await writeIndex(notes.filter((item) => !ids.has(item.id)));
-  await del([...ids].map(pagePath)).catch(() => undefined);
+  await del(await Promise.all([...ids].map(pagePath))).catch(() => undefined);
 }
 
 export async function duplicateNote(id: string) {

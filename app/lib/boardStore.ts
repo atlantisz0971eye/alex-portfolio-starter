@@ -1,12 +1,14 @@
 import { del, get, list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
+import { scopeRoot } from "./workspaceScope";
 
 export type BoardMeta = { id: string; title: string; createdAt: string; updatedAt: string; nodeCount: number; /** The note last written from this board (Mindstream). */ noteId?: string; /** The note this board was made from. */ fromNoteId?: string };
 export type BoardContent = { nodes: unknown[]; edges: unknown[] };
 
-const INDEX = "workspace/boards/index.json";
-const contentPath = (id: string) => `workspace/boards/${id}/board.json`;
-const assetPrefix = (id: string) => `workspace/boards/${id}/assets/`;
+// Boards live in the signed-in person's own folder.
+const indexPath = async () => `${await scopeRoot()}boards/index.json`;
+const contentPath = async (id: string) => `${await scopeRoot()}boards/${id}/board.json`;
+const assetPrefix = async (id: string) => `${await scopeRoot()}boards/${id}/assets/`;
 const MAX_CONTENT = 900_000;
 const MAX_BOARDS = 200;
 const MAX_NODES = 600;
@@ -21,10 +23,10 @@ async function readText(path: string) {
   return new Response(result.stream).text();
 }
 async function readIndex(): Promise<BoardMeta[]> {
-  const raw = await readText(INDEX);
+  const raw = await readText(await indexPath());
   return raw ? (JSON.parse(raw) as { boards: BoardMeta[] }).boards : [];
 }
-const writeIndex = (boards: BoardMeta[]) => put(INDEX, JSON.stringify({ boards }), { access: "private", allowOverwrite: true, contentType: "application/json" });
+const writeIndex = async (boards: BoardMeta[]) => put(await indexPath(), JSON.stringify({ boards }), { access: "private", allowOverwrite: true, contentType: "application/json" });
 
 export const listBoards = async () => (await readIndex()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
@@ -32,7 +34,7 @@ export async function readBoard(id: string): Promise<{ board: BoardMeta; content
   if (!validBoardId(id)) return null;
   const board = (await readIndex()).find((item) => item.id === id);
   if (!board) return null;
-  const raw = await readText(contentPath(id));
+  const raw = await readText(await contentPath(id));
   return { board, content: raw ? JSON.parse(raw) as BoardContent : { nodes: [], edges: [] } };
 }
 
@@ -41,7 +43,7 @@ export async function createBoard(title: string, fromNoteId?: string) {
   if (boards.length >= MAX_BOARDS) throw new BoardError("There are too many boards.");
   const now = new Date().toISOString();
   const board: BoardMeta = { id: randomUUID(), title: title.trim().slice(0, 120) || "Untitled board", createdAt: now, updatedAt: now, nodeCount: 0, ...(fromNoteId && validBoardId(fromNoteId) ? { fromNoteId } : {}) };
-  await put(contentPath(board.id), JSON.stringify({ nodes: [], edges: [] }), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put(await contentPath(board.id), JSON.stringify({ nodes: [], edges: [] }), { access: "private", allowOverwrite: true, contentType: "application/json" });
   await writeIndex([board, ...boards]);
   return board;
 }
@@ -62,7 +64,7 @@ export async function updateBoard(id: string, patch: { title?: unknown; content?
   if (typeof patch.noteId === "string" && validBoardId(patch.noteId)) board.noteId = patch.noteId;
   if (patch.content !== undefined) {
     const content = check(patch.content);
-    await put(contentPath(id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
+    await put(await contentPath(id), JSON.stringify(content), { access: "private", allowOverwrite: true, contentType: "application/json" });
     board.nodeCount = content.nodes.length;
   }
   board.updatedAt = new Date().toISOString();
@@ -73,7 +75,7 @@ export async function updateBoard(id: string, patch: { title?: unknown; content?
 export async function deleteBoard(id: string) {
   const boards = await readIndex();
   if (!boards.some((item) => item.id === id)) return false;
-  const files = await list({ prefix: `workspace/boards/${id}/` });
+  const files = await list({ prefix: `${await scopeRoot()}boards/${id}/` });
   if (files.blobs.length) await del(files.blobs.map((blob) => blob.url));
   await writeIndex(boards.filter((item) => item.id !== id));
   return true;
@@ -82,8 +84,8 @@ export async function deleteBoard(id: string) {
 export async function saveAsset(id: string, bytes: Uint8Array, type: "image/jpeg" | "image/png" | "image/webp") {
   const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
   const name = `${randomUUID()}.${ext}`;
-  await put(assetPrefix(id) + name, Buffer.from(bytes), { access: "private", contentType: type });
+  await put((await assetPrefix(id)) + name, Buffer.from(bytes), { access: "private", contentType: type });
   return name;
 }
 
-export const readAsset = (id: string, name: string) => get(assetPrefix(id) + name, { access: "private", useCache: false });
+export const readAsset = async (id: string, name: string) => get((await assetPrefix(id)) + name, { access: "private", useCache: false });

@@ -30,6 +30,8 @@ export const errors: Record<string, string> = {
   mail_failed: "Gmail could not be reached. Try again.",
   invalid_selection: "Select a shorter passage to translate.",
   ai_timeout: "DeepSeek is responding slowly right now. Try again.",
+  ai_quota: "Today's AI allowance for this account is used up. It resets tomorrow.",
+  member_feature_off: "This feature is not turned on for your account.",
   ai_busy: "DeepSeek is overloaded right now. Try again in a moment.",
   ai_auth: "DeepSeek rejected the API key. Check DEEPSEEK_API_KEY in Vercel.",
   ai_balance: "The DeepSeek account has insufficient balance. Top it up on the DeepSeek platform.",

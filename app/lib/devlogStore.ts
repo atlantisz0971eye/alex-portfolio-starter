@@ -1,4 +1,5 @@
 import { get, put } from "@vercel/blob";
+import { scopeRoot } from "./workspaceScope";
 import { randomUUID } from "node:crypto";
 
 export type DevProject = {
@@ -33,9 +34,10 @@ export type DevEntry = {
 
 export class DevlogError extends Error {}
 
-const PROJECTS = "workspace/devlog/projects.json";
-const ENTRIES = "workspace/devlog/entries.json";
-const assetPath = (name: string) => `workspace/devlog/assets/${name}`;
+// Paths are relative to the signed-in person's folder.
+const PROJECTS = "devlog/projects.json";
+const ENTRIES = "devlog/entries.json";
+const assetPath = (name: string) => `devlog/assets/${name}`;
 const MAX_PROJECTS = 40;
 const MAX_ENTRIES = 3000;
 const COLORS = ["#4a6fb8", "#4f8a5b", "#b9822e", "#8a5aa8", "#b4382c", "#2f8f9d"];
@@ -45,11 +47,11 @@ export const validDate = (value: unknown): value is string => typeof value === "
 export const validAsset = (name: string) => /^[0-9a-f-]{36}\.(jpg|png|webp)$/.test(name);
 
 async function readJson<T>(path: string, fallback: T): Promise<T> {
-  const result = await get(path, { access: "private", useCache: false });
+  const result = await get((await scopeRoot()) + path, { access: "private", useCache: false });
   if (!result || result.statusCode !== 200) return fallback;
   return JSON.parse(await new Response(result.stream).text()) as T;
 }
-const writeJson = (path: string, value: unknown) => put(path, JSON.stringify(value), { access: "private", allowOverwrite: true, contentType: "application/json" });
+const writeJson = async (path: string, value: unknown) => put((await scopeRoot()) + path, JSON.stringify(value), { access: "private", allowOverwrite: true, contentType: "application/json" });
 
 export const readProjects = () => readJson<DevProject[]>(PROJECTS, []);
 export const readEntries = () => readJson<DevEntry[]>(ENTRIES, []);
@@ -135,7 +137,7 @@ export async function replaceCommitEntries(projectId: string, fresh: Omit<DevEnt
 
 export async function saveAsset(bytes: Uint8Array, type: "image/jpeg" | "image/png" | "image/webp") {
   const name = `${randomUUID()}.${type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"}`;
-  await put(assetPath(name), Buffer.from(bytes), { access: "private", contentType: type });
+  await put((await scopeRoot()) + assetPath(name), Buffer.from(bytes), { access: "private", contentType: type });
   return name;
 }
-export const readAsset = (name: string) => get(assetPath(name), { access: "private", useCache: false });
+export const readAsset = async (name: string) => get((await scopeRoot()) + assetPath(name), { access: "private", useCache: false });

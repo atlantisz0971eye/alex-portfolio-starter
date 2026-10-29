@@ -7,6 +7,7 @@ import { validZone, wallDate, wallParts, zonedToInstant } from "./calendarTime";
 import { listMessages, MailAuthError, type MailSummary } from "./gmail";
 import { mailConfigured } from "./mailGuard";
 import { readAccounts } from "./mailStore";
+import { scopeRoot } from "./workspaceScope";
 import type { ChatMessage } from "./workspaceDeepSeek";
 
 export type PlanProposal = Proposal & { status?: "applied" | "dismissed" };
@@ -23,18 +24,18 @@ export type TodayPlan = {
 };
 type TodayState = { seen: string[]; zone?: string; plan?: TodayPlan; lastGenerated?: string; lastCheck?: string };
 
-const PATH = "workspace/today/state.json";
+const statePath = async () => `${await scopeRoot()}today/state.json`;
 const COOLDOWN_MS = 8 * 60_000;
 const MAX_SEEN = 800;
 
 async function readState(): Promise<TodayState> {
-  const result = await get(PATH, { access: "private", useCache: false });
+  const result = await get(await statePath(), { access: "private", useCache: false });
   if (!result || result.statusCode !== 200) return { seen: [] };
   return JSON.parse(await new Response(result.stream).text()) as TodayState;
 }
 
 async function writeState(state: TodayState) {
-  await put(PATH, JSON.stringify(state), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put(await statePath(), JSON.stringify(state), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
 /** Recent inbox messages across accounts, newest first. Accounts that fail are skipped. */

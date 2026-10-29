@@ -1,4 +1,5 @@
 import { calendarGuard } from "../../../lib/calendarGuard";
+import { currentUser } from "../../../lib/workspaceScope";
 import { DevlogError, deleteEntry, deleteProject, readEntries, readProjects, saveEntry, saveProject, validId } from "../../../lib/devlogStore";
 
 export const runtime = "nodejs";
@@ -10,7 +11,7 @@ export async function GET() {
   if (denied) return denied;
   try {
     const [projects, entries] = await Promise.all([readProjects(), readEntries()]);
-    return Response.json({ projects, entries, github: !!process.env.GITHUB_TOKEN }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ projects, entries, github: !!process.env.GITHUB_TOKEN && (await currentUser()).features.github }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return failure(error);
   }

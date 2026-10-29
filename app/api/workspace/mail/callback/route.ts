@@ -4,7 +4,7 @@ import { exchangeCode, profileEmail } from "../../../../lib/gmail";
 import { encryptToken } from "../../../../lib/mailCrypto";
 import { mailConfigured, OAUTH_COOKIE } from "../../../../lib/mailGuard";
 import { MAX_ACCOUNTS, readAccounts, writeAccounts } from "../../../../lib/mailStore";
-import { workspaceSignatureMatches } from "../../../../lib/workspaceAuth";
+import { workspaceSignatureMatches, workspaceUser } from "../../../../lib/workspaceAuth";
 
 export const runtime = "nodejs";
 
@@ -27,8 +27,10 @@ export async function GET(request: Request) {
   const [nonce, verifier] = cookie.split(".");
   const state = url.searchParams.get("state") ?? "";
   const code = url.searchParams.get("code");
-  // Only a flow started from a signed-in session carries a cookie whose nonce matches the state.
-  if (!nonce || !verifier || !state || !workspaceSignatureMatches(nonce, state)) return finish(url.origin, "mail=error&reason=invalid_state");
+  // Only a flow started from a signed-in session carries a cookie whose nonce matches the state, and the state names
+  // the person who started it, so a mailbox can only be connected to the account that asked for it.
+  const me = await workspaceUser();
+  if (!me || !me.features.mail || !nonce || !verifier || !state || !workspaceSignatureMatches(`${me.id}.${nonce}`, state)) return finish(url.origin, "mail=error&reason=invalid_state");
   if (url.searchParams.get("error") || !code) return finish(url.origin, "mail=error&reason=denied");
   try {
     const tokens = await exchangeCode(code, verifier, `${url.origin}/api/workspace/mail/callback`);

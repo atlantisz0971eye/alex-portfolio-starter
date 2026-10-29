@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, type ReactNode } from "react";
 
 export type Theme = "light" | "dark";
@@ -19,6 +19,10 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return <button type="button" className={className} onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}{className.includes("sidebar-theme") ? (theme === "dark" ? " Light mode" : " Dark mode") : ""}</button>;
 }
 
+/** Who is signed in, as the browser may know it. */
+export type PublicUser = { id: string; name: string; role: "owner" | "member"; features: { mail: boolean; github: boolean; today: boolean }; root: string };
+export const UserContext = createContext<{ user: PublicUser | null; openMembers: () => void }>({ user: null, openMembers: () => undefined });
+
 export type Tab = "today" | "library" | "mail" | "calendar" | "mindstreams" | "devlog";
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
@@ -31,35 +35,47 @@ const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
 ];
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */
+/** The destinations this person may use: a member without mail does not see the Mail tab. */
+function useItems() {
+  const { user } = useContext(UserContext);
+  return ITEMS.filter((item) => item.id !== "mail" || !user || user.features.mail);
+}
+
 export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void; onAssistant: () => void; badges?: Partial<Record<Tab, boolean>> }) {
+  const { user, openMembers } = useContext(UserContext);
+  const items = useItems();
   return <aside className="sidebar" aria-label="Workspace">
-    <div className="sidebar__brand"><span>Alex</span> Workspace</div>
+    <div className="sidebar__brand"><span>{user?.name ?? "Alex"}</span> Workspace</div>
     <nav className="sidebar__nav">
-      {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={18} /> {label}{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
+      {items.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={18} /> {label}{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
     </nav>
     <button type="button" className="sidebar__assistant" onClick={onAssistant}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
     <div className="sidebar__foot">
       <a href="/">Portfolio</a>
       <ThemeToggle className="sidebar-theme" />
       <SkinToggle className="sidebar-theme" />
+      {user?.role === "owner" && <button type="button" onClick={openMembers}><Users size={15} /> Members</button>}
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </div>
   </aside>;
 }
 
 export function TabBar({ tab, onTab, onAssistant, badges = {} }: { tab: Tab; onTab: (tab: Tab) => void; onAssistant: () => void; badges?: Partial<Record<Tab, boolean>> }) {
+  const items = useItems();
   return <nav className="tabbar" aria-label="Workspace">
-    {ITEMS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={22} /><span>{label}</span>{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
+    {items.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={22} /><span>{label}</span>{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
     <button type="button" onClick={onAssistant}><Sparkles size={22} /><span>Assistant</span></button>
   </nav>;
 }
 
 /** Phone-only row with the links the sidebar carries on desktop. */
 export function TopRow({ onSignOut }: { onSignOut: () => void }) {
+  const { user, openMembers } = useContext(UserContext);
   return <div className="toprow">
     <a href="/" className="ws-text-button">Portfolio</a>
     <ThemeToggle className="ws-text-button" />
     <SkinToggle className="ws-text-button" />
+    {user?.role === "owner" && <button type="button" className="ws-text-button" onClick={openMembers}><Users size={15} /> Members</button>}
     <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
   </div>;
 }

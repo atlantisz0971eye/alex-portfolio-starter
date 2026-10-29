@@ -1,7 +1,6 @@
 import { PDFParse } from "pdf-parse";
-import { get } from "@vercel/blob";
 import { workspaceAuthorized } from "../../../../../lib/workspaceAuth";
-import { readDocument, readDocumentText, workspaceStorageConfigured, writeDocument } from "../../../../../lib/workspaceStore";
+import { readDocument, readDocumentText, readOriginalFile, workspaceStorageConfigured, writeDocument } from "../../../../../lib/workspaceStore";
 import { recognize, VisionError, visionConfigured } from "../../../../../lib/vision";
 
 export const runtime = "nodejs";
@@ -53,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const pages = Array.isArray(body.pages) ? [...new Set(body.pages.map(Number))].filter((page) => pending.has(page)).slice(0, BATCH) : [];
     if (!pages.length) return Response.json({ done: [], pending: [...pending], characterCount: document.characterCount });
 
-    const original = await get(document.filePath, { access: "private", useCache: false });
+    const original = await readOriginalFile(document);
     if (!original || original.statusCode !== 200) return Response.json({ error: "file_not_found" }, { status: 404 });
     const bytes = new Uint8Array(await new Response(original.stream).arrayBuffer());
     const parser = new PDFParse({ data: bytes });

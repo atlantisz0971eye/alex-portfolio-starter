@@ -1,5 +1,6 @@
 import { get, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
+import { scopeRoot } from "./workspaceScope";
 import {
   addDaysToKey, dateKey, daysBetweenKeys, expand, isDateOnly, toInstant, validZone, wallDate, wallParts, zonedToInstant,
   type Occurrence, type Repeat, type StoredEvent,
@@ -8,7 +9,7 @@ import {
 export type Category = { id: string; name: string; color: string };
 type CalendarDoc = { categories: Category[]; events: StoredEvent[] };
 
-const PATH = "workspace/calendar/data.json";
+const calendarPath = async () => `${await scopeRoot()}calendar/data.json`;
 const MAX_EVENTS = 5000;
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: "personal", name: "Personal", color: "#0a84ff" },
@@ -18,14 +19,14 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 export async function readCalendar(): Promise<CalendarDoc> {
-  const result = await get(PATH, { access: "private", useCache: false });
+  const result = await get(await calendarPath(), { access: "private", useCache: false });
   if (!result || result.statusCode !== 200) return { categories: DEFAULT_CATEGORIES, events: [] };
   const doc = JSON.parse(await new Response(result.stream).text()) as Partial<CalendarDoc>;
   return { categories: doc.categories?.length ? doc.categories : DEFAULT_CATEGORIES, events: doc.events ?? [] };
 }
 
 async function writeCalendar(doc: CalendarDoc) {
-  await put(PATH, JSON.stringify(doc), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  await put(await calendarPath(), JSON.stringify(doc), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
 export class CalendarInputError extends Error {}

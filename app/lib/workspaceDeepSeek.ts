@@ -1,3 +1,10 @@
+import { chargeAi, QuotaError } from "./aiQuota";
+
+/** Charges the signed-in member for one AI call; a used-up allowance reads as status 599 so every caller reports it the same way. */
+async function charge() {
+  try { await chargeAi(); } catch (error) { if (error instanceof QuotaError) throw new DeepSeekError(599); throw error; }
+}
+
 export class DeepSeekError extends Error {
   /** `status` is DeepSeek's HTTP status, or 0 when the key is not configured here. */
   constructor(readonly status: number) {
@@ -7,6 +14,7 @@ export class DeepSeekError extends Error {
 
 /** Maps an upstream status to the error code the client explains to the reader. */
 export function deepSeekErrorCode(status: number) {
+  if (status === 599) return "ai_quota";
   if (status === 0) return "ai_not_configured";
   if (status === 401) return "ai_auth";
   if (status === 402) return "ai_balance";
@@ -33,6 +41,7 @@ type Chunk = { choices?: { delta?: { content?: string | null } }[] };
 export async function* streamDeepSeek(system: string, user: string, maxTokens: number, signal?: AbortSignal): AsyncGenerator<string> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new DeepSeekError(0);
+  await charge();
   const controller = new AbortController();
   let stalled = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -102,6 +111,8 @@ export async function* streamDeepSeek(system: string, user: string, maxTokens: n
 export async function quickDeepSeek(system: string, user: string, maxTokens: number, timeoutMs: number) {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) return null;
+  // Callers of this helper treat "no answer" as a soft failure, so a used-up allowance reads the same way.
+  try { await chargeAi(); } catch (error) { if (error instanceof QuotaError) return null; throw error; }
   try {
     const response = await fetch(ENDPOINT, {
       method: "POST",
@@ -156,6 +167,7 @@ type ToolChunk = { choices?: { delta?: { content?: string | null; tool_calls?: {
 export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], maxTokens: number, signal?: AbortSignal): AsyncGenerator<ChatPart> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new DeepSeekError(0);
+  await charge();
   const controller = new AbortController();
   let stalled = false;
   let timer: ReturnType<typeof setTimeout> | undefined;

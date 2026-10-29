@@ -1,9 +1,9 @@
-import { get } from "@vercel/blob";
 import { after } from "next/server";
 import { enrichDocument } from "../../../../lib/bookEnrich";
+import { currentUser, runAs } from "../../../../lib/workspaceScope";
 import { workspaceAuthorized } from "../../../../lib/workspaceAuth";
 import { emptyPages, ExtractError, extractDocument } from "../../../../lib/workspaceExtract";
-import { deleteDocument, readDocument, readDocumentText, workspaceStorageConfigured, writeDocument } from "../../../../lib/workspaceStore";
+import { deleteDocument, readDocument, readDocumentText, readOriginalFile, workspaceStorageConfigured, writeDocument } from "../../../../lib/workspaceStore";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await writeDocument(updated);
       return Response.json({ document: updated, emptyPages: empty.length, totalPages: total });
     }
-    const original = await get(document.filePath, { access: "private", useCache: false });
+    const original = await readOriginalFile(document);
     if (!original || original.statusCode !== 200) return Response.json({ error: "file_not_found" }, { status: 404 });
     const extension = document.mimeType === "application/pdf" ? "pdf" : (document.name.split(".").pop() ?? "txt").toLowerCase();
     const { text, pageCount, ocrPending } = await extractDocument(new Uint8Array(await new Response(original.stream).arrayBuffer()), extension);
@@ -77,7 +77,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     delete updated.outline;
     delete updated.outlineSource;
     await writeDocument(updated, text);
-    after(async () => { await enrichDocument(document.id, ["outline"]).catch(() => undefined); });
+    // Background work has no cookie, so it carries the signed-in person with it.
+    const me = await currentUser();
+    after(() => runAs(me, async () => { await enrichDocument(document.id, ["outline"]).catch(() => undefined); }));
     return Response.json({ document: updated, emptyPages: ocrPending.length, totalPages: pageCount });
   } catch (error) {
     if (error instanceof ExtractError) return Response.json({ error: error.code }, { status: error.status });

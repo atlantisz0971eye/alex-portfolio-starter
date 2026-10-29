@@ -3,6 +3,7 @@ import { authUrl, pkcePair } from "../../../../lib/gmail";
 import { mailGuard, OAUTH_COOKIE } from "../../../../lib/mailGuard";
 import { MAX_ACCOUNTS, readAccounts } from "../../../../lib/mailStore";
 import { workspaceSign } from "../../../../lib/workspaceAuth";
+import { currentUser } from "../../../../lib/workspaceScope";
 
 export const runtime = "nodejs";
 
@@ -16,9 +17,10 @@ export async function GET(request: Request) {
   if (accounts.length >= MAX_ACCOUNTS && !accounts.some((account) => account.email === hint)) {
     return Response.redirect(`${url.origin}/workspace?mail=error&reason=too_many_accounts`, 302);
   }
+  const me = await currentUser();
   const nonce = randomBytes(16).toString("base64url");
   const { verifier, challenge } = pkcePair();
-  const location = authUrl({ state: workspaceSign(nonce), challenge, redirectUri: `${url.origin}/api/workspace/mail/callback`, loginHint: hint });
+  const location = authUrl({ state: workspaceSign(`${me.id}.${nonce}`), challenge, redirectUri: `${url.origin}/api/workspace/mail/callback`, loginHint: hint });
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return new Response(null, {
     status: 302,

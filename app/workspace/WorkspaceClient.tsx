@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import { ArrowLeft, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ENRICH_VERSION } from "../lib/bookTitle";
 import type { WorkspaceDocument, WorkspaceLibraryItem } from "../lib/workspaceStore";
 import { AssistantSheet, type AssistantIntent } from "./AssistantSheet";
@@ -16,10 +16,11 @@ import { GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Notes } from "./Notes";
-import { Sidebar, TabBar, ThemeContext, type Skin, type Tab, type Theme } from "./Shell";
+import { Members } from "./Members";
+import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Skin, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
 
-type Props = { authorized: boolean; configured: boolean };
+type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
 
 const MAIL_NOTES: Record<string, string> = {
   too_many_accounts: "Two Gmail accounts are already connected. Disconnect one first.",
@@ -65,7 +66,9 @@ function Login({ configured }: { configured: boolean }) {
   </main>;
 }
 
-export default function WorkspaceClient({ authorized, configured }: Props) {
+export default function WorkspaceClient({ authorized, configured, user }: Props) {
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [errorText, setErrorText] = useState("");
   // Track the visual viewport: iOS keeps 100dvh unchanged when the keyboard opens.
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -111,10 +114,11 @@ export default function WorkspaceClient({ authorized, configured }: Props) {
   }, []);
   const toggleSkin = () => setSkin((current) => { const next = current === "graphic" ? "paper" : "graphic"; try { localStorage.setItem("ws-skin", next); } catch { /* storage unavailable */ } return next; });
   const toggle = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; try { localStorage.setItem("ws-theme", next); } catch { /* storage unavailable */ } return next; });
-  return <ThemeContext.Provider value={{ theme, toggle, skin, toggleSkin }}><div className="ws-root" data-theme={theme} data-skin={skin}>{authorized ? <App /> : <Login configured={configured} />}</div></ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggle, skin, toggleSkin }}><div className="ws-root" data-theme={theme} data-skin={skin}>{authorized ? <UserContext.Provider value={{ user, openMembers: () => setMembersOpen(true) }}><App />{user?.role === "owner" && <Members open={membersOpen} onClose={() => setMembersOpen(false)} onError={setErrorText} />}{errorText && <div className="ws-toast" role="alert"><span>{errorText}</span><button type="button" onClick={() => setErrorText("")} aria-label="Dismiss"><X size={16} /></button></div>}</UserContext.Provider> : <Login configured={configured} />}</div></ThemeContext.Provider>;
 }
 
 function App() {
+  const { user } = useContext(UserContext);
   const [documents, setDocuments] = useState<WorkspaceLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -310,7 +314,7 @@ function App() {
       const id = crypto.randomUUID();
       const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
       const type = extension === "pdf" ? "application/pdf" : extension === "md" ? "text/markdown" : extension.startsWith("htm") ? "text/html" : "text/plain";
-      const blob = await upload(`workspace/files/${id}/${safeName}`, file, {
+      const blob = await upload(`${user?.root ?? "workspace/"}files/${id}/${safeName}`, file, {
         access: "private",
         handleUploadUrl: "/api/workspace/upload",
         contentType: type,
