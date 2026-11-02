@@ -36,14 +36,17 @@
 /* ---- navigation: a corner word, then a page of huge words ---- */
 .ws-root[data-skin="byte"] .tabbar, .ws-root[data-skin="byte"] .toprow { display: none; }
 .ws-root[data-skin="byte"] .shell { grid-template-columns: minmax(0, 1fr); }
-.ws-root[data-skin="byte"] .sidebar { position: fixed; z-index: 40; inset: 0 auto auto 0; display: flex; flex-direction: row; align-items: baseline; gap: 3ch; padding: 14px 2.2vw; background: transparent; border: 0; }
+.ws-root[data-skin="byte"] .sidebar { position: fixed; z-index: 40; inset: 0 0 auto 0; display: flex; flex-direction: row; align-items: baseline; gap: 3ch; padding: 14px 2.2vw 12px; background: transparent; border: 0; }
+/* Closed, the corner is a strip of frosted glass over whatever scrolls beneath, as on the portfolio. It lets clicks through except on its own words. */
+.ws-root[data-skin="byte"] .sidebar:not([data-open]) { background: color-mix(in srgb, var(--bg) 62%, transparent); -webkit-backdrop-filter: blur(10px) !important; backdrop-filter: blur(10px) !important; pointer-events: none; }
+.ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__brand, .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__index { pointer-events: auto; }
 .ws-root[data-skin="byte"] .sidebar__brand { padding: 0; font-size: 15px; font-weight: 700; color: var(--text); }
 .ws-root[data-skin="byte"] .sidebar__brand span { color: var(--text); margin: 0; }
 .ws-root[data-skin="byte"] .sidebar__index { display: inline; color: var(--text-2); font-size: 15px; }
 .ws-root[data-skin="byte"] .sidebar__index::before { content: "■ "; color: var(--blue); }
 .ws-root[data-skin="byte"] .sidebar__index:hover { color: var(--text); }
 .ws-root[data-skin="byte"] .sidebar__nav, .ws-root[data-skin="byte"] .sidebar__assistant, .ws-root[data-skin="byte"] .sidebar__foot { display: none; }
-.ws-root[data-skin="byte"] .sidebar[data-open] { inset: 0; width: auto; height: auto; flex-direction: column; align-items: flex-start; gap: 0; padding: 14px 2.2vw 4vw; background: var(--bg); overflow-y: auto; }
+.ws-root[data-skin="byte"] .sidebar[data-open] { z-index: 50; inset: 0; width: auto; height: auto; flex-direction: column; align-items: flex-start; gap: 0; padding: 14px 2.2vw 4vw; background: var(--bg); overflow-y: auto; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__brand, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__index { position: fixed; top: 14px; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__index { left: calc(2.2vw + 22ch); }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav { display: flex; flex-direction: column; gap: 0; margin-top: 6vh; width: 100%; }
@@ -68,7 +71,7 @@
 .ws-root[data-skin="byte"] .pagetitle h1 { font-family: var(--display); font-size: clamp(48px, min(20vw, calc(94vw / (var(--chars, 6) * .675))), 300px); font-weight: 800; letter-spacing: -.05em; line-height: 1; margin: 0 0 0 -.04em; white-space: nowrap; text-transform: uppercase; color: var(--text); }
 .ws-root[data-skin="byte"] .pagetitle h1::before { content: ""; display: table; margin-bottom: -.148em; }
 .ws-root[data-skin="byte"] .pagetitle h1::after { content: ""; display: table; margin-top: -.166em; }
-.ws-root[data-skin="byte"] .pagetitle__actions { position: absolute; z-index: 3; top: -40px; right: 0; display: flex; align-items: center; gap: 2ch; }
+.ws-root[data-skin="byte"] .pagetitle__actions { position: absolute; z-index: 45; top: -40px; right: 0; display: flex; align-items: center; gap: 2ch; }
 .ws-root[data-skin="byte"] .section-label { padding-top: 0; border-top: 0; margin: 5vw 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: lowercase; color: var(--blue); }
 .ws-root[data-skin="byte"] .section-label::before { content: "■ "; }
 .ws-root[data-skin="byte"] .today__date { color: var(--text-2); margin: 0 0 3vw; }
