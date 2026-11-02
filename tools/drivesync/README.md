@@ -1,7 +1,24 @@
 # drivesync
 
 把电脑上标记的文件夹镜像到 Google Drive，并在 Workspace 里显示在线状态和同步情况（侧栏 **Drive sync**）。
-一个文件、没有依赖，只需要 Node 18+ 和 [rclone](https://rclone.org)。
+没有依赖，只需要 Node 18+ 和 [rclone](https://rclone.org)。
+
+## 桌面应用（不用终端）
+
+```bash
+node tools/drivesync/drivesync.mjs app      # 在 ~/Applications 生成 “Drive Sync.app”
+```
+
+双击 **Drive Sync** 打开窗口（有 Chrome / Edge / Brave 时是独立的应用窗口，否则是浏览器标签页）：
+
+- **添加文件夹**：点 “Add folder…”，用 Finder 的原生选择框选，可改在 Drive 里显示的名字、选 “Copy only”。
+- **预览**：每个文件夹的 “Preview” 只比对不上传，告诉你会复制多少、会从 Drive 移除多少。
+- **首次运行不会自动上传**：窗口里先看、先预览，按 “Start syncing” 才开始。
+- **状态**：每个文件夹的状态、上次同步时间、文件数和大小、出错原因；右上角可暂停 / 恢复、立即同步全部。
+- **设置清单**：检查 rclone、Google Drive 连接（“Connect Google Drive” 一键登录）、和 Workspace 的连接（令牌、测试），以及 “Start at login” 开关。
+- 窗口只通过 `127.0.0.1` 访问，需要应用交给它的密钥，别的网页和别的程序都用不了。
+
+窗口就是后台进程提供的一个页面：关掉窗口不影响同步。如果后台进程是旧版本，打开应用时会问你是否做一次性更新（几秒后重启，上传会接着继续）。
 
 ## 安装（只做一次）
 
@@ -45,7 +62,7 @@ drivesync sync ANTs --dry-run      # 只显示会传什么、删什么，不真�
 
 ```
 drivesync init | add | remove | list | status | sync [NAME] [--dry-run] [--force]
-drivesync doctor | install | uninstall | logs
+drivesync app | pause | resume | doctor | install | uninstall | logs
 ```
 
 日志在 `~/.drivesync/logs/`。换电脑（比如以后的 Mac mini）：装 rclone，复制 `~/.drivesync/`（`folders.json` 和 `config.json`），再 `drivesync install`。

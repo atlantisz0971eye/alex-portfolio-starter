@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive Sync</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f6f3; --card: #fff; --text: #16171a; --muted: #6d7078; --line: #e3e3de; --accent: #1f9d6b; --accent-ink: #fff; --warn: #c27a00; --bad: #d4382c; --soft: #efefea; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111214; --card: #1a1c1f; --text: #ececec; --muted: #8e929a; --line: #2a2d32; --accent: #38d39f; --accent-ink: #06130d; --warn: #ffb020; --bad: #ff6b5e; --soft: #23262b; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 860px; margin: 0 auto; padding: 22px 22px 60px; }
+  header.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  .grow { flex: 1; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 7px 13px; transition: background .12s, opacity .12s; }
+  button:hover:not(:disabled) { background: var(--soft); } button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; } button.primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--accent); }
+  button.quiet { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 8px; } button.quiet:hover:not(:disabled) { color: var(--text); background: var(--soft); } button.danger { color: var(--bad); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--soft); font-size: 12px; font-weight: 600; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); } .ok .dot { background: var(--accent); } .busy .dot { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; } .bad .dot { background: var(--bad); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  section { margin-bottom: 20px; }
+  h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .banner { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 14px 16px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); margin-bottom: 18px; } .banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--card)); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+  .banner p { margin: 0; flex: 1; min-width: 220px; } .banner strong { display: block; font-size: 15px; }
+  .step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); } .step:first-child { border-top: 0; padding-top: 0; } .step:last-child { padding-bottom: 0; }
+  .tick { flex: none; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--soft); color: var(--muted); } .tick.ok { background: var(--accent); color: var(--accent-ink); } .tick.bad { background: var(--bad); color: #fff; }
+  .step .what { flex: 1; min-width: 0; } .step .what b { font-weight: 600; } .step small, .muted { color: var(--muted); } .step small { display: block; }
+  code, .path { font-family: var(--mono); font-size: 12px; } code { background: var(--soft); padding: 1px 6px; border-radius: 6px; user-select: all; }
+  .folder { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line); } .folder:first-child { border-top: 0; padding-top: 2px; } .folder:last-child { padding-bottom: 2px; }
+  .folder .main { flex: 1; min-width: 0; } .folder .name { font-weight: 650; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .folder .path { color: var(--muted); overflow-wrap: anywhere; margin-top: 2px; }
+  .folder .meta { margin-top: 5px; color: var(--muted); } .folder .err { margin-top: 5px; color: var(--bad); }
+  .folder .acts { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; max-width: 300px; }
+  .tag { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); } .tag.ok { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); } .tag.busy { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); } .tag.bad { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+  .empty { text-align: center; padding: 26px 10px; color: var(--muted); }
+  .switch { position: relative; width: 40px; height: 24px; flex: none; } .switch input { opacity: 0; width: 0; height: 0; } .switch span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: .15s; cursor: pointer; } .switch span::after { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: .15s; } .switch input:checked + span { background: var(--accent); } .switch input:checked + span::after { transform: translateX(16px); }
+  .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; } .log li { color: var(--muted); font-size: 13px; } .log time { font-family: var(--mono); font-size: 12px; margin-right: 8px; }
+  footer { color: var(--muted); font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); padding: 20px; width: min(560px, calc(100vw - 32px)); box-shadow: 0 24px 60px rgba(0,0,0,.35); } dialog::backdrop { background: rgba(0,0,0,.42); }
+  dialog h3 { margin: 0 0 12px; font-size: 17px; } dialog label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 12px; } dialog input[type=text] { width: 100%; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+  dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; } .check { display: flex; gap: 9px; align-items: flex-start; margin-top: 14px; } .check input { margin-top: 3px; } .err-text { color: var(--bad); margin-top: 10px; }
+  pre { margin: 10px 0 0; max-height: 260px; overflow: auto; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; }
+  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; display: inline-block; vertical-align: -2px; margin-right: 6px; } @keyframes spin { to { transform: rotate(360deg); } }
+  .lost { position: fixed; left: 0; right: 0; top: 0; padding: 8px; text-align: center; background: var(--bad); color: #fff; font-weight: 600; z-index: 9; }
+</style>
+</head>
+<body>
+<div id="lost" class="lost" hidden>Reconnecting to Drive Sync…</div>
+<main>
+  <header class="top">
+    <h1>Drive Sync</h1>
+    <span id="status" class="pill"><i class="dot"></i><span>…</span></span>
+    <span class="grow"></span>
+    <button id="syncAll">Sync all now</button>
+    <button id="toggle" class="primary">Pause</button>
+  </header>
+
+  <div id="banner"></div>
+
+  <section id="setup"></section>
+
+  <section>
+    <h2>Folders <button id="add" class="primary" style="margin-left:auto;text-transform:none;letter-spacing:0;font-size:13px">+ Add folder…</button></h2>
+    <div id="folders" class="card"></div>
+  </section>
+
+  <section>
+    <h2>Recent activity</h2>
+    <div class="card"><ul id="log" class="log"></ul></div>
+  </section>
+
+  <footer>
+    <span id="where"></span>
+    <button class="quiet" id="openDrive">Open Google Drive</button>
+    <button class="quiet" id="openLogs">Show log file</button>
+    <span class="grow"></span>
+    <span id="version"></span>
+  </footer>
+</main>
+
+<dialog id="addDialog">
+  <h3>Add a folder</h3>
+  <div class="muted">Everything in it is copied to Google Drive and kept up to date.</div>
+  <label>Folder</label><div id="addPath" class="path" style="overflow-wrap:anywhere"></div>
+  <label for="addName">Name on Google Drive</label><input id="addName" type="text" maxlength="60">
+  <label class="check"><input id="addCopy" type="checkbox"><span><b style="color:var(--text)">Copy only</b><br><span class="muted">Never remove anything from Drive, even if you delete it here.</span></span></label>
+  <div id="addErr" class="err-text" hidden></div>
+  <div class="row"><button id="addCancel">Cancel</button><button id="addGo" class="primary">Add folder</button></div>
+</dialog>
+
+<dialog id="dryDialog">
+  <h3 id="dryTitle">Preview</h3>
+  <div id="dryBody"></div>
+  <div class="row"><button id="dryClose">Close</button></div>
+</dialog>
+
+<script>
+const $ = (selector) => document.querySelector(selector);
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let S = null;
+let reachable = true;
+
+async function api(path, body) {
+  const options = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-DriveSync": "1" }, body: JSON.stringify(body) };
+  const response = await fetch(path, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Something went wrong (${response.status})`);
+  return data;
+}
+const ago = (iso) => { if (!iso) return "never"; const s = (Date.now() - Date.parse(iso)) / 1000; return s < 15 ? "just now" : s < 90 ? `${Math.round(s)} s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`; };
+const size = (b) => b == null ? "" : b < 1024 ** 2 ? `${Math.max(1, Math.round(b / 1024))} KB` : b < 1024 ** 3 ? `${Math.round(b / 1024 ** 2)} MB` : `${(b / 1024 ** 3).toFixed(1)} GB`;
+const act = async (fn, button) => { if (button) button.disabled = true; try { await fn(); } catch (error) { alert(error.message); } finally { if (button) button.disabled = false; await poll(); } };
+
+let drawn = { sig: "", at: 0 };
+async function poll() {
+  try {
+    S = await api("/api/state");
+    if (!reachable) { reachable = true; $("#lost").hidden = true; }
+    // Redraw only when something changed (or every 30 s so “3 min ago” stays true): a page that rebuilds itself under the
+    // pointer swallows clicks.
+    const sig = JSON.stringify(S, (key, value) => key === "at" || key === "startedAt" ? undefined : value);
+    if (sig !== drawn.sig || Date.now() - drawn.at > 30_000) { drawn = { sig, at: Date.now() }; render(); }
+  } catch { reachable = false; $("#lost").hidden = false; }
+}
+
+function summary() {
+  if (!S) return ["", "…"];
+  const f = S.folders;
+  if (S.firstRun) return ["", "Not started"];
+  if (f.some((x) => x.state === "error")) return ["bad", "Needs attention"];
+  if (S.paused) return ["", "Paused"];
+  if (!S.online) return ["", "Offline"];
+  if (S.running || S.queue.length || f.some((x) => x.state === "syncing" || x.state === "queued")) return ["busy", "Syncing…"];
+  return ["ok", "Up to date"];
+}
+
+function render() {
+  const [tone, label] = summary();
+  $("#status").className = `pill ${tone}`; $("#status span").textContent = label;
+  $("#toggle").textContent = S.firstRun ? "Start syncing" : S.paused ? "Resume" : "Pause";
+  $("#toggle").className = S.firstRun || S.paused ? "primary" : "";
+  $("#syncAll").disabled = !S.folders.length;
+  $("#version").textContent = `v${S.version} · ${S.device}`;
+  $("#where").textContent = `On Drive: ${S.root}/…  ·  removed files stay in ${S.archive}/ for 30 days`;
+
+  $("#banner").innerHTML = S.firstRun
+    ? `<div class="banner"><p><strong>Nothing has been uploaded yet.</strong>Look over the folders below. “Preview” shows what would be copied without changing anything. When you are ready, press Start syncing.</p><button class="primary" id="startBanner">Start syncing</button></div>`
+    : S.paused ? `<div class="banner warn"><p><strong>Syncing is paused.</strong>Changes are not being sent to Google Drive.</p><button class="primary" id="startBanner">Resume</button></div>` : "";
+  const sb = $("#startBanner"); if (sb) sb.onclick = () => act(() => api("/api/resume", {}), sb);
+
+  renderSetup();
+  renderFolders();
+  $("#log").innerHTML = S.events.length ? S.events.slice(0, 40).map((e) => `<li><time>${new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>${esc(e.text)}</li>`).join("") : `<li>Nothing yet.</li>`;
+}
+
+const CHECKS = {
+  rclone: ["The transfer tool (rclone)", "Install it once with: brew install rclone"],
+  remote: ["Google Drive account", ""],
+  drive: ["Google Drive account", ""],
+};
+function renderSetup() {
+  const checks = S.setup.checks || [];
+  const byId = Object.fromEntries(checks.map((c) => [c.id, c]));
+  const drive = byId.drive ?? byId.remote;
+  const rows = [];
+  const row = (ok, title, note, action) => rows.push(`<div class="step"><span class="tick ${ok === true ? "ok" : ok === false ? "bad" : ""}">${ok === true ? "✓" : ok === false ? "!" : "·"}</span><div class="what"><b>${title}</b><small>${note || ""}</small></div>${action || ""}</div>`);
+  const pending = S.setup.busy && !checks.length;
+  if (byId.rclone) row(byId.rclone.ok, "Transfer tool (rclone)", byId.rclone.ok ? "Installed" : `Not installed. In Terminal, once: <code>brew install rclone</code>`, byId.rclone.ok ? "" : `<button id="recheck">Check again</button>`);
+  if (byId.rclone?.ok) {
+    const c = S.connect;
+    const note = drive?.ok ? "Connected" : c.running ? `<span class="spin"></span>Waiting for you to sign in, in your browser…${c.url ? ` <a href="${esc(c.url)}" target="_blank">Open the sign-in page</a>` : ""}` : c.error ? `<span style="color:var(--bad)">${esc(c.error)}</span>` : esc(drive?.hint || "Not connected yet");
+    row(drive?.ok ?? false, "Google Drive account", note, drive?.ok ? "" : `<button class="primary" id="connect" ${c.running ? "disabled" : ""}>Connect Google Drive</button>`);
+  }
+  const wk = byId.workspace;
+  if (byId.token && !byId.token.ok) row(false, "Workspace link", "Not set up. In Terminal, once: <code>node ~/.drivesync/drivesync.mjs init</code> — it prints the token to put in Vercel.", "");
+  else row(wk ? wk.ok : null, "Workspace link", wk ? (wk.ok ? esc(wk.text) : `${esc(wk.text)}${wk.hint ? ` — ${esc(wk.hint)}` : ""}`) : "Checking…", `<span style="display:flex;gap:4px"><button class="quiet" id="showToken">Token</button><button class="quiet" id="testWk">Test</button></span>`);
+  row(S.login.installed, "Start at login", S.login.installed ? "Drive Sync runs in the background whenever you are logged in." : "Off. Syncing only runs while this app’s background process is running.", `<label class="switch"><input type="checkbox" id="login" ${S.login.installed ? "checked" : ""}><span></span></label>`);
+  const allGood = checks.length && checks.every((c) => c.ok || c.id.startsWith("folder:")) && S.login.installed;
+  $("#setup").innerHTML = `<h2>Setup ${allGood ? `<span class="tag ok">all good</span>` : ""}<button class="quiet" id="toggleSetup" style="margin-left:auto;text-transform:none;letter-spacing:0">${allGood && !window.__showSetup ? "Show" : "Hide"}</button></h2>${allGood && !window.__showSetup ? "" : `<div class="card">${rows.join("")}</div>`}`;
+  const bind = (id, fn) => { const el = $(id); if (el) el.onclick = () => act(fn, el); };
+  bind("#recheck", () => api("/api/check", {}));
+  bind("#connect", () => api("/api/connect-drive", {}));
+  bind("#testWk", async () => { const r = await api("/api/test-workspace", {}); await api("/api/check", {}); alert(r.status === 200 ? "The Workspace can see this computer." : r.status === 401 ? "The Workspace refused the token. It differs from WORKSPACE_SYNC_TOKEN in Vercel." : r.status === 503 ? "WORKSPACE_SYNC_TOKEN is not set in Vercel yet." : "The Workspace could not be reached."); });
+  bind("#showToken", async () => { const { token } = await api("/api/token"); prompt("Put this in Vercel as WORKSPACE_SYNC_TOKEN (Settings → Environment Variables), then redeploy:", token); });
+  const ts = $("#toggleSetup"); if (ts) ts.onclick = () => { window.__showSetup = !window.__showSetup; renderSetup(); };
+  const lg = $("#login"); if (lg) lg.onchange = () => act(async () => { await api("/api/login", { on: lg.checked }); if (lg.checked) alert("Done. Drive Sync restarts for a moment and will start by itself at login."); });
+}
+
+function renderFolders() {
+  const box = $("#folders");
+  if (!S.folders.length) { box.innerHTML = `<div class="empty">No folders yet.<br>Press <b>Add folder…</b> and pick a folder to keep on Google Drive.</div>`; return; }
+  box.innerHTML = S.folders.map((f) => {
+    const tone = f.state === "error" ? "bad" : f.state === "syncing" || f.state === "queued" ? "busy" : f.state === "idle" && f.lastOk ? "ok" : "";
+    const name = esc(f.name);
+    const meta = f.state === "error" ? "" : f.state === "unmounted" ? "The disk is not connected." : f.lastOk ? `Synced ${ago(f.lastOk)} · ${(f.files ?? 0).toLocaleString()} files · ${size(f.bytes)}${f.transferred ? ` · ${f.transferred} changed` : ""}` : "Not synced yet.";
+    return `<div class="folder" data-name="${name}">
+      <div class="main">
+        <div class="name">${name}<span class="tag ${tone}">${f.state === "unmounted" ? "disk not connected" : f.state === "idle" && !f.lastOk ? "waiting" : f.state}</span>${f.mode === "copy" ? `<span class="tag">copy only</span>` : ""}</div>
+        <div class="path">${esc(f.path)}</div>
+        ${meta ? `<div class="meta">${meta}</div>` : ""}
+        ${f.state === "error" ? `<div class="err">${esc(f.lastError || "Failed")}</div>` : ""}
+      </div>
+      <div class="acts">
+        <button class="quiet" data-do="sync">Sync now</button><button class="quiet" data-do="dry">Preview</button><button class="quiet" data-do="open">Open</button><button class="quiet danger" data-do="remove">Remove</button>
+      </div></div>`;
+  }).join("");
+  box.querySelectorAll("[data-do]").forEach((button) => {
+    const name = button.closest(".folder").dataset.name.replace(/&amp;/g, "&");
+    const real = S.folders.find((f) => esc(f.name) === button.closest(".folder").dataset.name)?.name ?? name;
+    button.onclick = () => {
+      const what = button.dataset.do;
+      if (what === "sync") act(() => api("/api/sync", { name: real }), button);
+      if (what === "open") act(() => api("/api/open", { what: "folder", name: real }), button);
+      if (what === "dry") preview(real);
+      if (what === "remove" && confirm(`Stop syncing “${real}”?\n\nThe copy already on Google Drive and the folder on your computer are left as they are.`)) act(() => api("/api/folders/remove", { name: real }), button);
+    };
+  });
+}
+
+async function preview(name) {
+  const dialog = $("#dryDialog");
+  $("#dryTitle").textContent = `Preview: ${name}`;
+  $("#dryBody").innerHTML = `<div class="muted"><span class="spin"></span>Comparing with Google Drive… a large folder can take a minute. Nothing is changed.</div>`;
+  dialog.showModal();
+  try {
+    const r = await api("/api/dry-run", { name });
+    if (r.error) $("#dryBody").innerHTML = `<div class="err-text">${esc(r.error)}</div>`;
+    else if (r.skipped) $("#dryBody").innerHTML = `<div class="muted">The disk for this folder is not connected.</div>`;
+    else $("#dryBody").innerHTML = `<div><b>${r.copies}</b> file${r.copies === 1 ? "" : "s"} would be copied or updated.<br><b>${r.deletes}</b> would be removed from Drive (kept in the archive for 30 days).</div><pre>${esc(r.lines.join("\n") || "Already up to date.")}</pre>`;
+  } catch (error) { $("#dryBody").innerHTML = `<div class="err-text">${esc(error.message)}</div>`; }
+}
+$("#dryClose").onclick = () => $("#dryDialog").close();
+
+let picked = null;
+$("#add").onclick = () => act(async () => {
+  const { path } = await api("/api/folders/pick", {});
+  if (!path) return;
+  picked = path;
+  $("#addPath").textContent = path; $("#addName").value = path.split("/").filter(Boolean).pop() || "folder"; $("#addCopy").checked = false; $("#addErr").hidden = true;
+  $("#addDialog").showModal(); $("#addName").select();
+}, $("#add"));
+$("#addCancel").onclick = () => $("#addDialog").close();
+$("#addGo").onclick = async () => {
+  $("#addGo").disabled = true;
+  try { await api("/api/folders", { path: picked, name: $("#addName").value, copy: $("#addCopy").checked }); $("#addDialog").close(); await poll(); }
+  catch (error) { $("#addErr").textContent = error.message; $("#addErr").hidden = false; }
+  finally { $("#addGo").disabled = false; }
+};
+$("#addName").addEventListener("keydown", (event) => { if (event.key === "Enter") $("#addGo").click(); });
+
+$("#syncAll").onclick = (event) => act(() => api("/api/sync", {}), event.currentTarget);
+$("#toggle").onclick = (event) => act(() => api(S.paused || S.firstRun ? "/api/resume" : "/api/pause", {}), event.currentTarget);
+$("#openDrive").onclick = () => act(() => api("/api/open", { what: "drive" }));
+$("#openLogs").onclick = () => act(() => api("/api/open", { what: "logs" }));
+
+setInterval(poll, 2000);
+poll();
+</script>
+</body>
+</html>
