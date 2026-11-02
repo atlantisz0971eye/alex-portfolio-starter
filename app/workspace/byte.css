@@ -190,3 +190,18 @@
 /* Chinese titles are taller than the Latin capitals the trim was measured on, so they keep their full box. */
 .ws-root[data-skin="byte"] .pagetitle h1[data-wide] { line-height: 1.12; padding-top: .06em; }
 .ws-root[data-skin="byte"] .pagetitle h1[data-wide]::before, .ws-root[data-skin="byte"] .pagetitle h1[data-wide]::after { content: none; }
+
+/* Mindstreams: the notebook is a line of text, the map is plain words under it. */
+.ws-root[data-skin="byte"] .mind__input { font-family: var(--mono); font-size: 20px; line-height: 30px; border-bottom: 1px dashed var(--line); padding: 0 0 4px; }
+.ws-root[data-skin="byte"] .mind__overview { font-size: 24px; line-height: 34px; max-width: 30em; margin-bottom: 3vw; }
+.ws-root[data-skin="byte"] .mind__project { max-width: none; margin-bottom: 3vw; }
+.ws-root[data-skin="byte"] .mind__summary { color: var(--text); max-width: 46em; }
+.ws-root[data-skin="byte"] .mind__topic > summary b { font-weight: 700; }
+.ws-root[data-skin="byte"] .mind__topic > summary::before { content: "□"; color: var(--text-2); }
+.ws-root[data-skin="byte"] .mind__topic[open] > summary::before { content: "■"; color: var(--blue); }
+.ws-root[data-skin="byte"] .mind__back { top: 14px; z-index: 55; }
+.ws-root[data-skin="byte"] .page--mind .pagetitle { margin-bottom: 2.4vw; }
+.ws-root[data-skin="byte"] .mind__hint { margin: 6px 0 2vw; }
+.ws-root[data-skin="byte"] .mind__overview { margin-bottom: 1.6vw; }
+.ws-root[data-skin="byte"] .page--mind .mind__tabs { margin: 0 0 1vw; }
+.ws-root[data-skin="byte"] .page--mind .section-label { margin: 2.6vw 0 6px; }

@@ -691,7 +691,7 @@ function Inner({ boardId, title, onTitle, onSaveState, onBack, onError, onChange
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChangeWithGuides} onEdgesChange={onEdgesChange} onConnect={onConnect} onReconnect={onReconnect}
           onNodeDragStop={onNodeDragStop} onConnectStart={() => setConnecting(true)} onConnectEnd={() => setConnecting(false)}
           connectionMode={ConnectionMode.Loose} connectionLineType={ConnectionLineType.SmoothStep} snapToGrid={snap} snapGrid={[GRID, GRID]} elevateNodesOnSelect={false}
-          selectionOnDrag={marquee} selectionMode={SelectionMode.Partial} panOnDrag={marquee ? [1, 2] : true} panOnScroll={marquee && !touch} multiSelectionKeyCode={["Meta", "Control", "Shift"]}
+          selectionOnDrag={marquee} selectionMode={SelectionMode.Partial} panOnDrag={marquee ? [1, 2] : true} panOnScroll={!touch} zoomOnScroll={touch} zoomOnPinch multiSelectionKeyCode={["Meta", "Control", "Shift"]}
           colorMode={theme} minZoom={0.1} maxZoom={2.5} zoomOnDoubleClick={false} connectionRadius={32} deleteKeyCode={["Backspace", "Delete"]} proOptions={{ hideAttribution: true }}>
           <Background variant={BackgroundVariant.Dots} gap={snap ? GRID * 3 : 22} size={1.4} />
           <Controls showInteractive={false} position="bottom-left" />

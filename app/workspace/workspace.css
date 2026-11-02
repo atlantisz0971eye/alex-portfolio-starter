@@ -1101,3 +1101,25 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .sync__folders strong { font-size: 15px; } .sync__folders small { color: var(--text-2); font-size: 12px; overflow-wrap: anywhere; } .sync__path { opacity: .75; }
 .sync__state { align-self: flex-start; padding: 1px 8px; border-radius: 999px; background: var(--f2); color: var(--text-2); font-size: 11px; } .sync__state--syncing, .sync__state--queued { background: rgba(255, 159, 10, .18); color: #ff9f0a; } .sync__state--error { background: rgba(255, 69, 58, .16); color: var(--danger); } .sync__state--idle { background: rgba(48, 209, 88, .16); color: #30d158; }
 .sync__log summary { cursor: pointer; color: var(--text-2); font-size: 13px; } .sync__log ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); } .sync__log time { margin-right: 6px; font-variant-numeric: tabular-nums; }
+
+/* ===== Mindstreams: the notebook and its map ===== */
+.mind__input { display: block; width: 100%; resize: none; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 18px; line-height: 1.5; }
+.mind__input:focus { border-bottom-color: var(--text); }
+.mind__hint { margin: 6px 0 22px; font-size: 13px; color: var(--text-2); }
+.mind__overview { max-width: 40em; margin: 0 0 22px; font-size: 18px; line-height: 1.55; }
+.mind__empty { color: var(--text-2); }
+.mind__project { max-width: 760px; margin-bottom: 28px; }
+.mind__project .section-label span { margin-left: 6px; font-weight: 400; }
+.mind__summary { margin: 4px 0 12px; font-size: 15px; line-height: 1.55; color: var(--text-2); }
+.mind__topic > summary { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; list-style: none; cursor: pointer; font-size: 16px; }
+.mind__topic > summary::-webkit-details-marker, .mind__entry > summary::-webkit-details-marker { display: none; }
+.mind__topic > summary span { font-size: 13px; color: var(--text-2); }
+.mind__topic { margin-bottom: 10px; }
+.mind__entry > summary { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; list-style: none; cursor: pointer; }
+.mind__kind { flex: none; min-width: 8ch; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.mind__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mind__entry time, .mind__entry i { flex: none; font-size: 12px; font-style: normal; color: var(--text-2); }
+.mind__entry p { margin: 4px 0 8px 9ch; font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mind__delete { margin: 0 0 8px 9ch; font-size: 13px; color: var(--text-2); }
+.mind__streamrow small { display: block; margin-left: 9ch; font-size: 12px; color: var(--text-2); }
+.mind__back { position: fixed; z-index: 30; top: 14px; right: 24px; font-size: 14px; color: var(--text-2); }
