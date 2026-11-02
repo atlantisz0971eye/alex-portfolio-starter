@@ -29,6 +29,7 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
   const [view, setView] = useRemembered("ws-mind-view", "tree");
   const [archive, setArchive] = useState(!!openId);
   const [rebuilding, setRebuilding] = useState(false);
+  const [moving, setMoving] = useState<{ id: string; project: string; topic: string } | null>(null);
   const polls = useRef(0);
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -67,6 +68,26 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
     catch (cause) { onError(cause instanceof Error ? cause.message : "Could not delete."); void load(); }
   }
 
+  const post = async (body: object) => parseResponse(await fetch("/api/workspace/mind", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+  async function move() {
+    if (!moving) return;
+    try { await post({ action: "edit", id: moving.id, project: moving.project, topic: moving.topic }); setMoving(null); await load(); }
+    catch (cause) { onError(cause instanceof Error ? cause.message : "Could not move it."); }
+  }
+  async function rename(project: string, topic: string) {
+    const to = window.prompt("Rename this topic", topic)?.trim();
+    if (!to || to === topic) return;
+    try { await post({ action: "renameTopic", project, topic, to }); await load(); }
+    catch (cause) { onError(cause instanceof Error ? cause.message : "Could not rename."); }
+  }
+
+  async function importOld() {
+    try {
+      const result = await parseResponse<{ added: number; checked: number; remaining: number }>(await fetch("/api/workspace/mind", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "importNotes" }) }));
+      onError(result.checked === 0 ? "Everything is already in the notebook." : `Brought ${result.added} pages into the notebook${result.remaining ? `; ${result.remaining} more, press again` : ""}. They are being filed.`);
+    } catch (cause) { onError(cause instanceof Error ? cause.message : "Could not import."); }
+  }
+
   async function rebuild() {
     if (rebuilding) return;
     setRebuilding(true);
@@ -98,17 +119,27 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
   }, [data]);
 
   if (archive) return <>
-    <button type="button" className="mind__back" onClick={() => setArchive(false)}>← notebook</button>
+    <div className="mind__back"><button type="button" onClick={() => void importOld()}>import these pages into the notebook</button><button type="button" onClick={() => setArchive(false)}>← notebook</button></div>
     <Notes onError={onError} onSignOut={onSignOut} refresh={refresh} openId={openId} />
   </>;
 
   const entry = (item: Item) => <details key={item.id} className="mind__entry">
     <summary><span className="mind__kind">{item.derived?.kind ?? "…"}</span><span className="mind__title">{item.derived?.title ?? item.text.slice(0, 48)}</span><time>{day.format(new Date(item.at))}</time>{item.source === "devlog" && <i>devlog</i>}</summary>
     <p>{item.text}</p>
-    {item.source === "notebook" && <button type="button" className="mind__delete" aria-label="Delete this entry" onClick={() => void remove(item.id)}><Trash2 size={14} /> delete</button>}
+    <div className="mind__tools">
+      {item.derived && <button type="button" className="mind__delete" onClick={() => setMoving({ id: item.id, project: item.derived!.project, topic: item.derived!.topic })}>move</button>}
+      {item.source === "notebook" && <button type="button" className="mind__delete" aria-label="Delete this entry" onClick={() => void remove(item.id)}><Trash2 size={14} /> delete</button>}
+    </div>
+    {moving?.id === item.id && <form className="mind__move" onSubmit={(event) => { event.preventDefault(); void move(); }}>
+      {item.source === "notebook" && <label>project <input list="mind-projects" value={moving.project} onChange={(event) => setMoving({ ...moving, project: event.target.value })} maxLength={28} /></label>}
+      <label>topic <input list="mind-topics" value={moving.topic} onChange={(event) => setMoving({ ...moving, topic: event.target.value })} maxLength={24} /></label>
+      <button type="submit" className="ws-text-button">save</button><button type="button" className="ws-text-button" onClick={() => setMoving(null)}>cancel</button>
+    </form>}
   </details>;
 
   const unfiled = data?.items.filter((item) => !item.derived) ?? [];
+  const projectNames = [...new Set(data?.projects.map((project) => project.name) ?? [])];
+  const topicNames = [...new Set(data?.topics.map((topic) => topic.name) ?? [])];
   return <main className="page page--mind">
     <TopRow onSignOut={onSignOut} />
     <div className="page__inner">
@@ -131,13 +162,14 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
       {view === "projects" && <Projects onError={onError} />}
       {view === "self" && <Self onError={onError} />}
 
+      <datalist id="mind-projects">{projectNames.map((name) => <option key={name} value={name} />)}</datalist><datalist id="mind-topics">{topicNames.map((name) => <option key={name} value={name} />)}</datalist>
       {view === "tree" && <>
         {unfiled.length > 0 && <section className="mind__project"><h2 className="section-label">filing</h2>{unfiled.map(entry)}</section>}
         {tree.map((project) => <section key={project.name} className="mind__project">
           <h2 className="section-label">{project.name} <span>{project.count}</span></h2>
           {project.summary && <p className="mind__summary">{project.summary}</p>}
           {project.topics.map((topic) => <details key={topic.name} className="mind__topic" open={topic.items.length <= 3}>
-            <summary><b>{topic.name}</b><span>{topic.items.length}</span></summary>
+            <summary><b>{topic.name}</b><span>{topic.items.length}</span><button type="button" className="mind__rename" onClick={(event) => { event.preventDefault(); void rename(project.name, topic.name); }}>rename</button></summary>
             {topic.summary && <p className="mind__summary mind__summary--topic">{topic.summary}</p>}
             {[...topic.items].sort((a, b) => b.at.localeCompare(a.at)).map(entry)}
           </details>)}

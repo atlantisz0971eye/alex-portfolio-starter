@@ -1122,7 +1122,7 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .mind__entry p { margin: 4px 0 8px 9ch; font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mind__delete { margin: 0 0 8px 9ch; font-size: 13px; color: var(--text-2); }
 .mind__streamrow small { display: block; margin-left: 9ch; font-size: 12px; color: var(--text-2); }
-.mind__back { position: fixed; z-index: 30; top: 14px; right: 24px; font-size: 14px; color: var(--text-2); }
+.mind__back { position: fixed; z-index: 30; top: 14px; right: 24px; display: flex; gap: 18px; font-size: 14px; color: var(--text-2); }
 
 /* ===== Self: the network of one's writing ===== */
 .self__lead { max-width: 44em; margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: var(--text-2); }
@@ -1162,3 +1162,8 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .projects__facts a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .projects__open { margin-top: 6px; font-size: 13px; color: var(--text-2); } .projects__open summary { cursor: pointer; } .projects__open ul { margin: 4px 0 0; padding-left: 18px; }
 .projects__card .section-label span { margin-left: 10px; font-weight: 400; color: var(--text-2); }
+.mind__tools { display: flex; gap: 16px; margin: 0 0 8px 9ch; } .mind__tools .mind__delete { margin: 0; }
+.mind__move { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; margin: 0 0 10px 9ch; font-size: 13px; color: var(--text-2); }
+.mind__move input { min-width: 12ch; padding: 2px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; outline: 0; }
+.mind__rename { margin-left: auto; font-size: 12px; color: var(--text-2); opacity: 0; transition: opacity .15s; } .mind__topic > summary:hover .mind__rename, .mind__rename:focus-visible { opacity: 1; }
+.mail-view__keep, .today__keep { font-size: 13px; color: var(--text-2) !important; min-height: 28px; }

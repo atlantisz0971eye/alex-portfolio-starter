@@ -17,6 +17,8 @@ export type SyncFolder = {
   files?: number;
   bytes?: number;
   transferred?: number;
+  /** Boxes ticked in the folder's own README, ROADMAP, TODO or PLAN: counts and a few open items, never the files. */
+  checklist?: { file: string; done: number; total: number; open: string[] }[];
 };
 export type SyncCommand = { id: string; type: "sync" | "pause" | "resume"; folder?: string; at: string };
 export type SyncDevice = {
@@ -88,13 +90,20 @@ const count = (value: unknown) => (typeof value === "number" && Number.isFinite(
 const iso = (value: unknown) => (typeof value === "string" && !Number.isNaN(Date.parse(value)) ? new Date(value).toISOString() : undefined);
 
 /** Cleans what the computer sent: lengths capped, unknown values dropped. */
+const cleanChecklist = (value: unknown) => (Array.isArray(value) ? value : []).slice(0, 4).flatMap((item) => {
+  const c = (item ?? {}) as Record<string, unknown>;
+  const file = text(c.file, 24), done = count(c.done), total = count(c.total);
+  if (!file || done === undefined || total === undefined || total === 0 || done > total) return [];
+  return [{ file, done, total, open: (Array.isArray(c.open) ? c.open : []).slice(0, 5).flatMap((line) => { const t = text(line, 100); return t ? [t] : []; }) }];
+});
+
 export function cleanReport(body: Record<string, unknown>) {
   const folders = (Array.isArray(body.folders) ? body.folders : []).slice(0, 30).flatMap((item): SyncFolder[] => {
     const f = item as Record<string, unknown>;
     const name = text(f?.name, 80);
     const path = text(f?.path, 300);
     if (!name || !path || !STATES.includes(f.state as SyncState)) return [];
-    return [{ name, path, state: f.state as SyncState, mode: f.mode === "copy" ? "copy" : "sync", lastOk: iso(f.lastOk), lastError: text(f.lastError, 400), lastDurationMs: count(f.lastDurationMs), files: count(f.files), bytes: count(f.bytes), transferred: count(f.transferred) }];
+    return [{ name, path, state: f.state as SyncState, mode: f.mode === "copy" ? "copy" : "sync", lastOk: iso(f.lastOk), lastError: text(f.lastError, 400), lastDurationMs: count(f.lastDurationMs), files: count(f.files), bytes: count(f.bytes), transferred: count(f.transferred), checklist: cleanChecklist(f.checklist) }];
   });
   const events = (Array.isArray(body.events) ? body.events : []).slice(-20).flatMap((item) => {
     const e = item as Record<string, unknown>;

@@ -1,6 +1,8 @@
 import { after } from "next/server";
 import { readEntries as readDevlogEntries, readProjects } from "./devlogStore";
-import { KINDS, emptyGraph, readGraph, readMindEntries, writeGraph, type Derived, type MindGraph, type MindKind } from "./mindStore";
+import { jsonToText } from "./notesText";
+import { listNotes, readNote } from "./notesStore";
+import { KINDS, MindError, addMindEntries, readImported, writeImported, emptyGraph, readGraph, readMindEntries, readOverrides, writeGraph, writeOverrides, type Derived, type MindGraph, type MindKind, type Overrides } from "./mindStore";
 import { quickDeepSeek } from "./workspaceDeepSeek";
 import { currentUser, runAs } from "./workspaceScope";
 
@@ -113,6 +115,61 @@ export async function summarize(graph: MindGraph, inputs: Input[], touched: Set<
   if (parsed) graph.summarizedAt = new Date().toISOString();
 }
 
+const short28 = (value: unknown, max: number) => short(value, max);
+
+/** Puts the person's corrections over what the model filed. */
+export function applyOverrides(graph: MindGraph, overrides: Overrides) {
+  for (const [id, patch] of Object.entries(overrides.entries)) { const d = graph.derived[id]; if (d) graph.derived[id] = { ...d, ...patch }; }
+  for (const [key, to] of Object.entries(overrides.topics)) { const [project, topic] = key.split("\u0000"); for (const d of Object.values(graph.derived)) if (d.project === project && d.topic === topic) d.topic = to; }
+}
+
+/** Topic and project lists from what is filed, keeping the summaries whose group still exists (a renamed topic keeps its summary). */
+function regroup(graph: MindGraph, renamed: Map<string, string> = new Map()) {
+  const oldTopics = new Map(graph.topics.map((topic) => [`${topic.project}\u0000${topic.name}`, topic.summary]));
+  for (const [from, to] of renamed) { const summary = oldTopics.get(from); if (summary !== undefined) oldTopics.set(`${from.split("\u0000")[0]}\u0000${to}`, summary); }
+  const groups = new Set(Object.values(graph.derived).map((d) => `${d.project}\u0000${d.topic}`));
+  graph.topics = [...groups].map((key) => { const [project, name] = key.split("\u0000"); return { name, project, summary: oldTopics.get(key) ?? "" }; });
+  const oldProjects = new Map(graph.projects.map((project) => [project.name, project.summary]));
+  graph.projects = [...new Set(Object.values(graph.derived).map((d) => d.project))].map((name) => ({ name, summary: oldProjects.get(name) ?? "" }));
+}
+
+/** Moves or renames one entry by hand. The affected summaries are cleared so the next pass writes them again. */
+export async function editEntry(id: string, patch: { title?: unknown; topic?: unknown; project?: unknown }) {
+  if (!/^(dl:)?[0-9a-f-]{36}$/.test(id)) throw new MindError("Unknown entry.");
+  const clean: Overrides["entries"][string] = {};
+  const title = short28(patch.title, 36), topic = short28(patch.topic, 24), project = short28(patch.project, 28);
+  if (title) clean.title = title;
+  if (topic) clean.topic = topic;
+  if (project && !id.startsWith("dl:")) clean.project = project;
+  if (!Object.keys(clean).length) throw new MindError("Nothing to change.");
+  const [overrides, graph] = await Promise.all([readOverrides(), readGraph()]);
+  if (!graph.derived[id]) throw new MindError("That entry has not been filed yet.");
+  const before = graph.derived[id];
+  overrides.entries[id] = { ...overrides.entries[id], ...clean };
+  graph.derived[id] = { ...before, ...clean };
+  const touched = new Set([`${before.project}\u0000${before.topic}`, `${graph.derived[id].project}\u0000${graph.derived[id].topic}`]);
+  regroup(graph);
+  for (const topic of graph.topics) if (touched.has(`${topic.project}\u0000${topic.name}`)) topic.summary = "";
+  for (const project of graph.projects) if (project.name === before.project || project.name === graph.derived[id].project) project.summary = "";
+  graph.updatedAt = new Date().toISOString();
+  await Promise.all([writeOverrides(overrides), writeGraph(graph)]);
+}
+
+/** Renames a topic for every entry in it. */
+export async function renameTopic(project: unknown, topic: unknown, to: unknown) {
+  const p = short28(project, 28), from = short28(topic, 24), name = short28(to, 24);
+  if (!p || !from || !name) throw new MindError("Give the topic a name.");
+  const [overrides, graph] = await Promise.all([readOverrides(), readGraph()]);
+  const key = `${p}\u0000${from}`;
+  // Renames made before stay valid: anything that pointed at the old name now points at the new one.
+  for (const [k, v] of Object.entries(overrides.topics)) if (k.startsWith(`${p}\u0000`) && v === from) overrides.topics[k] = name;
+  overrides.topics[key] = name;
+  for (const d of Object.values(graph.derived)) if (d.project === p && d.topic === from) d.topic = name;
+  regroup(graph, new Map([[key, name]]));
+  graph.updatedAt = new Date().toISOString();
+  await Promise.all([writeOverrides(overrides), writeGraph(graph)]);
+}
+
 /** One pass: file what is new, then refresh summaries (at most every ten minutes unless forced). Safe to call often. */
 export async function organize(options: { force?: boolean } = {}) {
   const user = await currentUser();
@@ -129,14 +186,18 @@ export async function organize(options: { force?: boolean } = {}) {
         for (const id of await extract(graph, todo.slice(at, at + BATCH), projects)) touched.add(id);
         if (at + BATCH >= 120) break;
       }
+      applyOverrides(graph, await readOverrides());
+      const missing = graph.topics.some((topic) => !topic.summary) || graph.projects.some((project) => !project.summary);
       const due = options.force || !summarizedAt.get(user.id) || Date.now() - (summarizedAt.get(user.id) ?? 0) > SUMMARY_COOLDOWN_MS || !graph.overview;
-      if (touched.size || options.force) {
+      if (touched.size || options.force || (missing && graph.topics.length > 0 && Object.keys(graph.derived).length > 0)) {
         if (due) { summarizedAt.set(user.id, Date.now()); await summarize(graph, inputs, touched, projects, !!options.force); }
         else {
           // Between summaries the map still has to show the new entries in their topics.
           const known = new Set(graph.topics.map((topic) => `${topic.project}\u0000${topic.name}`));
           for (const id of touched) { const d = graph.derived[id]; const key = `${d.project}\u0000${d.topic}`; if (!known.has(key)) { known.add(key); graph.topics.push({ name: d.topic, project: d.project, summary: "" }); } if (!graph.projects.some((project) => project.name === d.project)) graph.projects.push({ name: d.project, summary: "" }); }
         }
+        // A correction made while the model was working must not be undone by what it hands back.
+        applyOverrides(graph, await readOverrides());
         graph.updatedAt = new Date().toISOString();
         await writeGraph(graph);
       }
@@ -149,4 +210,24 @@ export async function organize(options: { force?: boolean } = {}) {
 export async function organizeLater(options: { force?: boolean } = {}) {
   const user = await currentUser();
   after(async () => { try { await runAs(user, () => organize(options)); } catch { /* the notebook works without the map */ } });
+}
+
+/** Brings the pages from before the notebook in as entries (dated when they were created), once each. Boards are left in the archive. */
+export async function importLegacyNotes() {
+  const [notes, done] = await Promise.all([listNotes(), readImported()]);
+  const todo = notes.filter((note) => !note.deletedAt && note.kind !== "vocabulary" && !done.has(note.id)).slice(0, 300);
+  const items: { at: string; text: string }[] = [];
+  const handled = new Set(done);
+  for (let at = 0; at < todo.length; at += 8) {
+    await Promise.all(todo.slice(at, at + 8).map(async (note) => {
+      const read = await readNote(note.id);
+      const body = read ? jsonToText(read.content).trim() : "";
+      handled.add(note.id);
+      const text = `${note.title ? `${note.title}\n` : ""}${body}`.trim();
+      if (text.length >= 8) items.push({ at: note.createdAt, text });
+    }));
+  }
+  const added = await addMindEntries(items);
+  await writeImported(handled);
+  return { added, checked: todo.length, remaining: Math.max(0, notes.filter((note) => !note.deletedAt && note.kind !== "vocabulary" && !handled.has(note.id)).length) };
 }

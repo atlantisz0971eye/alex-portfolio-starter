@@ -34,6 +34,12 @@ export const emptyGraph = (): MindGraph => ({ updatedAt: "", derived: {}, topics
 export const readGraph = () => readJson<MindGraph>(GRAPH, emptyGraph());
 export const writeGraph = (graph: MindGraph) => writeJson(GRAPH, graph);
 
+/** What the person has corrected by hand. Kept apart from the map so rebuilding it never undoes a correction. */
+export type Overrides = { entries: Record<string, Partial<Pick<Derived, "title" | "topic" | "project">>>; /** "project\u0000topic" to its new name. */ topics: Record<string, string> };
+const OVERRIDES = "mind/overrides.json";
+export const readOverrides = () => readJson<Overrides>(OVERRIDES, { entries: {}, topics: {} });
+export const writeOverrides = (overrides: Overrides) => writeJson(OVERRIDES, overrides);
+
 export class MindError extends Error {}
 
 export async function addMindEntry(text: unknown): Promise<MindEntry> {
@@ -54,3 +60,19 @@ export async function deleteMindEntry(id: string) {
   if (graph.derived[id]) { delete graph.derived[id]; await writeGraph(graph); }
   return true;
 }
+
+/** Several entries at once, each with the time it was originally written. Used to bring older writing in. */
+export async function addMindEntries(items: { at: string; text: string }[]) {
+  const entries = await readMindEntries();
+  const fresh: MindEntry[] = [];
+  for (const item of items) {
+    const text = item.text.replace(/\r\n/g, "\n").trim().slice(0, MAX_TEXT);
+    if (text && entries.length + fresh.length < MAX_ENTRIES) fresh.push({ id: randomUUID(), at: item.at, text });
+  }
+  if (fresh.length) await writeJson(ENTRIES, { entries: [...entries, ...fresh].sort((a, b) => a.at.localeCompare(b.at)) });
+  return fresh.length;
+}
+
+const IMPORTED = "mind/imported.json";
+export const readImported = async () => new Set((await readJson<{ ids: string[] }>(IMPORTED, { ids: [] })).ids);
+export const writeImported = (ids: Set<string>) => writeJson(IMPORTED, { ids: [...ids] });

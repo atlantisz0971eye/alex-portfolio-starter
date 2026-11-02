@@ -110,10 +110,15 @@ export function Self({ onError }: { onError: (message: string) => void }) {
   }
 
   const readAndBuild = async () => {
+    // Stop when reading stops getting anywhere, so a model that keeps answering with nothing usable cannot spend the allowance in a loop.
+    let last = -1, stalled = 0;
     for (;;) {
       const { read, total } = await call<{ read: number; total: number }>({ action: "analyze" });
       setNote(`Reading ${read} of ${total}…`);
       if (read >= total) break;
+      stalled = read > last ? 0 : stalled + 1;
+      last = read;
+      if (stalled >= 3) throw new Error(`Gemini gave nothing usable for the next pieces. ${read} of ${total} are read; press “continue reading” to try again later.`);
     }
     setNote("Building the network and the portrait…");
     await call({ action: "build" });

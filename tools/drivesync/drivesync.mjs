@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const HOME = process.env.DRIVESYNC_HOME || path.join(os.homedir(), ".drivesync");
 const FAST = process.env.DRIVESYNC_FAST === "1"; // seconds instead of minutes, for tests
 const FILE = {
@@ -267,8 +267,37 @@ function folderReport() {
     else if (runtime.queue.some((item) => item.name === folder.name)) phase = "queued";
     else if (st.lastError && st.failedAt) phase = "error";
     else if (all.paused) phase = "paused";
-    return { name: folder.name, path: folder.path, state: phase, mode, lastOk: st.lastOk, lastError: st.lastError, lastDurationMs: st.lastDurationMs, files: st.files, bytes: st.bytes, transferred: st.transferred };
+    return { name: folder.name, path: folder.path, state: phase, mode, lastOk: st.lastOk, lastError: st.lastError, lastDurationMs: st.lastDurationMs, files: st.files, bytes: st.bytes, transferred: st.transferred, checklist: phase === "unmounted" ? [] : checklistOf(folder.path) };
   });
+}
+
+// Counts the "- [ ]" and "- [x]" boxes in a folder's own README, ROADMAP, TODO or PLAN, so the Workspace can say how far a local project is.
+// Only the counts and the first few open items leave the computer, never the files. Re-read only when a file changes.
+const checklistMemo = new Map();
+function checklistOf(dir) {
+  const out = [];
+  for (const file of ["README.md", "ROADMAP.md", "TODO.md", "PLAN.md"]) {
+    try {
+      const full = path.join(dir, file);
+      const stat = fs.statSync(full);
+      if (!stat.isFile() || stat.size > 400_000) continue;
+      const memo = checklistMemo.get(full);
+      if (memo && memo.mtime === stat.mtimeMs) { if (memo.value) out.push(memo.value); continue; }
+      let done = 0, total = 0, fenced = false; const open = [];
+      for (const line of fs.readFileSync(full, "utf8").split("\n")) {
+        if (/^\s*```/.test(line)) { fenced = !fenced; continue; }
+        if (fenced) continue;
+        const m = line.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s*(.*)$/);
+        if (!m) continue;
+        total += 1;
+        if (m[1] === " ") { if (open.length < 5 && m[2].trim()) open.push(m[2].replace(/\s+/g, " ").trim().slice(0, 100)); } else done += 1;
+      }
+      const value = total > 0 ? { file, done, total, open } : null;
+      checklistMemo.set(full, { mtime: stat.mtimeMs, value });
+      if (value) out.push(value);
+    } catch { /* no such file */ }
+  }
+  return out;
 }
 
 async function heartbeat() {

@@ -63,22 +63,26 @@ export function buildNetwork(pieces: Piece[], graph: SelfGraph) {
   const from = Math.min(...times); const to = Math.max(...times); const span = Math.max(1, to - from);
   const hidden = new Set(graph.hidden);
   type Acc = { label: string; kind: NodeKind; ids: string[]; score: number; times: number[]; byYear: Map<string, number> };
-  const acc = new Map<string, Acc>();
+  const acc = new Map<string, Acc & { kinds: Map<NodeKind, number> }>();
   const perPiece = new Map<string, string[]>();
+  // The same word is one concept even when it is a theme in one piece and a person in another ("母亲"): it takes the kind it is most often given.
+  const isHidden = (id: string, label: string) => hidden.has(id) || [...NODE_KINDS].some((kind) => hidden.has(`${kind}:${key(label)}`));
   for (const piece of pieces) {
     const a = graph.analysis[piece.id];
     if (!a) continue;
     const entries: [NodeKind, string][] = [...a.themes.map((l): [NodeKind, string] => ["theme", l]), ...a.images.map((l): [NodeKind, string] => ["image", l]), ...a.feelings.map((l): [NodeKind, string] => ["feeling", l]), ...a.people.map((l): [NodeKind, string] => ["person", l]), ...a.places.map((l): [NodeKind, string] => ["place", l]), ...(a.author ? [["author", a.author] as [NodeKind, string]] : [])];
     const ids: string[] = [];
     for (const [kind, label] of entries) {
-      const id = `${kind}:${key(label)}`;
-      if (hidden.has(id)) continue;
-      const node: Acc = acc.get(id) ?? { label, kind, ids: [], score: 0, times: [], byYear: new Map<string, number>() };
+      const id = key(label);
+      if (isHidden(id, label)) continue;
+      const node = acc.get(id) ?? { label, kind, ids: [], score: 0, times: [], byYear: new Map<string, number>(), kinds: new Map<NodeKind, number>() };
+      node.kinds.set(kind, (node.kinds.get(kind) ?? 0) + 1);
       if (!node.ids.includes(piece.id)) { node.ids.push(piece.id); node.score += WEIGHT[a.type]; node.times.push(Date.parse(piece.at)); node.byYear.set(year(piece.at), (node.byYear.get(year(piece.at)) ?? 0) + 1); ids.push(id); }
       acc.set(id, node);
     }
     perPiece.set(piece.id, ids);
   }
+  for (const node of acc.values()) node.kind = [...node.kinds.entries()].sort((a, b) => b[1] - a[1] || NODE_KINDS.indexOf(a[0]) - NODE_KINDS.indexOf(b[0]))[0][0];
   const kept = [...acc.entries()].filter(([, node]) => node.ids.length >= 2).sort((a, b) => b[1].score - a[1].score).slice(0, 150);
   const dropped = acc.size - kept.length;
   const keptIds = new Set(kept.map(([id]) => id));

@@ -1,6 +1,6 @@
 import { calendarGuard } from "../../../lib/calendarGuard";
 import { MindError, addMindEntry, deleteMindEntry, readGraph } from "../../../lib/mindStore";
-import { organizeLater, readInputs } from "../../../lib/mindOrganize";
+import { editEntry, importLegacyNotes, organizeLater, readInputs, renameTopic } from "../../../lib/mindOrganize";
 import { currentUser } from "../../../lib/workspaceScope";
 
 export const runtime = "nodejs";
@@ -29,7 +29,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const denied = await calendarGuard();
   if (denied) return denied;
-  let body: { action?: unknown; text?: unknown; id?: unknown };
+  let body: { action?: unknown; text?: unknown; id?: unknown; title?: unknown; topic?: unknown; project?: unknown; to?: unknown };
   try {
     if (Number(request.headers.get("content-length")) > 12_000) throw new Error("too large");
     body = await request.json();
@@ -49,6 +49,9 @@ export async function POST(request: Request) {
       return Response.json({ entry });
     }
     if (body.action === "delete" && typeof body.id === "string" && /^[0-9a-f-]{36}$/.test(body.id)) return Response.json({ ok: await deleteMindEntry(body.id) });
+    if (body.action === "edit" && typeof body.id === "string") { await editEntry(body.id, { title: body.title, topic: body.topic, project: body.project }); return Response.json({ ok: true }); }
+    if (body.action === "renameTopic") { await renameTopic(body.project, body.topic, body.to); return Response.json({ ok: true }); }
+    if (body.action === "importNotes") { const result = await importLegacyNotes(); await organizeLater(); return Response.json(result); }
     if (body.action === "reorganize") { await organizeLater({ force: true }); return Response.json({ ok: true }); }
     return Response.json({ error: "invalid_request" }, { status: 400 });
   } catch (error) {

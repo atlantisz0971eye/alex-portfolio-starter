@@ -19,7 +19,7 @@ export type Signals = {
   deploy: { state: string; at: string; environment: string } | null;
   commits: { last7: number; prev7: number; last30: number; lastAt: string | null; source: "github" | "devlog" };
   notebook: { last30: number; topics: string[] };
-  sync: { folder: string; files: number | null; lastOk: string | null; state: string }[];
+  sync: { folder: string; files: number | null; lastOk: string | null; state: string; checklist?: Doc[] }[];
   repoError?: string;
 };
 export type ProjectStatus = {
@@ -127,7 +127,9 @@ async function gather(project: DevProject, ctx: { entries: DevEntry[]; devices: 
   const mine = ctx.inputs.filter((input) => ctx.derived[input.id]?.project === project.name);
   signals.notebook = { last30: mine.filter((input) => Date.now() - Date.parse(input.date) < 30 * DAY).length, topics: [...new Set(mine.map((input) => ctx.derived[input.id].topic))].slice(0, 6) };
   const key = norm(project.name);
-  for (const device of ctx.devices) for (const folder of device.folders) { const f = norm(folder.name); if (key.length >= 3 && f && (f.includes(key) || key.includes(f))) signals.sync.push({ folder: folder.name, files: folder.files ?? null, lastOk: folder.lastOk ?? null, state: folder.state }); }
+  for (const device of ctx.devices) for (const folder of device.folders) { const f = norm(folder.name); if (key.length >= 3 && f && (f.includes(key) || key.includes(f))) signals.sync.push({ folder: folder.name, files: folder.files ?? null, lastOk: folder.lastOk ?? null, state: folder.state, checklist: folder.checklist?.map((c) => ({ file: `${folder.name}/${c.file}`, url: "", done: c.done, total: c.total, open: c.open })) }); }
+  // A project with no repository to read still has its own folder: the boxes counted there are used when GitHub gave none.
+  if (!signals.docs.length) signals.docs = signals.sync.flatMap((folder) => folder.checklist ?? []);
   return signals;
 }
 

@@ -8,6 +8,7 @@ import { timeFormat, zone } from "./calendarFormat";
 import { MailMessage, type MailItem } from "./Mail";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { PageTitle, TopRow, type Tab } from "./Shell";
+import { keepInNotebook } from "./keep";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
@@ -119,6 +120,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
                   {stale && <p className="today__stale">This plan is from an earlier day. <button type="button" onClick={() => void regenerate()}>Make today’s plan</button></p>}
                   <div className={`ws-markdown${planning ? " is-updating" : ""}`}><ReactMarkdown>{plan.text}</ReactMarkdown></div>
                   {planning && <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Updating…</p>}
+                  <button type="button" className="ws-text-button today__keep" onClick={() => void keepInNotebook(`Today’s plan, ${plan.date}\n${plan.text}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."))}>keep in notebook</button>
                   {plan.basedOn.length > 0 && <p className="today__based">{plan.reason === "new_mail" ? "Updated for new mail" : "Based on"}: {plan.basedOn.slice(0, 3).map((item) => item.subject).join(" · ")}{plan.basedOn.length > 3 ? ` · +${plan.basedOn.length - 3}` : ""}</p>}
                 </> : <>
                   <p className="ws-muted">No plan yet.</p>

@@ -2,6 +2,7 @@
 
 import { ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
 import { PageTitle, TopRow } from "./Shell";
+import { keepInNotebook } from "./keep";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { errors, parseResponse, streamNdjson } from "./api";
@@ -228,12 +229,17 @@ export function MailMessage({ summary, onClose, onError, pane = false }: { summa
   }
 
   const shown = detail ?? summary;
+  const keep = () => {
+    const body = detail?.body ? detail.body.replace(/\s+/g, " ").trim().slice(0, 700) : summary.snippet;
+    keepInNotebook(`Email from ${shown.from}: ${shown.subject}\n${body}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
+  };
   return <div className={`mail-view${pane ? " mail-view--pane" : ""}`}>
     {!pane && <header className="mail-view__bar">
       <button type="button" className="ws-text-button" onClick={onClose}><ChevronLeft size={22} /> Mail</button>
     </header>}
     <div className="mail-view__scroll">
       <h2>{shown.subject}</h2>
+      <button type="button" className="ws-text-button mail-view__keep" onClick={keep}>keep in notebook</button>
       <div className="mail-view__meta">
         <strong>{shown.from}</strong> <span>&lt;{shown.fromEmail}&gt;</span>
         {detail?.to && <p>To: {detail.to}</p>}

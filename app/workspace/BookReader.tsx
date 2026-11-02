@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, ChevronLeft, Highlighter, Languages, List, MessageCircle, ScanText, Type } from "lucide-react";
+import { Bookmark, ChevronLeft, Highlighter, Languages, List, MessageCircle, NotebookPen, ScanText, Type } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { displayTitle } from "../lib/bookTitle";
@@ -11,6 +11,7 @@ import { ContentsSheet, SettingsSheet } from "./ReaderSheets";
 import { isTranslatable, toBlocks } from "./readerText";
 import { useReaderPrefs } from "./readerPrefs";
 import type { PdfSelection } from "./PdfPages";
+import { keepInNotebook } from "./keep";
 import { useBookmarks } from "./useBookmarks";
 import { useTranslations } from "./useTranslations";
 
@@ -556,6 +557,12 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
     clearSelection();
   };
 
+  const keep = (text: string) => {
+    const where = `${displayTitle(book.document)}${currentPageRef.current ? `, p. ${currentPageRef.current}` : ""}`;
+    keepInNotebook(`“${text.trim()}”\n— ${where}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
+    clearSelection();
+  };
+
   const translateSelection = () => {
     if (!selection) return;
     // The paragraph the selection starts in gives a word its meaning in context.
@@ -746,11 +753,13 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       <button type="button" onClick={() => highlight()}><Highlighter size={15} /> Highlight</button>
       <button type="button" onClick={translateSelection}><Languages size={15} /> Translate</button>
       <button type="button" onClick={askAbout}><MessageCircle size={15} /> Ask</button>
+      <button type="button" onClick={() => keep(selection.text)}><NotebookPen size={15} /> Keep</button>
     </div>}
 
     {pdfSelection && original && <div className={`reader-selection is-${pdfSelection.dock}`} onPointerDown={(event) => event.preventDefault()}>
       <button type="button" onClick={() => { setTranslating({ text: pdfSelection.text, context: pdfSelection.context }); clearSelection(); }}><Languages size={15} /> Translate</button>
       <button type="button" onClick={() => { onAssistant("ask", pdfSelection.text, offsetRef.current); clearSelection(); }}><MessageCircle size={15} /> Ask</button>
+      <button type="button" onClick={() => keep(pdfSelection.text)}><NotebookPen size={15} /> Keep</button>
     </div>}
 
     {translating && <TranslateCard source={translating.text} context={translating.context} documentId={documentId} stream={stream} onSave={(answer) => saveWord(translating.text, answer, translating.context)} onClose={() => setTranslating(null)} onAsk={() => { onAssistant("ask", translating.text, offsetRef.current); setTranslating(null); }} />}
