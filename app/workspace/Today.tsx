@@ -11,7 +11,9 @@ import { PageTitle, TopRow, type Tab } from "./Shell";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
-type View = { configured: boolean; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[] };
+type Block = "plan" | "proposals" | "schedule" | "mail";
+type Layout = { headline: string; kicker: string; order: Block[]; focus: Block | null };
+type View = { configured: boolean; layout?: Layout | null; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[] };
 
 const COLORS: Record<string, string> = { personal: "#4a6fb8", study: "#4f8a5b", work: "#b9822e", other: "#8a5aa8" };
 const today = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -49,6 +51,9 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   useEffect(() => { void load(); }, [load, refresh]);
 
   const plan = view?.plan ?? null;
+  const layout = view?.layout ?? null;
+  // The model arranges the blocks; this only reads its answer. `order` places a block, `data-focus` stresses one.
+  const place = (block: Block) => ({ "data-block": block, "data-focus": layout?.focus === block ? "" : undefined, style: layout ? { order: layout.order.indexOf(block) } : undefined });
   const localDate = useMemo(() => new Intl.DateTimeFormat("sv-SE", { timeZone: view?.zone ?? zone() }).format(new Date()), [view?.zone]);
   const stale = !!plan && plan.date !== localDate;
 
@@ -96,17 +101,18 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
       <TopRow onSignOut={onSignOut} />
       <div className="today">
         <header className="today__head">
-          <PageTitle actions={view?.connected ? <button type="button" className="ws-round" aria-label="Make a new plan" onClick={() => void regenerate()} disabled={planning}>{planning ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button> : undefined}>Today</PageTitle>
+          <PageTitle actions={view?.connected ? <button type="button" className="ws-round" aria-label="Make a new plan" onClick={() => void regenerate()} disabled={planning}>{planning ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button> : undefined}>{layout?.headline || "Today"}</PageTitle>
           <p className="today__date"><Sun size={15} /> {today.format(new Date())}</p>
+          {layout?.kicker && <p className="today__kicker">{layout.kicker}</p>}
         </header>
 
         {view === null && <div className="mail-skeleton"><div><span className="skeleton skeleton--line" /><span className="skeleton skeleton--line skeleton--short" /></div></div>}
         {view && !view.configured && <div className="empty"><Inbox size={28} /><p>Mail is not set up yet.</p><small>Today builds your plan from your calendar and new email.</small></div>}
         {view && view.configured && !view.connected && <div className="empty"><Inbox size={28} /><p>Connect Gmail to get a plan for today.</p><a className="ws-pill ws-pill--solid" href="/api/workspace/mail/connect">Connect Gmail</a><small>Read-only access. New mail updates your plan automatically.</small></div>}
 
-        {view && view.connected && <div className="today__grid">
+        {view && view.connected && <div className="today__grid" data-directed={layout ? "" : undefined}>
           <div className="today__main">
-            <section className="ws-card today__plan" aria-live="polite">
+            <section className="ws-card today__plan" aria-live="polite" {...place("plan")}>
               <div className="ws-card__head"><span><Sparkles size={15} /> Suggested plan</span>{plan && <small>{ago(Date.parse(plan.generatedAt))}</small>}</div>
               {planning && !plan ? <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading your mail and calendar…</p>
                 : plan ? <>
@@ -120,14 +126,14 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
                 </>}
             </section>
 
-            {plan && plan.proposals.length > 0 && <section className="today__proposals" aria-label="Suggested calendar changes">
+            {plan && plan.proposals.length > 0 && <section className="today__proposals" aria-label="Suggested calendar changes" {...place("proposals")}>
               <h2 className="section-label">From your mail</h2>
               {plan.proposals.map((proposal, index) => <ProposalCard key={index} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(index)} onDismiss={() => dismiss(index)} />)}
             </section>}
           </div>
 
           <aside className="today__side">
-            <section aria-label="Today’s schedule">
+            <section aria-label="Today’s schedule" {...place("schedule")}>
               <h2 className="section-label">Schedule</h2>
               {(view.events ?? []).length === 0 ? <p className="today__none">Nothing scheduled today.</p> : <ul className="today__events">
                 {(view.events ?? []).map((event) => <li key={event.id + event.occurrenceDate} className={!event.allDay && Date.parse(event.end) < now ? "is-past" : ""} style={{ "--c": COLORS[event.category] ?? "#8e8e93" } as CSSProperties}>
@@ -137,7 +143,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
                 </li>)}
               </ul>}
             </section>
-            <section aria-label="New mail">
+            <section aria-label="New mail" {...place("mail")}>
             <h2 className="section-label">New mail {mail.length > 0 && <span>{mail.length}</span>}</h2>
             {mail.length === 0 ? <p className="today__none"><Check size={14} /> You’re all caught up.</p> : <ul className="today__mail">
               {mail.slice(0, showAll ? 40 : 5).map((message) => <li key={`${message.account}-${message.id}`}>

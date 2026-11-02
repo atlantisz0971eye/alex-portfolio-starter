@@ -99,6 +99,8 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
 
 export function PageTitle({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   // The byte look sizes a title by its length so every word fills the width; other looks ignore this.
-  const chars = typeof children === "string" ? ({ "--chars": children.length } as CSSProperties) : undefined;
-  return <div className="pagetitle"><h1 style={chars}>{children}</h1>{actions && <div className="pagetitle__actions">{actions}</div>}</div>;
+  const text = typeof children === "string" ? children : "";
+  const wide = /[\u2e80-\u9fff\uff00-\uffef]/.test(text);
+  const chars = text ? ({ "--chars": [...text].reduce((sum, ch) => sum + (/[\u2e80-\u9fff\uff00-\uffef]/.test(ch) ? 2 : 1), 0) } as CSSProperties) : undefined;
+  return <div className="pagetitle"><h1 style={chars} data-wide={wide || undefined}>{children}</h1>{actions && <div className="pagetitle__actions">{actions}</div>}</div>;
 }

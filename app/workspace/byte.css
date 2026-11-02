@@ -174,3 +174,16 @@
 
 .ws-root[data-skin="byte"] .dl-day { grid-template-columns: 14ch minmax(0, 1fr); }
 
+
+/* Today: the model's arrangement. The two columns dissolve so the four blocks can be ordered freely; the stressed one runs the full width. */
+.ws-root[data-skin="byte"] .today__grid[data-directed] > .today__main, .ws-root[data-skin="byte"] .today__grid[data-directed] > .today__side { display: contents; }
+.ws-root[data-skin="byte"] .today__grid > * > section { min-width: 0; }
+.ws-root[data-skin="byte"] .today__grid > * > section[data-focus] { grid-column: 1 / -1; }
+.ws-root[data-skin="byte"] .today__grid > * > section[data-focus] .ws-markdown { font-size: 28px; line-height: 38px; max-width: 30em; }
+.ws-root[data-skin="byte"] .today__grid > * > section[data-focus] .today__what strong, .ws-root[data-skin="byte"] .today__grid > * > section[data-focus] .mail-row__subject { font-size: 22px; }
+.ws-root[data-skin="byte"] .today__kicker { margin: -2vw 0 3vw; font-size: 15px; font-weight: 700; color: var(--text); }
+.ws-root[data-skin="byte"] .today__kicker::before { content: "■ "; color: var(--blue); }
+.today__kicker { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
+/* Chinese titles are taller than the Latin capitals the trim was measured on, so they keep their full box. */
+.ws-root[data-skin="byte"] .pagetitle h1[data-wide] { line-height: 1.12; padding-top: .06em; }
+.ws-root[data-skin="byte"] .pagetitle h1[data-wide]::before, .ws-root[data-skin="byte"] .pagetitle h1[data-wide]::after { content: none; }

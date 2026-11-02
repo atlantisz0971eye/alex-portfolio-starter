@@ -7,7 +7,10 @@ import { validZone, wallDate, wallParts, zonedToInstant } from "./calendarTime";
 import { listMessages, MailAuthError, type MailSummary } from "./gmail";
 import { mailConfigured } from "./mailGuard";
 import { readAccounts } from "./mailStore";
-import { scopeRoot } from "./workspaceScope";
+import { after } from "next/server";
+import { currentUser, runAs, scopeRoot } from "./workspaceScope";
+import { directToday, readLayout, type LayoutFacts } from "./todayLayout";
+import { listDevices } from "./syncStore";
 import type { ChatMessage } from "./workspaceDeepSeek";
 
 export type PlanProposal = Proposal & { status?: "applied" | "dismissed" };
@@ -76,6 +79,53 @@ async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["
   };
 }
 
+const ONLINE_MS = 4 * 60_000;
+const LAYOUT_MAX_AGE_MS = 4 * 3_600_000;
+const LAYOUT_COOLDOWN_MS = 10 * 60_000;
+const attempts = new Map<string, number>();
+
+/** What the model may know when it arranges the screen: today's events, unread mail, the plan and (for the owner) the state of the sync. */
+async function layoutFacts(zone: string, plan: TodayPlan | undefined, owner: boolean): Promise<LayoutFacts> {
+  const wall = wallParts(Date.now(), zone);
+  const start = zonedToInstant(wall.y, wall.m, wall.d, 0, 0, zone);
+  const end = zonedToInstant(wall.y, wall.m, wall.d + 1, 0, 0, zone);
+  const local = new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const [{ occurrences }, inbox] = await Promise.all([listOccurrences(start, end), recentInbox(3, 20).catch(() => [] as MailSummary[])]);
+  const facts: LayoutFacts = {
+    now: local.format(Date.now()),
+    plan: (plan?.date === wallDate(Date.now(), zone) ? plan.text : "").slice(0, 900),
+    proposals: plan?.date === wallDate(Date.now(), zone) ? plan.proposals.filter((item) => !item.status).length : 0,
+    events: occurrences.slice(0, 20).map((event) => ({ when: event.allDay ? "all day" : local.format(Date.parse(event.start)), title: event.title.slice(0, 80), past: !event.allDay && Date.parse(event.end) < Date.now() })),
+    unreadMail: inbox.filter((message) => message.unread && relevant(message)).slice(0, 8).map((message) => ({ from: message.from.slice(0, 40), subject: message.subject.slice(0, 80) })),
+  };
+  if (owner) {
+    try {
+      facts.sync = (await listDevices()).map((device) => ({ device: device.name, online: Date.now() - Date.parse(device.lastSeen) < ONLINE_MS, folders: device.folders.map((folder) => ({ name: folder.name, state: folder.state, error: folder.lastError?.slice(0, 80) })) }));
+    } catch { /* sync is optional */ }
+  }
+  return facts;
+}
+
+/** Has the model arrange today's screen from the current facts and saves the result. */
+export async function refreshLayout(zoneInput?: string) {
+  const state = await readState();
+  const zone = validZone(zoneInput ?? state.zone ?? "Europe/London");
+  const user = await currentUser();
+  return directToday(await layoutFacts(zone, state.plan, user.role === "owner"), wallDate(Date.now(), zone));
+}
+
+/** When the saved arrangement is missing, from another day or old, makes a new one after the response has gone out. */
+async function ensureLayout(zone: string, saved: Awaited<ReturnType<typeof readLayout>>) {
+  const date = wallDate(Date.now(), zone);
+  const fresh = !!saved && saved.date === date && Date.now() - Date.parse(saved.generatedAt) < LAYOUT_MAX_AGE_MS;
+  if (fresh) return;
+  const user = await currentUser();
+  const last = attempts.get(user.id) ?? 0;
+  if (Date.now() - last < LAYOUT_COOLDOWN_MS) return;
+  attempts.set(user.id, Date.now());
+  after(async () => { try { await runAs(user, () => refreshLayout(zone)); } catch { /* the screen works without it */ } });
+}
+
 /**
  * Looks for new mail and, when there is some worth acting on, writes a fresh plan for today.
  * Shared by the scheduled job and the app. `force` regenerates even without new mail.
@@ -108,6 +158,8 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
     lastGenerated: updated ? new Date().toISOString() : state.lastGenerated,
     lastCheck: new Date().toISOString(),
   });
+  // A new plan is the event that changes what matters today, so the arrangement is remade with it.
+  if (updated) { try { await refreshLayout(zone); } catch { /* the plan is saved either way */ } }
   return { configured: true as const, updated, newCount: worth.length };
 }
 
@@ -129,12 +181,15 @@ export async function todayView(zoneInput?: string) {
   const wall = wallParts(Date.now(), zone);
   const start = zonedToInstant(wall.y, wall.m, wall.d, 0, 0, zone);
   const end = zonedToInstant(wall.y, wall.m, wall.d + 1, 0, 0, zone);
-  const [{ occurrences }, inbox] = await Promise.all([
+  const [{ occurrences }, inbox, saved] = await Promise.all([
     listOccurrences(start, end),
     accounts.length ? recentInbox(3, 20) : Promise.resolve([] as MailSummary[]),
+    readLayout(),
   ]);
+  try { await ensureLayout(zone, saved); } catch { /* optional */ }
   return {
     configured: true as const,
+    layout: saved && saved.date === wallDate(Date.now(), zone) ? saved : null,
     connected: accounts.length > 0,
     zone,
     plan: state.plan ?? null,
