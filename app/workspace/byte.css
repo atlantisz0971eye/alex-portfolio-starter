@@ -209,4 +209,3 @@
 /* Self: the network is drawn on the dot grid like everything else. */
 .ws-root[data-skin="byte"] .self__lead { color: var(--text); font-size: 15px; }
 .ws-root[data-skin="byte"] .self__section p { font-size: 17px; line-height: 26px; }
-.ws-root[data-skin="byte"] .self__node--theme { --k: var(--text); }
