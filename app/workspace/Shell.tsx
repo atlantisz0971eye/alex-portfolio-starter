@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
 
 export type Theme = "light" | "dark";
@@ -98,5 +98,7 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
 }
 
 export function PageTitle({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
-  return <div className="pagetitle"><h1>{children}</h1>{actions && <div className="pagetitle__actions">{actions}</div>}</div>;
+  // The byte look sizes a title by its length so every word fills the width; other looks ignore this.
+  const chars = typeof children === "string" ? ({ "--chars": children.length } as CSSProperties) : undefined;
+  return <div className="pagetitle"><h1 style={chars}>{children}</h1>{actions && <div className="pagetitle__actions">{actions}</div>}</div>;
 }

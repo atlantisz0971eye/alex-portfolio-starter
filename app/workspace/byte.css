@@ -4,8 +4,9 @@
    that opens a page of huge words. Applies when the root carries data-skin="byte"; the other skins are untouched.
    ===================================================================== */
 .ws-root[data-skin="byte"] {
-  --mono: ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "PingFang SC", monospace;
+  --mono: var(--font-byte-mono), ui-monospace, "SF Mono", Menlo, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", monospace;
   --serif: var(--mono);
+  --display: var(--font-byte-display), "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --radius: 0px;
   --blue: #2f6bff;
   font-family: var(--mono);
@@ -46,7 +47,9 @@
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__brand, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__index { position: fixed; top: 14px; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__index { left: calc(2.2vw + 22ch); }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav { display: flex; flex-direction: column; gap: 0; margin-top: 6vh; width: 100%; }
-.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button { height: auto; padding: 0; gap: 0; font-size: 14vw; font-weight: 800; line-height: .84; letter-spacing: -.07em; text-transform: uppercase; color: var(--f3); white-space: nowrap; background: transparent; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button { display: block; height: auto; margin-bottom: 2.2vw; padding: 0; text-align: left; font-family: var(--display); font-size: 12.5vw; font-weight: 800; line-height: 1; letter-spacing: -.05em; text-transform: uppercase; color: var(--f3); white-space: nowrap; background: transparent; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button::before { content: ""; display: table; margin-bottom: -.148em; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button::after { content: ""; display: table; margin-top: -.166em; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button svg { display: none; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button:hover, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button.is-on { color: var(--text); background: transparent; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav .badge-dot { position: static; display: inline-block; width: .12em; height: .12em; margin-left: .06em; background: var(--blue); vertical-align: top; }
@@ -60,9 +63,12 @@
 /* ---- pages: type at scale, no boxes ---- */
 .ws-root[data-skin="byte"] .page { padding: 52px 2.2vw 10vw; }
 .ws-root[data-skin="byte"] .page__inner { max-width: none; }
-.ws-root[data-skin="byte"] .pagetitle { position: relative; align-items: flex-start; margin: 0 0 1vw; }
-.ws-root[data-skin="byte"] .pagetitle h1 { font-family: var(--mono); font-size: clamp(56px, 16vw, 260px); font-weight: 800; letter-spacing: -.07em; line-height: .78; margin: 0 0 0 -1vw; white-space: nowrap; text-transform: uppercase; color: var(--text); }
-.ws-root[data-skin="byte"] .pagetitle__actions { position: absolute; z-index: 45; top: -40px; right: 0; display: flex; align-items: center; gap: 2ch; }
+.ws-root[data-skin="byte"] .pagetitle { position: relative; align-items: flex-start; margin: 0 0 3vw; }
+/* Titles: Archivo 800, sized by the viewport. Capsize trims the box to the cap height and the baseline (measured at a line height of 1, so the trims in em hold at any size). */
+.ws-root[data-skin="byte"] .pagetitle h1 { font-family: var(--display); font-size: clamp(48px, min(20vw, calc(94vw / (var(--chars, 6) * .675))), 300px); font-weight: 800; letter-spacing: -.05em; line-height: 1; margin: 0 0 0 -.04em; white-space: nowrap; text-transform: uppercase; color: var(--text); }
+.ws-root[data-skin="byte"] .pagetitle h1::before { content: ""; display: table; margin-bottom: -.148em; }
+.ws-root[data-skin="byte"] .pagetitle h1::after { content: ""; display: table; margin-top: -.166em; }
+.ws-root[data-skin="byte"] .pagetitle__actions { position: absolute; z-index: 3; top: -40px; right: 0; display: flex; align-items: center; gap: 2ch; }
 .ws-root[data-skin="byte"] .section-label { padding-top: 0; border-top: 0; margin: 5vw 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: lowercase; color: var(--blue); }
 .ws-root[data-skin="byte"] .section-label::before { content: "■ "; }
 .ws-root[data-skin="byte"] .today__date { color: var(--text-2); margin: 0 0 3vw; }
@@ -167,3 +173,4 @@
 .ws-root[data-skin="byte"] .dl-project p { font-family: var(--mono); }
 
 .ws-root[data-skin="byte"] .dl-day { grid-template-columns: 14ch minmax(0, 1fr); }
+
