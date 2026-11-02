@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseResponse } from "./api";
 import { PageTitle, TopRow } from "./Shell";
 import { Notes } from "./Notes";
+import { Projects } from "./Projects";
 import { Self } from "./Self";
 import { useRemembered } from "./useSplit";
 
@@ -123,9 +124,11 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
       <div className="mail-chips mind__tabs" role="group" aria-label="View">
         <button type="button" className={view === "tree" ? "is-on" : ""} onClick={() => setView("tree")}>Tree</button>
         <button type="button" className={view === "stream" ? "is-on" : ""} onClick={() => setView("stream")}>Stream</button>
+        <button type="button" className={view === "projects" ? "is-on" : ""} onClick={() => setView("projects")}>Projects</button>
         <button type="button" className={view === "self" ? "is-on" : ""} onClick={() => setView("self")}>Self</button>
       </div>
-      {view !== "self" && data && data.items.length === 0 && <p className="mind__empty">Nothing yet. Write a thought above, in any order.</p>}
+      {(view === "tree" || view === "stream") && data && data.items.length === 0 && <p className="mind__empty">Nothing yet. Write a thought above, in any order.</p>}
+      {view === "projects" && <Projects onError={onError} />}
       {view === "self" && <Self onError={onError} />}
 
       {view === "tree" && <>

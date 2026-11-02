@@ -1152,3 +1152,13 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .self__node, .self__edge, .self__halo, .self__trail { transition: none; } }
 .self__detail { max-width: 46em; margin-top: 26px; }
 .self__detail .section-label span { margin-left: 10px; font-weight: 400; color: var(--text-2); }
+
+/* ===== Projects: where each one stands ===== */
+.projects__bar { margin: 2px 0 8px; font-size: 14px; letter-spacing: .02em; }
+.projects__bar span { letter-spacing: 1px; color: var(--text); }
+.projects__bar--none { color: var(--text-2); }
+.projects__next { margin: 0 0 8px; font-size: 14px; color: var(--text); }
+.projects__facts { margin: 6px 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.7; color: var(--text-2); }
+.projects__facts a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.projects__open { margin-top: 6px; font-size: 13px; color: var(--text-2); } .projects__open summary { cursor: pointer; } .projects__open ul { margin: 4px 0 0; padding-left: 18px; }
+.projects__card .section-label span { margin-left: 10px; font-weight: 400; color: var(--text-2); }
