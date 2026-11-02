@@ -17,7 +17,7 @@ import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
 import { Members } from "./Members";
-import { Sidebar, SKINS, TabBar, ThemeContext, UserContext, type PublicUser, type Skin, type Tab, type Theme } from "./Shell";
+import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
 
 type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
@@ -103,18 +103,14 @@ export default function WorkspaceClient({ authorized, configured, user }: Props)
     };
   }, []);
   const [theme, setTheme] = useState<Theme>("dark");
-  const [skin, setSkin] = useState<Skin>("graphic");
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ws-theme");
       if (saved === "dark" || saved === "light") setTheme(saved); else if (!window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("light");
-      const savedSkin = localStorage.getItem("ws-skin");
-      if (SKINS.includes(savedSkin as Skin)) setSkin(savedSkin as Skin);
     } catch { /* storage unavailable */ }
   }, []);
-  const toggleSkin = () => setSkin((current) => { const next = SKINS[(SKINS.indexOf(current) + 1) % SKINS.length]; try { localStorage.setItem("ws-skin", next); } catch { /* storage unavailable */ } return next; });
   const toggle = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; try { localStorage.setItem("ws-theme", next); } catch { /* storage unavailable */ } return next; });
-  return <ThemeContext.Provider value={{ theme, toggle, skin, toggleSkin }}><div className="ws-root" data-theme={theme} data-skin={skin}>{authorized ? <UserContext.Provider value={{ user, openMembers: () => setMembersOpen(true) }}><App />{user?.role === "owner" && <Members open={membersOpen} onClose={() => setMembersOpen(false)} onError={setErrorText} />}{errorText && <div className="ws-toast" role="alert"><span>{errorText}</span><button type="button" onClick={() => setErrorText("")} aria-label="Dismiss"><X size={16} /></button></div>}</UserContext.Provider> : <Login configured={configured} />}</div></ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggle }}><div className="ws-root" data-theme={theme} data-skin="byte">{authorized ? <UserContext.Provider value={{ user, openMembers: () => setMembersOpen(true) }}><App />{user?.role === "owner" && <Members open={membersOpen} onClose={() => setMembersOpen(false)} onError={setErrorText} />}{errorText && <div className="ws-toast" role="alert"><span>{errorText}</span><button type="button" onClick={() => setErrorText("")} aria-label="Dismiss"><X size={16} /></button></div>}</UserContext.Provider> : <Login configured={configured} />}</div></ThemeContext.Provider>;
 }
 
 function App() {

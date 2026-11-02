@@ -1,24 +1,13 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
 
 export type Theme = "light" | "dark";
-export type Skin = "graphic" | "paper" | "byte";
-/** The order the toggle walks through. */
-export const SKINS: Skin[] = ["graphic", "paper", "byte"];
-const SKIN_NAME: Record<Skin, string> = { graphic: "graphic look", paper: "paper look", byte: "byte look" };
-export const ThemeContext = createContext<{ theme: Theme; toggle: () => void; skin: Skin; toggleSkin: () => void }>({ theme: "light", toggle: () => undefined, skin: "graphic", toggleSkin: () => undefined });
+export const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({ theme: "light", toggle: () => undefined });
 
-/** Graphic realism (glass, grain, signal colour), the quieter paper look, or the type-only byte look. */
-export function SkinToggle({ className = "" }: { className?: string }) {
-  const { skin, toggleSkin } = useContext(ThemeContext);
-  const next = SKINS[(SKINS.indexOf(skin) + 1) % SKINS.length];
-  return <button type="button" className={className} onClick={toggleSkin} aria-label={`Switch to the ${SKIN_NAME[next]}`}><Layers size={15} />{className.includes("sidebar-theme") ? ` ${SKIN_NAME[next].replace(/^./, (c) => c.toUpperCase())}` : ""}</button>;
-}
-
-/** Paper by day, charcoal by night. */
+/** Light by day, dark by night. */
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const { theme, toggle } = useContext(ThemeContext);
   return <button type="button" className={className} onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}{className.includes("sidebar-theme") ? (theme === "dark" ? " Light mode" : " Dark mode") : ""}</button>;
@@ -68,7 +57,6 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
     <div className="sidebar__foot">
       <a href="/">Portfolio</a>
       <ThemeToggle className="sidebar-theme" />
-      <SkinToggle className="sidebar-theme" />
       {user?.role === "owner" && <button type="button" onClick={openMembers}><Users size={15} /> Members</button>}
       {user?.role === "owner" && <SyncButton />}
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
@@ -90,7 +78,6 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
   return <div className="toprow">
     <a href="/" className="ws-text-button">Portfolio</a>
     <ThemeToggle className="ws-text-button" />
-    <SkinToggle className="ws-text-button" />
     {user?.role === "owner" && <button type="button" className="ws-text-button" onClick={openMembers}><Users size={15} /> Members</button>}
     {user?.role === "owner" && <SyncButton className="ws-text-button" />}
     <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
