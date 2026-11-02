@@ -17,3 +17,6 @@ yarn-error.log*
 public/pdf.min.mjs
 public/pdf.worker.min.mjs
 public/pdfjs/
+
+# drivesync marker files
+.drivesync

@@ -1085,3 +1085,18 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .mem__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: 14px; } .mem__controls label { display: flex; align-items: center; gap: 8px; } .mem__controls input[type="number"] { width: 84px; min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); font-size: 14px; }
 .mem__row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; } .mem__row .ws-text-button { min-height: 36px; font-size: 14px; } .mem__danger { color: var(--danger) !important; }
 @media (max-width: 520px) { .mem__controls { grid-template-columns: 1fr; } }
+
+/* Drive sync status */
+.syncdot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: var(--text-2); vertical-align: middle; }
+.syncdot--ok { background: #30d158; box-shadow: 0 0 0 3px rgba(48, 209, 88, .18); } .syncdot--busy { background: #ff9f0a; animation: ws-pulse 1.2s ease-in-out infinite; } .syncdot--bad { background: #ff453a; } .syncdot--off { background: var(--f3); }
+@keyframes ws-pulse { 50% { opacity: .35; } }
+.sync { display: flex; flex-direction: column; gap: 14px; } .sync code { padding: 1px 5px; border-radius: 5px; background: var(--panel-2); font-size: 12px; }
+.sync__error { margin: 0; color: var(--danger); font-size: 14px; }
+.sync__device { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.sync__device header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; } .sync__device header strong { font-size: 16px; } .sync__device header small { display: block; margin-top: 2px; color: var(--text-2); font-size: 12px; }
+.sync__actions { display: flex; align-items: center; gap: 8px; } .sync__actions .ws-pill { min-height: 38px; padding: 0 14px; font-size: 14px; } .sync__actions .ws-text-button { min-height: 38px; font-size: 14px; }
+.sync__waiting { margin: 0; color: var(--accent); font-size: 13px; }
+.sync__folders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; } .sync__folders li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); } .sync__folders li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sync__folders strong { font-size: 15px; } .sync__folders small { color: var(--text-2); font-size: 12px; overflow-wrap: anywhere; } .sync__path { opacity: .75; }
+.sync__state { align-self: flex-start; padding: 1px 8px; border-radius: 999px; background: var(--f2); color: var(--text-2); font-size: 11px; } .sync__state--syncing, .sync__state--queued { background: rgba(255, 159, 10, .18); color: #ff9f0a; } .sync__state--error { background: rgba(255, 69, 58, .16); color: var(--danger); } .sync__state--idle { background: rgba(48, 209, 88, .16); color: #30d158; }
+.sync__log summary { cursor: pointer; color: var(--text-2); font-size: 13px; } .sync__log ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); } .sync__log time { margin-right: 6px; font-variant-numeric: tabular-nums; }

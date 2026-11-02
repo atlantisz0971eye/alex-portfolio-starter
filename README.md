@@ -57,6 +57,10 @@ app/
 
 本地开发时把这些值放在未提交的 `.env.local`。访问密钥和 Blob 令牌都不得以 `NEXT_PUBLIC_` 开头。配置缺失时，Workspace 会保持锁定或提示资料库尚未连接。私人文档只存入 Private Blob Store，并由已登录的服务端接口读取；会话使用 HttpOnly Cookie。第一版登录限流是函数实例内的兜底措施，发布前还应在 Vercel Firewall 为 `/api/workspace/session` 和 `/api/workspace/assistant` 配置跨实例限流。
 
+## Alex Workspace · 把项目同步到 Google Drive
+
+`tools/drivesync/` 是一个跑在你电脑上的小脚本：标记文件夹后，它用 rclone 把这些文件夹镜像到 Drive，并向 Workspace 报告在线状态；侧栏的 **Drive sync**（仅站主可见）显示电脑是否在线、每个文件夹的同步情况和错误，还能点 **Sync now**。需要在 Vercel 设置 `WORKSPACE_SYNC_TOKEN`（至少 32 个字符，与电脑上 `~/.drivesync/config.json` 里的一致）。安装和用法见 `tools/drivesync/README.md`。
+
 ## Alex Workspace · 多人使用
 
 `WORKSPACE_ACCESS_KEY` 是站主（owner）的密钥，站主的数据仍在原来的 `workspace/` 下，无需迁移。站主登录后，侧栏的 **Members** 可以给朋友各发一把密钥：每个人只输入自己的密钥就进入各自独立的空间（笔记、画板、资料库、日历、Devlog、邮箱连接都互不相通，存放在 `workspace/users/<id>/`）。密钥只在创建时显示一次，服务器只保存哈希；可随时停用、换新密钥、全端登出，或删除成员并清除其全部数据。

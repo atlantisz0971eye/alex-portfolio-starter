@@ -2,6 +2,7 @@
 
 import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, type ReactNode } from "react";
+import { SyncButton } from "./SyncStatus";
 
 export type Theme = "light" | "dark";
 export type Skin = "graphic" | "paper";
@@ -55,6 +56,7 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
       <ThemeToggle className="sidebar-theme" />
       <SkinToggle className="sidebar-theme" />
       {user?.role === "owner" && <button type="button" onClick={openMembers}><Users size={15} /> Members</button>}
+      {user?.role === "owner" && <SyncButton />}
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </div>
   </aside>;
@@ -76,6 +78,7 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
     <ThemeToggle className="ws-text-button" />
     <SkinToggle className="ws-text-button" />
     {user?.role === "owner" && <button type="button" className="ws-text-button" onClick={openMembers}><Users size={15} /> Members</button>}
+    {user?.role === "owner" && <SyncButton className="ws-text-button" />}
     <button type="button" className="ws-text-button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
   </div>;
 }
