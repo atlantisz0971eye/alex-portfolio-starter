@@ -5,7 +5,7 @@ import { SelfError, importPieces, readPieces, readSelf, wipeSelf } from "../../.
 import { currentUser } from "../../../lib/workspaceScope";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 const calls = new Map<string, { count: number; until: number }>();
 const GEMINI_CODES: Record<string, number> = { gemini_not_configured: 503, gemini_forbidden: 502, gemini_billing: 502, gemini_failed: 502, ai_quota: 429 };
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   calls.set(user.id, { count: count + 1, until: previous && previous.until > now ? previous.until : now + 60_000 });
   try {
     if (body.action === "import") return Response.json(await importPieces(body.pieces));
-    if (body.action === "analyze") return Response.json(await analyzeSome(4));
+    if (body.action === "analyze") return Response.json(await analyzeSome(3));
     if (body.action === "build") { const graph = await buildSelf(); return Response.json({ nodes: graph.nodes.length, edges: graph.edges.length }); }
     if (body.action === "hide" && typeof body.id === "string") { const graph = await hideConcept(body.id.slice(0, 80)); return Response.json({ nodes: graph.nodes.length }); }
     if (body.action === "wipe") { await wipeSelf(); return Response.json({ ok: true }); }

@@ -26,7 +26,7 @@ const key = (label: string) => label.toLowerCase();
 
 /** What Gemini makes of one batch of pieces. Anything it returns for an id that was not asked about is dropped. */
 export async function readBatch(slice: Piece[], vocabulary: string[]): Promise<Record<string, Analysis>> {
-  const parsed = await geminiJson(ANALYZE, JSON.stringify({ VOCABULARY: vocabulary, PIECES: slice.map((piece) => ({ id: piece.id, date: piece.at.slice(0, 10), text: piece.text.slice(0, CLIP) })) }), 6000, 70_000);
+  const parsed = await geminiJson(ANALYZE, JSON.stringify({ VOCABULARY: vocabulary, PIECES: slice.map((piece) => ({ id: piece.id, date: piece.at.slice(0, 10), text: piece.text.slice(0, CLIP) })) }), 12_000, 100_000);
   const known = new Set(slice.map((piece) => piece.id));
   const out: Record<string, Analysis> = {};
   for (const raw of Array.isArray(parsed.items) ? parsed.items : []) {
@@ -135,7 +135,7 @@ export async function writePortrait(pieces: Piece[], graph: SelfGraph): Promise<
     LINKS: graph.edges.slice(0, 30).map((edge) => `${labelOf.get(edge.a)} — ${labelOf.get(edge.b)} (${edge.weight})`),
     SAMPLES,
   };
-  const parsed = await geminiJson(PORTRAIT, JSON.stringify(payload), 3000, 70_000);
+  const parsed = await geminiJson(PORTRAIT, JSON.stringify(payload), 10_000, 100_000);
   const ids = new Set(SAMPLES.map((sample) => sample.id));
   const sections = (Array.isArray(parsed.sections) ? parsed.sections : []).slice(0, 6).map((raw) => {
     const s = (raw ?? {}) as Record<string, unknown>;
