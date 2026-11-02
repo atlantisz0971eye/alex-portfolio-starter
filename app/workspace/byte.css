@@ -1,0 +1,84 @@
+/* =====================================================================
+   Byte look. No chrome: no boxes, borders, bars or rounded corners. One monospace face, real type set very large
+   and left to run off the page, glyphs (■ □) as bullets, a faint dot grid. The navigation is one word in the corner
+   that opens a page of huge words. Applies when the root carries data-skin="byte"; the other skins are untouched.
+   ===================================================================== */
+.ws-root[data-skin="byte"] {
+  --mono: ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "PingFang SC", monospace;
+  --serif: var(--mono);
+  --radius: 0px;
+  --blue: #2f6bff;
+  font-family: var(--mono);
+  -webkit-font-smoothing: antialiased;
+}
+.ws-root[data-skin="byte"][data-theme="dark"] {
+  --bg: #0b0b0c; --panel: transparent; --panel-2: transparent; --panel-3: rgba(255,255,255,.06); --float: #131316;
+  --text: #f2f2f0; --text-2: #7b7e85; --accent: #f2f2f0; --on-accent: #0b0b0c;
+  --f1: rgba(255,255,255,.05); --f2: rgba(255,255,255,.1); --f3: rgba(255,255,255,.18); --line: rgba(255,255,255,.14);
+  --shade: rgba(0,0,0,.5); --well: rgba(255,255,255,.05); --dot: rgba(255,255,255,.13);
+  color-scheme: dark;
+}
+.ws-root[data-skin="byte"][data-theme="light"] {
+  --bg: #f1f1ed; --panel: transparent; --panel-2: transparent; --panel-3: rgba(0,0,0,.06); --float: #f8f8f5;
+  --text: #0b0b0c; --text-2: #70727a; --accent: #0b0b0c; --on-accent: #f1f1ed;
+  --f1: rgba(0,0,0,.05); --f2: rgba(0,0,0,.1); --f3: rgba(0,0,0,.18); --line: rgba(0,0,0,.16);
+  --shade: rgba(0,0,0,.12); --well: rgba(0,0,0,.05); --dot: rgba(0,0,0,.15);
+  color-scheme: light;
+}
+.ws-root[data-skin="byte"] {
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.6px); background-size: 20px 22px; background-position: 10px 11px;
+}
+.ws-root[data-skin="byte"] *:not(:focus-visible) { box-shadow: none !important; }
+.ws-root[data-skin="byte"] * { border-radius: 0 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
+/* ---- navigation: a corner word, then a page of huge words ---- */
+.ws-root[data-skin="byte"] .tabbar, .ws-root[data-skin="byte"] .toprow { display: none; }
+.ws-root[data-skin="byte"] .shell { grid-template-columns: minmax(0, 1fr); }
+.ws-root[data-skin="byte"] .sidebar { position: fixed; z-index: 40; inset: 0 auto auto 0; display: flex; flex-direction: row; align-items: baseline; gap: 3ch; padding: 14px 2.2vw; background: transparent; border: 0; }
+.ws-root[data-skin="byte"] .sidebar__brand { padding: 0; font-size: 15px; font-weight: 700; color: var(--text); }
+.ws-root[data-skin="byte"] .sidebar__brand span { color: var(--text); margin: 0; }
+.ws-root[data-skin="byte"] .sidebar__index { display: inline; color: var(--text-2); font-size: 15px; }
+.ws-root[data-skin="byte"] .sidebar__index::before { content: "■ "; color: var(--blue); }
+.ws-root[data-skin="byte"] .sidebar__index:hover { color: var(--text); }
+.ws-root[data-skin="byte"] .sidebar__nav, .ws-root[data-skin="byte"] .sidebar__assistant, .ws-root[data-skin="byte"] .sidebar__foot { display: none; }
+.ws-root[data-skin="byte"] .sidebar[data-open] { inset: 0; width: auto; height: auto; flex-direction: column; align-items: flex-start; gap: 0; padding: 14px 2.2vw 4vw; background: var(--bg); overflow-y: auto; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__brand, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__index { position: fixed; top: 14px; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__index { left: calc(2.2vw + 22ch); }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav { display: flex; flex-direction: column; gap: 0; margin-top: 6vh; width: 100%; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button { height: auto; padding: 0; gap: 0; font-size: 14vw; font-weight: 800; line-height: .84; letter-spacing: -.07em; text-transform: uppercase; color: var(--f3); white-space: nowrap; background: transparent; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button svg { display: none; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button:hover, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button.is-on { color: var(--text); background: transparent; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav .badge-dot { position: static; display: inline-block; width: .12em; height: .12em; margin-left: .06em; background: var(--blue); vertical-align: top; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__assistant, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot { display: flex; flex-direction: row; flex-wrap: wrap; gap: 2ch 3ch; width: auto; height: auto; margin: 4vh 0 0; padding: 0; font-size: 15px; color: var(--text-2) !important; background: transparent !important; border: 0; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot { margin-top: 18px; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__assistant kbd { margin-left: 1ch; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot a, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot button { height: auto; padding: 0; color: var(--text-2); }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot a:hover, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot button:hover, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__assistant:hover { color: var(--text) !important; background: transparent !important; }
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot svg { display: none; }
+
+/* ---- pages: type at scale, no boxes ---- */
+.ws-root[data-skin="byte"] .page { padding: 52px 2.2vw 10vw; }
+.ws-root[data-skin="byte"] .page__inner { max-width: none; }
+.ws-root[data-skin="byte"] .pagetitle { position: relative; align-items: flex-start; margin: 0 0 1vw; }
+.ws-root[data-skin="byte"] .pagetitle h1 { font-family: var(--mono); font-size: clamp(64px, 20vw, 300px); font-weight: 800; letter-spacing: -.07em; line-height: .78; margin: 0 0 0 -1vw; white-space: nowrap; text-transform: uppercase; color: var(--text); }
+.ws-root[data-skin="byte"] .pagetitle__actions { position: relative; z-index: 3; align-self: flex-start; margin-top: 8px; }
+.ws-root[data-skin="byte"] .section-label { margin: 5vw 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: lowercase; color: var(--blue); }
+.ws-root[data-skin="byte"] .section-label::before { content: "■ "; }
+.ws-root[data-skin="byte"] .today__date { color: var(--text-2); margin: 0 0 3vw; }
+.ws-root[data-skin="byte"] .today__plan .ws-markdown { font-size: 21px; line-height: 30px; max-width: 34em; }
+.ws-root[data-skin="byte"] .today__grid { position: relative; z-index: 2; }
+.ws-root[data-skin="byte"] .pagetitle + * , .ws-root[data-skin="byte"] .today__head + * { position: relative; z-index: 2; }
+
+.ws-root[data-skin="byte"] div, .ws-root[data-skin="byte"] section, .ws-root[data-skin="byte"] li, .ws-root[data-skin="byte"] ul, .ws-root[data-skin="byte"] article, .ws-root[data-skin="byte"] header, .ws-root[data-skin="byte"] footer { border: 0; }
+
+/* controls read as words, not as buttons */
+.ws-root[data-skin="byte"] .ws-pill, .ws-root[data-skin="byte"] .ws-round { background: transparent !important; border: 0 !important; padding: 0 1ch; min-height: 32px; color: var(--text) !important; text-decoration: underline; text-underline-offset: 4px; font-weight: 400; }
+.ws-root[data-skin="byte"] .ws-pill--solid { text-decoration: none; background: var(--text) !important; color: var(--bg) !important; }
+.ws-root[data-skin="byte"] .ws-text-button { color: var(--text) !important; font-size: 15px; }
+.ws-root[data-skin="byte"] input, .ws-root[data-skin="byte"] textarea, .ws-root[data-skin="byte"] select { font-family: var(--mono); background: transparent; border: 0; border-bottom: 1px dashed var(--line); color: var(--text); }
+
+/* covers and lists lose their frames */
+.ws-root[data-skin="byte"] .cover { border-radius: 0; }
+.ws-root[data-skin="byte"] .continue { padding: 0; background: transparent; }
+.ws-root[data-skin="byte"] .tile__title { font-size: 15px; font-weight: 700; }

@@ -1,0 +1,47 @@
+/* No chrome: no borders, boxes, sidebar or bar. Real type in one monospace face, set very large and left to run off the page. */
+.byte {
+  --bg: #0b0b0c; --ink: #f2f2f0; --dim: #6b6d72; --ghost: #232427; --blue: #2f6bff; --amber: #ffb000; --red: #ff5a4d; --green: #5af08a;
+  position: relative; min-height: 100vh; overflow-x: clip; background: var(--bg); color: var(--ink);
+  font: 15px/22px ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "PingFang SC", monospace;
+  background-image: radial-gradient(circle, rgba(255,255,255,.13) 1px, transparent 1.6px); background-size: 20px 22px; background-position: 10px 11px;
+  padding: 18px 2.2vw 8vw;
+}
+.byte * { box-sizing: border-box; }
+.byte a { color: inherit; text-decoration: none; }
+.byte .top { display: flex; gap: 3ch; flex-wrap: wrap; color: var(--dim); position: relative; z-index: 3; }
+.byte .top b { color: var(--ink); font-weight: 700; }
+.byte .top i { font-style: normal; color: var(--green); }
+.byte .top a:hover { color: var(--ink); }
+
+.byte .mega { margin: 0; font-weight: 800; letter-spacing: -.07em; line-height: .76; white-space: nowrap; }
+.byte .day { font-size: 33vw; margin-left: -1.2vw; margin-top: 1vw; color: var(--ink); position: relative; z-index: 1; }
+/* a picture made of characters, loose on the page: no frame, running off the right edge */
+.byte pre.art { position: absolute; right: -3vw; top: 40px; margin: 0; font: 13px/15px ui-monospace, Menlo, monospace; color: #4a4d55; white-space: pre; z-index: 0; pointer-events: none; }
+.byte pre.art .w { color: var(--ink); } .byte pre.art .b { color: var(--blue); }
+
+.byte .body { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(12, 1fr); column-gap: 1.2vw; row-gap: 56px; margin-top: -7vw; mix-blend-mode: difference; }
+.byte h2 { margin: 0 0 10px; font: 700 15px/22px inherit; font-family: inherit; color: var(--blue); }
+.byte h2::before { content: "■ "; }
+.byte section { min-width: 0; }
+.byte .plan { grid-column: 1 / span 6; font-size: 21px; line-height: 30px; }
+.byte .plan p { margin: 0 0 14px; max-width: 34em; } .byte .plan p.dim { color: var(--dim); }
+.byte .sched { grid-column: 8 / span 5; margin-top: 12vw; }
+.byte .sched div { margin-bottom: 14px; } .byte .sched time { color: var(--amber); margin-right: 2ch; } .byte .sched small { display: block; color: var(--dim); font-size: 13px; line-height: 18px; margin-left: 7ch; }
+.byte .sync { grid-column: 3 / span 6; }
+.byte .sync div { display: grid; grid-template-columns: 12ch auto 7ch; gap: 2ch; } .byte .sync .bars { letter-spacing: 2px; color: var(--green); } .byte .sync .bars s { text-decoration: none; color: var(--ghost); }
+.byte .sync .w .bars { color: var(--amber); } .byte .sync .e .bars, .byte .sync .e em { color: var(--red); } .byte .sync em { font-style: normal; color: var(--dim); }
+.byte .mail { grid-column: 5 / span 8; }
+.byte .mail div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .byte .mail div::before { content: "■ "; color: var(--blue); } .byte .mail .read::before { content: "□ "; color: var(--dim); }
+.byte .mail time { color: var(--dim); margin-right: 2ch; } .byte .mail span { color: var(--dim); margin-left: 1ch; }
+.byte .ticker { grid-column: 1 / -1; color: var(--red); white-space: nowrap; overflow: hidden; }
+.byte .prompt { grid-column: 1 / span 8; font-size: 21px; } .byte .prompt::after { content: "_"; color: var(--blue); animation: byteblink 1s steps(1) infinite; }
+
+/* The navigation is the page: section names, huge, stacked, cut off by the edge. */
+.byte .index { position: relative; z-index: 2; margin-top: 10vw; display: grid; justify-items: start; }
+.byte .index a { font-size: 15vw; color: var(--ghost); display: block; }
+.byte .index a:hover, .byte .index a:focus-visible { color: var(--ink); outline: 0; }
+.byte .index a[aria-current] { color: var(--ink); }
+.byte .index sup { font-size: 14px; letter-spacing: 0; font-weight: 400; vertical-align: top; margin-left: 1ch; color: var(--blue); }
+@keyframes byteblink { 50% { opacity: 0; } }
+@media (max-width: 760px) { .byte .body { grid-template-columns: 1fr; margin-top: -4vw; } .byte .body > * { grid-column: 1 !important; margin-top: 0 !important; } .byte pre.art { display: none; } .byte .plan { font-size: 17px; line-height: 26px; } }
+@media (prefers-reduced-motion: reduce) { .byte .prompt::after { animation: none; } }

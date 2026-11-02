@@ -3,6 +3,7 @@ import { publicUser } from "../lib/workspaceScope";
 import WorkspaceClient from "./WorkspaceClient";
 import "./workspace.css";
 import "./graphic.css";
+import "./byte.css";
 
 export const dynamic = "force-dynamic";
 

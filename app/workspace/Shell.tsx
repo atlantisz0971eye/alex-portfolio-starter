@@ -1,17 +1,21 @@
 "use client";
 
 import { BookOpen, Calendar as CalendarIcon, Layers, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
 
 export type Theme = "light" | "dark";
-export type Skin = "graphic" | "paper";
+export type Skin = "graphic" | "paper" | "byte";
+/** The order the toggle walks through. */
+export const SKINS: Skin[] = ["graphic", "paper", "byte"];
+const SKIN_NAME: Record<Skin, string> = { graphic: "graphic look", paper: "paper look", byte: "byte look" };
 export const ThemeContext = createContext<{ theme: Theme; toggle: () => void; skin: Skin; toggleSkin: () => void }>({ theme: "light", toggle: () => undefined, skin: "graphic", toggleSkin: () => undefined });
 
-/** Graphic realism (glass, grain, signal colour) or the quieter paper look. */
+/** Graphic realism (glass, grain, signal colour), the quieter paper look, or the type-only byte look. */
 export function SkinToggle({ className = "" }: { className?: string }) {
   const { skin, toggleSkin } = useContext(ThemeContext);
-  return <button type="button" className={className} onClick={toggleSkin} aria-label={skin === "graphic" ? "Switch to the paper look" : "Switch to the graphic look"}><Layers size={15} />{className.includes("sidebar-theme") ? (skin === "graphic" ? " Paper look" : " Graphic look") : ""}</button>;
+  const next = SKINS[(SKINS.indexOf(skin) + 1) % SKINS.length];
+  return <button type="button" className={className} onClick={toggleSkin} aria-label={`Switch to the ${SKIN_NAME[next]}`}><Layers size={15} />{className.includes("sidebar-theme") ? ` ${SKIN_NAME[next].replace(/^./, (c) => c.toUpperCase())}` : ""}</button>;
 }
 
 /** Paper by day, charcoal by night. */
@@ -45,12 +49,22 @@ function useItems() {
 export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void; onAssistant: () => void; badges?: Partial<Record<Tab, boolean>> }) {
   const { user, openMembers } = useContext(UserContext);
   const items = useItems();
-  return <aside className="sidebar" aria-label="Workspace">
+  // Only the byte look uses this: the navigation folds into one word in the corner and opens as a page of huge words.
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [open]);
+  const go = (next: Tab) => { setOpen(false); onTab(next); };
+  return <aside className="sidebar" aria-label="Workspace" data-open={open || undefined}>
     <div className="sidebar__brand"><span>{user?.name ?? "Alex"}</span> Workspace</div>
+    <button type="button" className="sidebar__index" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? "close" : "index"}</button>
     <nav className="sidebar__nav">
-      {items.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)}><Icon size={18} /> {label}{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
+      {items.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => go(id)}><Icon size={18} /> {label}{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
     </nav>
-    <button type="button" className="sidebar__assistant" onClick={onAssistant}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
+    <button type="button" className="sidebar__assistant" onClick={() => { setOpen(false); onAssistant(); }}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
     <div className="sidebar__foot">
       <a href="/">Portfolio</a>
       <ThemeToggle className="sidebar-theme" />
