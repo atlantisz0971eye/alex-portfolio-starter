@@ -5,7 +5,7 @@ type Commit = { sha: string; message: string; date: string; url: string };
 const MAX_DAYS = 14;
 
 /** Commits of a repository since a time, newest first, restricted to the project's paths when it has any. */
-async function fetchCommits(project: DevProject, since: string): Promise<Commit[]> {
+export async function fetchCommits(project: DevProject, since: string): Promise<Commit[]> {
   const token = process.env.GITHUB_TOKEN;
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "alex-workspace", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   const found = new Map<string, Commit>();

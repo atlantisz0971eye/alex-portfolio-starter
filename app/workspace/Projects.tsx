@@ -8,7 +8,7 @@ type Doc = { file: string; url: string; done: number; total: number; open: strin
 type Project = {
   name: string; color: string; devlogStatus: string; repo?: string;
   progress: { done: number; total: number } | null; trend: "up" | "steady" | "down" | "quiet"; idleDays: number | null;
-  signals: { docs: Doc[]; deploy: { state: string; at: string; environment: string } | null; commits: { last7: number; prev7: number; last30: number; lastAt: string | null }; notebook: { last30: number; topics: string[] }; sync: { folder: string; files: number | null; lastOk: string | null; state: string }[]; repoError?: string };
+  signals: { docs: Doc[]; deploy: { state: string; at: string; environment: string } | null; commits: { last7: number; prev7: number; last30: number; lastAt: string | null; source?: "github" | "devlog" }; notebook: { last30: number; topics: string[] }; sync: { folder: string; files: number | null; lastOk: string | null; state: string }[]; repoError?: string };
   assessment: string; next: string;
 };
 type Data = { updatedAt: string; overview: string; projects: Project[] };
@@ -67,7 +67,7 @@ export function Projects({ onError }: { onError: (message: string) => void }) {
         {project.assessment && <p className="mind__summary">{project.assessment}</p>}
         {project.next && <p className="projects__next">next: {project.next}</p>}
         <ul className="projects__facts">
-          {s.commits.last30 > 0 || s.commits.lastAt ? <li>commits: {s.commits.last7} this week, {s.commits.prev7} the week before, {s.commits.last30} in 30 days{s.commits.lastAt ? `, last ${day.format(new Date(s.commits.lastAt))}` : ""}</li> : null}
+          {s.commits.last30 > 0 || s.commits.lastAt ? <li>commits: {s.commits.last7} this week, {s.commits.prev7} the week before, {s.commits.last30} in 30 days{s.commits.lastAt ? `, last ${day.format(new Date(s.commits.lastAt.length === 10 ? `${s.commits.lastAt}T12:00:00Z` : s.commits.lastAt))}` : ""} ({s.commits.source === "github" ? "from GitHub" : "from saved devlog entries, may be incomplete"})</li> : null}
           {s.deploy && <li>deploy ({s.deploy.environment}): {s.deploy.state}, {day.format(new Date(s.deploy.at))}</li>}
           {s.notebook.last30 > 0 && <li>notebook: {s.notebook.last30} entries in 30 days{s.notebook.topics.length ? ` · ${s.notebook.topics.join(", ")}` : ""}</li>}
           {s.sync.map((folder) => <li key={folder.folder}>sync: {folder.folder}{folder.files !== null ? `, ${folder.files} files` : ""}{folder.lastOk ? `, synced ${ago(folder.lastOk)}` : ""}{folder.state !== "idle" ? ` (${folder.state})` : ""}</li>)}
