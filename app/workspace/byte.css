@@ -61,9 +61,9 @@
 .ws-root[data-skin="byte"] .page { padding: 52px 2.2vw 10vw; }
 .ws-root[data-skin="byte"] .page__inner { max-width: none; }
 .ws-root[data-skin="byte"] .pagetitle { position: relative; align-items: flex-start; margin: 0 0 1vw; }
-.ws-root[data-skin="byte"] .pagetitle h1 { font-family: var(--mono); font-size: clamp(64px, 20vw, 300px); font-weight: 800; letter-spacing: -.07em; line-height: .78; margin: 0 0 0 -1vw; white-space: nowrap; text-transform: uppercase; color: var(--text); }
-.ws-root[data-skin="byte"] .pagetitle__actions { position: relative; z-index: 3; align-self: flex-start; margin-top: 8px; }
-.ws-root[data-skin="byte"] .section-label { margin: 5vw 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: lowercase; color: var(--blue); }
+.ws-root[data-skin="byte"] .pagetitle h1 { font-family: var(--mono); font-size: clamp(56px, 16vw, 260px); font-weight: 800; letter-spacing: -.07em; line-height: .78; margin: 0 0 0 -1vw; white-space: nowrap; text-transform: uppercase; color: var(--text); }
+.ws-root[data-skin="byte"] .pagetitle__actions { position: absolute; z-index: 45; top: -40px; right: 0; display: flex; align-items: center; gap: 2ch; }
+.ws-root[data-skin="byte"] .section-label { padding-top: 0; border-top: 0; margin: 5vw 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: lowercase; color: var(--blue); }
 .ws-root[data-skin="byte"] .section-label::before { content: "■ "; }
 .ws-root[data-skin="byte"] .today__date { color: var(--text-2); margin: 0 0 3vw; }
 .ws-root[data-skin="byte"] .today__plan .ws-markdown { font-size: 21px; line-height: 30px; max-width: 34em; }
@@ -82,3 +82,86 @@
 .ws-root[data-skin="byte"] .cover { border-radius: 0; }
 .ws-root[data-skin="byte"] .continue { padding: 0; background: transparent; }
 .ws-root[data-skin="byte"] .tile__title { font-size: 15px; font-weight: 700; }
+
+
+/* ---- one grammar for every page: giant title, a line of plain words, then the content on the same left edge ---- */
+.ws-root[data-skin="byte"] .cal, .ws-root[data-skin="byte"] .notes { max-width: none; margin: 0; }
+.ws-root[data-skin="byte"] .page--devlog { padding-bottom: 10vw; }
+/* chips, tabs and segments are words: a square says which one is on */
+.ws-root[data-skin="byte"] .mail-chips, .ws-root[data-skin="byte"] .dl-chips, .ws-root[data-skin="byte"] .ntree__tabs, .ws-root[data-skin="byte"] .ws-segment { display: flex; flex-wrap: wrap; gap: 0 3ch; padding: 0; margin: 12px 0 14px; background: transparent; }
+.ws-root[data-skin="byte"] .mail-chips button, .ws-root[data-skin="byte"] .mail-chips a, .ws-root[data-skin="byte"] .dl-chips button, .ws-root[data-skin="byte"] .ntree__tabs button, .ws-root[data-skin="byte"] .ws-segment button {
+  flex: none; display: inline-flex; align-items: center; gap: 1ch; height: auto; min-height: 28px; padding: 0; border: 0; background: transparent !important; color: var(--text-2); font-size: 15px; font-weight: 400;
+}
+.ws-root[data-skin="byte"] .mail-chips button::before, .ws-root[data-skin="byte"] .ntree__tabs button::before, .ws-root[data-skin="byte"] .ws-segment button::before { content: "□"; }
+.ws-root[data-skin="byte"] .mail-chips .is-on::before, .ws-root[data-skin="byte"] .ntree__tabs .is-on::before, .ws-root[data-skin="byte"] .ws-segment .is-on::before { content: "■"; color: var(--blue); }
+.ws-root[data-skin="byte"] .mail-chips .is-on, .ws-root[data-skin="byte"] .dl-chips .is-on, .ws-root[data-skin="byte"] .ntree__tabs .is-on, .ws-root[data-skin="byte"] .ws-segment .is-on { color: var(--text) !important; font-weight: 700; background: transparent !important; }
+.ws-root[data-skin="byte"] .dl-chips .is-on { text-decoration: underline; text-underline-offset: 5px; }
+.ws-root[data-skin="byte"] .dl-chips button i, .ws-root[data-skin="byte"] .cal-chip i { width: 9px; height: 9px; box-shadow: none; }
+.ws-root[data-skin="byte"] .mail-chips .cal-chip::before { content: none; }
+.ws-root[data-skin="byte"] .cal-chip { color: var(--text); font-size: 15px; }
+.ws-root[data-skin="byte"] .cal-chip.is-off { opacity: .4; text-decoration: line-through; }
+.ws-root[data-skin="byte"] .ws-segment { width: auto; }
+.ws-root[data-skin="byte"] .ws-pill--solid { background: transparent !important; color: var(--text) !important; font-weight: 700; text-decoration: underline; }
+.ws-root[data-skin="byte"] .mail-search { background: transparent; height: 36px; padding: 0; border-bottom: 1px dashed var(--line); color: var(--text-2); }
+.ws-root[data-skin="byte"] .mail-search:focus-within { box-shadow: none !important; border-bottom-style: solid; border-color: var(--text); }
+.ws-root[data-skin="byte"] .mail-search input { font-size: 15px; }
+
+/* mail and mindstreams: the title spans the page, the list sits left and the reading pane stays put on the right */
+.ws-root[data-skin="byte"] .page--split, .ws-root[data-skin="byte"] .page--notes.is-split { padding: 52px 2.2vw 8vw; overflow-y: auto; display: block; }
+.ws-root[data-skin="byte"] .split, .ws-root[data-skin="byte"] .page--notes.is-split .notes { display: grid !important; grid-template-columns: minmax(300px, 34vw) minmax(0, 1fr) !important; column-gap: 4vw; row-gap: 0; align-items: start; width: auto; }
+.ws-root[data-skin="byte"] .split__list, .ws-root[data-skin="byte"] .notes__list { display: contents; }
+.ws-root[data-skin="byte"] .split .pagetitle, .ws-root[data-skin="byte"] .notes .pagetitle { grid-column: 1 / -1; margin-bottom: 2vw; }
+.ws-root[data-skin="byte"] .split__list > :not(.pagetitle), .ws-root[data-skin="byte"] .notes__list > :not(.pagetitle) { grid-column: 1; min-width: 0; }
+.ws-root[data-skin="byte"] .split__detail, .ws-root[data-skin="byte"] .notes__pane { grid-column: 2; grid-row: 2 / span 60; position: sticky; top: 16px; height: calc(100vh - 72px); overflow: hidden; }
+.ws-root[data-skin="byte"] .notes > .ms-split { display: none; }
+.ws-root[data-skin="byte"] .mail-view--pane .mail-view__scroll { max-width: 48em; padding: 0 0 48px; }
+.ws-root[data-skin="byte"] .nview__scroll { padding-left: 0; padding-right: 0; }
+.ws-root[data-skin="byte"] .mail-view h2 { font-size: 34px; line-height: 1.1; letter-spacing: -.03em; font-weight: 800; }
+.ws-root[data-skin="byte"] .mail-view__meta { border-bottom: 0; padding-bottom: 6px; }
+.ws-root[data-skin="byte"] .mail-body { font-size: 16px; line-height: 26px; }
+.ws-root[data-skin="byte"] .empty { align-items: flex-start; text-align: left; padding: 24px 0; }
+@media (max-width: 899px) { .ws-root[data-skin="byte"] .split, .ws-root[data-skin="byte"] .page--notes .notes { grid-template-columns: minmax(0, 1fr) !important; } }
+
+/* lists: plain rows, a square marks what is unread or open */
+.ws-root[data-skin="byte"] .mail-list li + li, .ws-root[data-skin="byte"] .agenda li + li { border-top: 0; }
+.ws-root[data-skin="byte"] .mail-list button { margin: 0; width: 100%; padding: 9px 0; }
+.ws-root[data-skin="byte"] .mail-list button.is-open { background: transparent; }
+.ws-root[data-skin="byte"] .mail-list button.is-open .mail-row__top strong { text-decoration: underline; text-underline-offset: 4px; }
+.ws-root[data-skin="byte"] .mail-dot { width: 9px; height: 9px; margin-top: 8px; background: transparent; box-shadow: inset 0 0 0 1px var(--f3) !important; }
+.ws-root[data-skin="byte"] .mail-dot.is-unread { background: var(--blue); box-shadow: none !important; }
+.ws-root[data-skin="byte"] .mail-row__top strong { font-weight: 700; }
+.ws-root[data-skin="byte"] .mail-row__snippet { -webkit-line-clamp: 1; }
+.ws-root[data-skin="byte"] .mail-accounts { border-top: 0; margin-top: 36px; }
+.ws-root[data-skin="byte"] .ntree__row { min-height: 32px; background: transparent; }
+.ws-root[data-skin="byte"] .ntree__row.is-active { background: transparent; }
+.ws-root[data-skin="byte"] .ntree__row.is-active .ntree__title { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+.ws-root[data-skin="byte"] .ntree__title { font-size: 15px; }
+.ws-root[data-skin="byte"] .ntree__main { min-height: 32px; }
+
+/* calendar: the week is a table of words on the page, not a dark box */
+.ws-root[data-skin="byte"] .wk { background: transparent; border: 0; }
+.ws-root[data-skin="byte"] .wk__head, .ws-root[data-skin="byte"] .wk__allday, .ws-root[data-skin="byte"] .wk__head > div, .ws-root[data-skin="byte"] .wk__allday > div, .ws-root[data-skin="byte"] .wk__col { border-color: var(--f2); }
+.ws-root[data-skin="byte"] .wk__head b { font-size: 22px; font-weight: 800; min-width: 0; height: auto; background: transparent !important; }
+.ws-root[data-skin="byte"] .wk__head .is-today b { color: var(--blue); } .ws-root[data-skin="byte"] .wk__head .is-today small { color: var(--blue); }
+.ws-root[data-skin="byte"] .wk__col.is-today { background-color: var(--f1); }
+.ws-root[data-skin="byte"] .wk__event, .ws-root[data-skin="byte"] .wk__chip { background: color-mix(in srgb, var(--c) 22%, var(--bg)) !important; color: var(--text); border-left-width: 3px; }
+.ws-root[data-skin="byte"] .wk__event span { color: var(--text-2); }
+.ws-root[data-skin="byte"] .cal-bar { margin: 0 0 4px; }
+.ws-root[data-skin="byte"] .cal-range { font-size: 15px; font-weight: 700; }
+.ws-root[data-skin="byte"] .page--cal.is-grid { overflow-y: auto; display: block; padding-bottom: 8vw; }
+.ws-root[data-skin="byte"] .page--cal.is-grid .cal { display: block; }
+.ws-root[data-skin="byte"] .wk__scroll { max-height: 62vh; }
+
+/* devlog: entries are text on a rule, not cards */
+.ws-root[data-skin="byte"] .dl-month { max-width: none; }
+.ws-root[data-skin="byte"] .dl-day__entries { border-left: 0; padding-left: 0; gap: 22px; }
+.ws-root[data-skin="byte"] .dl-entry { padding: 0; border: 0; background: transparent; }
+.ws-root[data-skin="byte"] .dl-entry h3 { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+.ws-root[data-skin="byte"] .dl-entry header { justify-content: flex-start; gap: 2ch; }
+.ws-root[data-skin="byte"] .dl-strip i { background: var(--f2); }
+.ws-root[data-skin="byte"] .dl-strip i[data-level="1"] { background: color-mix(in srgb, var(--text) 30%, var(--f2)); }
+.ws-root[data-skin="byte"] .dl-strip i[data-level="2"] { background: color-mix(in srgb, var(--text) 62%, var(--f2)); }
+.ws-root[data-skin="byte"] .dl-strip i[data-level="3"] { background: var(--text); }
+.ws-root[data-skin="byte"] .dl-project p { font-family: var(--mono); }
+
+.ws-root[data-skin="byte"] .dl-day { grid-template-columns: 14ch minmax(0, 1fr); }
