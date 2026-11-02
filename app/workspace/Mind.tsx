@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseResponse } from "./api";
 import { PageTitle, TopRow } from "./Shell";
 import { Notes } from "./Notes";
+import { Self } from "./Self";
 import { useRemembered } from "./useSplit";
 
 type Derived = { title: string; topic: string; project: string; kind: string };
@@ -119,11 +120,13 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
       {data === null && <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Loading…</p>}
       {data?.overview && <p className="mind__overview">{data.overview}</p>}
 
-      {data && data.items.length > 0 && <div className="mail-chips mind__tabs" role="group" aria-label="View">
+      <div className="mail-chips mind__tabs" role="group" aria-label="View">
         <button type="button" className={view === "tree" ? "is-on" : ""} onClick={() => setView("tree")}>Tree</button>
         <button type="button" className={view === "stream" ? "is-on" : ""} onClick={() => setView("stream")}>Stream</button>
-      </div>}
-      {data && data.items.length === 0 && <p className="mind__empty">Nothing yet. Write a thought above, in any order.</p>}
+        <button type="button" className={view === "self" ? "is-on" : ""} onClick={() => setView("self")}>Self</button>
+      </div>
+      {view !== "self" && data && data.items.length === 0 && <p className="mind__empty">Nothing yet. Write a thought above, in any order.</p>}
+      {view === "self" && <Self onError={onError} />}
 
       {view === "tree" && <>
         {unfiled.length > 0 && <section className="mind__project"><h2 className="section-label">filing</h2>{unfiled.map(entry)}</section>}

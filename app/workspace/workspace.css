@@ -1123,3 +1123,27 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .mind__delete { margin: 0 0 8px 9ch; font-size: 13px; color: var(--text-2); }
 .mind__streamrow small { display: block; margin-left: 9ch; font-size: 12px; color: var(--text-2); }
 .mind__back { position: fixed; z-index: 30; top: 14px; right: 24px; font-size: 14px; color: var(--text-2); }
+
+/* ===== Self: the network of one's writing ===== */
+.self__lead { max-width: 44em; margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.self__actions { display: flex; flex-wrap: wrap; gap: 4px 22px; align-items: center; margin-bottom: 18px; }
+.self__busy { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-2); }
+.self__portrait { max-width: 46em; margin-bottom: 26px; }
+.self__section p { margin: 4px 0 6px; font-size: 16px; line-height: 1.6; }
+.self__cite { display: block; margin: 0 0 4px; font-size: 12px; line-height: 1.5; color: var(--text-2); }
+.self__note { display: block; margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-2); max-width: 52em; }
+.self__map { display: block; width: 100%; height: auto; margin: 6px 0 0; overflow: visible; }
+.self__year line { stroke: var(--f2); stroke-width: 1; stroke-dasharray: 2 5; }
+.self__year text { fill: var(--text-2); font-size: 11px; font-family: inherit; }
+.self__edge { stroke: var(--text); opacity: .1; }
+.self__edge.is-lit { opacity: .55; }
+.self__node { cursor: pointer; --k: var(--text); }
+.self__node rect { fill: var(--k); }
+.self__node .self__span { stroke: var(--k); stroke-width: 1.5; opacity: .3; }
+.self__node text { fill: var(--text); font-size: 12px; font-family: inherit; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.self__node.is-dim { opacity: .14; }
+.self__node:focus-visible { outline: 0; }
+.self__node:focus-visible rect, .self__node.is-selected rect { stroke: var(--text); stroke-width: 2px; }
+.self__node--image { --k: #2f6bff; } .self__node--feeling { --k: #d98e00; } .self__node--person { --k: #2f9e5a; } .self__node--place { --k: #d9483c; } .self__node--author { --k: var(--text-2); }
+.self__detail { max-width: 46em; margin-top: 26px; }
+.self__detail .section-label span { margin-left: 10px; font-weight: 400; color: var(--text-2); }

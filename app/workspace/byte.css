@@ -205,3 +205,8 @@
 .ws-root[data-skin="byte"] .mind__overview { margin-bottom: 1.6vw; }
 .ws-root[data-skin="byte"] .page--mind .mind__tabs { margin: 0 0 1vw; }
 .ws-root[data-skin="byte"] .page--mind .section-label { margin: 2.6vw 0 6px; }
+
+/* Self: the network is drawn on the dot grid like everything else. */
+.ws-root[data-skin="byte"] .self__lead { color: var(--text); font-size: 15px; }
+.ws-root[data-skin="byte"] .self__section p { font-size: 17px; line-height: 26px; }
+.ws-root[data-skin="byte"] .self__node--theme { --k: var(--text); }
