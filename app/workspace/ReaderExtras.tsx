@@ -2,7 +2,7 @@
 
 import { BookmarkPlus, Check, Loader2, MessageCircle, NotebookPen, Trash2, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "./Markdown";
 import type { MarkColor, WorkspaceMark } from "../lib/workspaceStore";
 import { Sheet } from "./Sheet";
 
@@ -89,7 +89,7 @@ export function TranslateCard({ source, context, documentId, stream, onClose, on
     <p className="reader-translate__source">{source.slice(0, 160)}{source.length > 160 ? "…" : ""}</p>
     {error
       ? <p className="reader-translate__error">{error} <button type="button" onClick={() => setAttempt((value) => value + 1)}>Try again</button></p>
-      : text ? <div className="reader-translate__text ws-markdown"><ReactMarkdown>{text}</ReactMarkdown></div> : <p className="reader-translate__wait"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
+      : text ? <div className="reader-translate__text ws-markdown"><Markdown>{text}</Markdown></div> : <p className="reader-translate__wait"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
     {done && onSave && source.trim().split(/\s+/).length <= 4 && source.length <= 60 && <button type="button" className="ws-pill reader-translate__save" disabled={saved === "saving" || saved === "saved" || saved === "duplicate"} onClick={() => { setSaved("saving"); onSave(text).then(setSaved).catch(() => setSaved("error")); }}>
       {saved === "saving" ? <Loader2 className="ws-spin" size={14} /> : saved === "saved" || saved === "duplicate" ? <Check size={15} /> : <BookmarkPlus size={15} />} {saved === "saved" ? "Saved to Vocabulary" : saved === "duplicate" ? "Already in Vocabulary" : saved === "error" ? "Could not save · Try again" : "Save to Vocabulary"}
     </button>}

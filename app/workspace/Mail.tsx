@@ -4,7 +4,7 @@ import { ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, S
 import { PageTitle, TopRow } from "./Shell";
 import { keepInNotebook } from "./keep";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "./Markdown";
 import { errors, parseResponse, streamNdjson } from "./api";
 
 type Account = { id: string; email: string; connectedAt: string };
@@ -257,7 +257,7 @@ export function MailMessage({ summary, onClose, onError, pane = false }: { summa
           </>}
           {[...turns, ...(live ? [live] : [])].map((turn, index) => <div key={index} className="mail-ai__turn">
             {turn.question && <p className="ws-quote">{turn.question}</p>}
-            {turn.text ? <div className="ws-markdown"><ReactMarkdown>{turn.text}</ReactMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading…</p>}
+            {turn.text ? <div className="ws-markdown"><Markdown>{turn.text}</Markdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading…</p>}
           </div>)}
           {(turns.length > 0 || live) && <form className="mail-ai__form" onSubmit={(event) => { event.preventDefault(); const text = question.trim(); if (text.length >= 2) { setQuestion(""); void ask("ask", text); } }}>
             <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about this email" enterKeyHint="send" />
