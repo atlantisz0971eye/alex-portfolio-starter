@@ -2,7 +2,7 @@
 
 import { BookOpen, Loader2, RotateCcw, Send, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "./Markdown";
 import type { WorkspaceDocument } from "../lib/workspaceStore";
 import { Sheet } from "./Sheet";
 
@@ -11,12 +11,12 @@ function withCitations(markdown: string) {
   return markdown.replace(/\[(?:Page|p\.?)\s*(\d{1,5})(?:\s*[-–,，、]\s*\d{1,5})?\]/gi, (_match, page) => `[p. ${page}](#cite-${page})`);
 }
 
-function Markdown({ children, onCite }: { children: string; onCite: (page: number) => void }) {
-  return <ReactMarkdown components={{
+function CitedMarkdown({ children, onCite }: { children: string; onCite: (page: number) => void }) {
+  return <Markdown components={{
     a: ({ href, children: label }) => href?.startsWith("#cite-")
       ? <button type="button" className="ws-cite" onClick={() => onCite(Number(href.slice(6)))}>{label}</button>
-      : <a href={href} target="_blank" rel="noreferrer">{label}</a>,
-  }}>{withCitations(children)}</ReactMarkdown>;
+      : <a href={href} target="_blank" rel="noopener noreferrer nofollow">{label}</a>,
+  }}>{withCitations(children)}</Markdown>;
 }
 
 export type AssistantIntent = { id: number; mode: "open" | "translate" | "ask"; selection?: string; offset?: number };
@@ -106,9 +106,9 @@ export function AssistantSheet({ open, onClose, document, intent, onDocument, st
         <section className="ws-card">
           <div className="ws-card__head"><span><BookOpen size={15} /> Reading guide</span><small>{document.guideCoverage === "excerpts" ? "Based on excerpts" : document.guideCoverage === "full" ? "Based on full text" : ""}</small></div>
           {live?.kind === "guide"
-            ? (live.text ? <div className="ws-markdown"><Markdown onCite={onCite}>{live.text}</Markdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading the book…</p>)
+            ? (live.text ? <div className="ws-markdown"><CitedMarkdown onCite={onCite}>{live.text}</CitedMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading the book…</p>)
             : document.guide
-              ? <div className="ws-markdown"><Markdown onCite={onCite}>{document.guide}</Markdown></div>
+              ? <div className="ws-markdown"><CitedMarkdown onCite={onCite}>{document.guide}</CitedMarkdown></div>
               : <button type="button" className="ws-pill" onClick={guide} disabled={busy}><Sparkles size={16} /> Generate guide</button>}
         </section>
         {showTranslation && <section className="ws-card">
@@ -117,12 +117,12 @@ export function AssistantSheet({ open, onClose, document, intent, onDocument, st
           {showTranslation.text ? <p className="ws-translation">{showTranslation.text}</p> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Translating…</p>}
         </section>}
         {(document.messages ?? []).map((message, index) => <div key={index} className={`ws-message ws-message--${message.role}`}>
-          <div className="ws-markdown"><Markdown onCite={onCite}>{message.content}</Markdown></div>
+          <div className="ws-markdown"><CitedMarkdown onCite={onCite}>{message.content}</CitedMarkdown></div>
         </div>)}
         {live?.kind === "ask" && <>
           <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{live.question}</p></div></div>
           <div className="ws-message ws-message--assistant">
-            {live.text ? <div className="ws-markdown"><Markdown onCite={onCite}>{live.text}</Markdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Searching the book…</p>}
+            {live.text ? <div className="ws-markdown"><CitedMarkdown onCite={onCite}>{live.text}</CitedMarkdown></div> : <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Searching the book…</p>}
           </div>
         </>}
         {failure && !busy && <div className="ws-card ws-card--error">

@@ -5,8 +5,8 @@
   "scripts": {
     "predev": "node scripts/copy-pdf-worker.mjs",
     "dev": "next dev",
-    "clean": "rimraf .next .next-dev",
-    "dev:clean": "rimraf .next-dev && next dev",
+    "clean": "node -e \"for (const d of ['.next','.next-dev']) require('fs').rmSync(d, { recursive: true, force: true })\"",
+    "dev:clean": "node -e \"for (const d of ['.next-dev']) require('fs').rmSync(d, { recursive: true, force: true })\" && next dev",
     "prebuild": "node scripts/copy-pdf-worker.mjs",
     "build": "next build",
     "start": "next start",
@@ -16,7 +16,7 @@
     "@dagrejs/dagre": "^3.1.1",
     "@floating-ui/dom": "^1.8.0",
     "@fontsource/satoshi": "file:packages/fontsource-satoshi",
-    "@tailwindcss/typography": "^0.5.19",
+    "@tailwindcss/typography": "^0.5.20",
     "@tiptap/extension-highlight": "^3.32.0",
     "@tiptap/extension-list": "^3.32.0",
     "@tiptap/extensions": "^3.32.0",
@@ -40,9 +40,13 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "10.4.20",
-    "postcss": "8.4.41",
-    "rimraf": "^5.0.5",
+    "postcss": "8.5.32",
     "tailwindcss": "3.4.10",
     "typescript": "5.6.2"
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "zod": "^4.6.7",
+    "postcss-selector-parser": "^6.1.5"
   }
 }

@@ -2,7 +2,7 @@
 
 import { ArrowRight, Check, Inbox, Loader2, MapPin, RefreshCw, Sparkles, Sun } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "./Markdown";
 import { parseResponse } from "./api";
 import { timeFormat, zone } from "./calendarFormat";
 import { MailMessage, type MailItem } from "./Mail";
@@ -118,7 +118,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
               {planning && !plan ? <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading your mail and calendar…</p>
                 : plan ? <>
                   {stale && <p className="today__stale">This plan is from an earlier day. <button type="button" onClick={() => void regenerate()}>Make today’s plan</button></p>}
-                  <div className={`ws-markdown${planning ? " is-updating" : ""}`}><ReactMarkdown>{plan.text}</ReactMarkdown></div>
+                  <div className={`ws-markdown${planning ? " is-updating" : ""}`}><Markdown>{plan.text}</Markdown></div>
                   {planning && <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Updating…</p>}
                   <button type="button" className="ws-text-button today__keep" onClick={() => void keepInNotebook(`Today’s plan, ${plan.date}\n${plan.text}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."))}>keep in notebook</button>
                   {plan.basedOn.length > 0 && <p className="today__based">{plan.reason === "new_mail" ? "Updated for new mail" : "Based on"}: {plan.basedOn.slice(0, 3).map((item) => item.subject).join(" · ")}{plan.basedOn.length > 3 ? ` · +${plan.basedOn.length - 3}` : ""}</p>}

@@ -2,7 +2,7 @@
 
 import { Check, Loader2, Send, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "./Markdown";
 import { streamNdjson } from "./api";
 import { currentMindstream } from "./mindstreamBus";
 import { zone } from "./calendarFormat";
@@ -97,7 +97,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
         {messages.map((message, messageIndex) => <div key={messageIndex} className={`ca-turn ca-turn--${message.role}`}>
           {message.role === "assistant" && message.tools && message.tools.length > 0 && <ul className="ca-tools">{message.tools.map((label, index) => <li key={index}>{busy && messageIndex === messages.length - 1 && index === message.tools!.length - 1 && !message.text ? <Loader2 className="ws-spin" size={12} /> : <Check size={12} />} {label}</li>)}</ul>}
           {message.role === "user" ? <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{message.text}</p></div></div> : <>
-            {message.text ? <div className="ws-message ws-message--assistant"><div className="ws-markdown"><ReactMarkdown>{message.text}</ReactMarkdown></div></div> : busy && messageIndex === messages.length - 1 && !message.proposals && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Thinking…</p></div>}
+            {message.text ? <div className="ws-message ws-message--assistant"><div className="ws-markdown"><Markdown>{message.text}</Markdown></div></div> : busy && messageIndex === messages.length - 1 && !message.proposals && <div className="ws-message ws-message--assistant"><p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Thinking…</p></div>}
             {message.proposals?.map((proposal, proposalIndex) => <ProposalCard key={proposalIndex} proposal={proposal} status={message.status?.[proposalIndex] ?? "pending"} onApply={() => void apply(messageIndex, proposalIndex)} onDismiss={() => dismiss(messageIndex, proposalIndex)} />)}
             {(message.proposals?.filter((_, i) => message.status?.[i] === "pending").length ?? 0) > 1 && <button type="button" className="ws-pill ca-all" onClick={() => void applyAll(messageIndex)}>Confirm all</button>}
           </>}

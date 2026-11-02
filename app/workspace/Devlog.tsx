@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronRight, ExternalLink, FileText, GitCommitHorizontal, ImagePlus, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, ScrollText, Sparkles, Trash2, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "./Markdown";
 import type { DevEntry, DevProject } from "../lib/devlogStore";
 import type { NoteMeta } from "../lib/notesStore";
 import { parseResponse } from "./api";
@@ -162,7 +162,7 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
                     <button type="button" className="ntree__act" aria-label="Entry options" onClick={() => setMenuFor(entry)}><MoreHorizontal size={16} /></button>
                   </header>
                   {entry.title && <h3>{entry.title}</h3>}
-                  {entry.body && <div className="ws-markdown dl-entry__body"><ReactMarkdown>{entry.body}</ReactMarkdown></div>}
+                  {entry.body && <div className="ws-markdown dl-entry__body"><Markdown>{entry.body}</Markdown></div>}
                   {entry.images && entry.images.length > 0 && <div className="dl-entry__images">{entry.images.map((name) => /* eslint-disable-next-line @next/next/no-img-element */ <img key={name} src={`${api}/assets/${name}`} alt="" loading="lazy" />)}</div>}
                   {entry.noteId && <button type="button" className="ws-pill dl-entry__open" onClick={() => onOpenStream(entry.noteId!)}><Waypoints size={15} /> Open mindstream</button>}
                   {entry.commits && entry.commits.length > 0 && <div className="dl-commits">
