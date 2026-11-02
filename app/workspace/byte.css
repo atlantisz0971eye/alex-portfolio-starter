@@ -114,6 +114,8 @@
 .ws-root[data-skin="byte"] .split__list > :not(.pagetitle), .ws-root[data-skin="byte"] .notes__list > :not(.pagetitle) { grid-column: 1; min-width: 0; }
 .ws-root[data-skin="byte"] .split__detail, .ws-root[data-skin="byte"] .notes__pane { grid-column: 2; grid-row: 2 / span 60; position: sticky; top: 16px; height: calc(100vh - 72px); overflow: hidden; }
 .ws-root[data-skin="byte"] .notes > .ms-split { display: none; }
+/* the list never folds away here: a remembered "collapsed" state would hide the title and the pages with no way back */
+.ws-root[data-skin="byte"] .notes__list.is-collapsed { visibility: visible; pointer-events: auto; overflow: visible; }
 .ws-root[data-skin="byte"] .mail-view--pane .mail-view__scroll { max-width: 48em; padding: 0 0 48px; }
 .ws-root[data-skin="byte"] .nview__scroll { padding-left: 0; padding-right: 0; }
 .ws-root[data-skin="byte"] .mail-view h2 { font-size: 34px; line-height: 1.1; letter-spacing: -.03em; font-weight: 800; }
