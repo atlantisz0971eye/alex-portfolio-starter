@@ -350,6 +350,10 @@ function App() {
     });
   }, []);
 
+  // Going to another part of the workspace from inside a book closes the book: the reader keeps its own progress, and the
+  // page underneath is what was asked for. Without this the book stayed on top and every destination showed the same page.
+  const go = useCallback((next: Tab) => { setAssistantOpen(false); setBook(null); setTab(next); }, []);
+
   async function signOut() {
     await fetch("/api/workspace/session", { method: "DELETE" });
     window.location.reload();
@@ -359,7 +363,7 @@ function App() {
 
   return <>
     <div className="shell">
-      <Sidebar tab={tab} onTab={setTab} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
+      <Sidebar tab={tab} onTab={go} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
       <div className="shell__main">
         {tab === "today"
           ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
@@ -370,7 +374,7 @@ function App() {
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
-      <TabBar tab={tab} onTab={setTab} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
+      <TabBar tab={tab} onTab={go} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
     <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
