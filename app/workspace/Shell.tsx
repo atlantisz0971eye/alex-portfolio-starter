@@ -54,7 +54,8 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
       {items.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={tab === id ? "is-on" : ""} onClick={() => go(id)}><Icon size={18} /> {label}{badges[id] && <b className="badge-dot" aria-label="New" />}</button>)}
     </nav>
     <button type="button" className="sidebar__assistant" onClick={() => { setOpen(false); onAssistant(); }}><Sparkles size={16} /> Assistant <kbd>⌘K</kbd></button>
-    <div className="sidebar__foot">
+    {/* Opening Members or the sync closes the index, so the pop-up is not left over a page of huge words. Switching light and dark leaves it open. */}
+    <div className="sidebar__foot" onClick={(event) => { const target = event.target as HTMLElement; if (target.closest("button,a") && !target.closest(".sidebar-theme")) setOpen(false); }}>
       <a href="/">Portfolio</a>
       <ThemeToggle className="sidebar-theme" />
       {user?.role === "owner" && <button type="button" onClick={openMembers}><Users size={15} /> Members</button>}

@@ -209,3 +209,8 @@
 /* Self: the network is drawn on the dot grid like everything else. */
 .ws-root[data-skin="byte"] .self__lead { color: var(--text); font-size: 15px; }
 .ws-root[data-skin="byte"] .self__section p { font-size: 17px; line-height: 26px; }
+
+/* Pop-ups are frosted glass like the strip at the top: translucent, blurred, no box. */
+.ws-root[data-skin="byte"] .ws-sheet { background: color-mix(in srgb, var(--bg) 74%, transparent) !important; -webkit-backdrop-filter: blur(14px) !important; backdrop-filter: blur(14px) !important; border: 0; border-top: 1px solid var(--line); box-shadow: none !important; }
+.ws-root[data-skin="byte"] .ws-sheet-backdrop { background: color-mix(in srgb, var(--bg) 32%, transparent); -webkit-backdrop-filter: blur(3px) !important; backdrop-filter: blur(3px) !important; }
+.ws-root[data-skin="byte"] .ws-sheet__grab { display: none; }
