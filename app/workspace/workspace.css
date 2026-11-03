@@ -71,11 +71,13 @@
 /* Library */
 
 /* Reader themes */
-.reader { --bg: #000; --fg: #d9d9d6; --muted: #8e8e93; --bar: rgba(28,28,30,.86); --barfg: #f2f2f7; --line: rgba(255,255,255,.14);
+/* One palette per page theme. The book and the corner strip over it both read these, so they cannot drift apart. */
+.reader, .ws-root:has(.reader) .sidebar:not([data-open]) { --rd-bg: #000; --rd-fg: #d9d9d6; --rd-muted: #8e8e93; --rd-bar: rgba(28,28,30,.86); --rd-barfg: #f2f2f7; --rd-line: rgba(255,255,255,.14); }
+.reader[data-theme="dark"], .ws-root:has(.reader[data-theme="dark"]) .sidebar:not([data-open]) { --rd-bg: #1c1c1e; --rd-fg: #e5e5ea; --rd-bar: rgba(44,44,46,.88); }
+.reader[data-theme="sepia"], .ws-root:has(.reader[data-theme="sepia"]) .sidebar:not([data-open]) { --rd-bg: #f4ecd8; --rd-fg: #3b3226; --rd-muted: #8a7b64; --rd-bar: rgba(244,236,216,.9); --rd-barfg: #3b3226; --rd-line: rgba(59,50,38,.18); }
+.reader[data-theme="white"], .ws-root:has(.reader[data-theme="white"]) .sidebar:not([data-open]) { --rd-bg: #fff; --rd-fg: #1c1c1e; --rd-muted: #8e8e93; --rd-bar: rgba(250,250,250,.9); --rd-barfg: #1c1c1e; --rd-line: rgba(0,0,0,.14); }
+.reader { --bg: var(--rd-bg); --fg: var(--rd-fg); --muted: var(--rd-muted); --bar: var(--rd-bar); --barfg: var(--rd-barfg); --line: var(--rd-line);
   position: absolute; inset: 0; z-index: 10; background: var(--bg); color: var(--fg); animation: ws-in .32s cubic-bezier(.2,.8,.2,1); }
-.reader[data-theme="dark"] { --bg: #1c1c1e; --fg: #e5e5ea; --bar: rgba(44,44,46,.88); }
-.reader[data-theme="sepia"] { --bg: #f4ecd8; --fg: #3b3226; --muted: #8a7b64; --bar: rgba(244,236,216,.9); --barfg: #3b3226; --line: rgba(59,50,38,.18); }
-.reader[data-theme="white"] { --bg: #fff; --fg: #1c1c1e; --muted: #8e8e93; --bar: rgba(250,250,250,.9); --barfg: #1c1c1e; --line: rgba(0,0,0,.14); }
 @keyframes ws-in { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* Reader chrome */
@@ -1167,3 +1169,8 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .mind__move input { min-width: 12ch; padding: 2px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; outline: 0; }
 .mind__rename { margin-left: auto; font-size: 12px; color: var(--text-2); opacity: 0; transition: opacity .15s; } .mind__topic > summary:hover .mind__rename, .mind__rename:focus-visible { opacity: 1; }
 .mail-view__keep, .today__keep { font-size: 13px; color: var(--text-2) !important; min-height: 28px; }
+
+/* Where the guide or an answer sent the reader from: one tap goes back. */
+.reader-trail { position: absolute; z-index: 4; left: max(16px, calc((100% - 680px) / 2)); bottom: calc(var(--sab) + 92px); display: flex; align-items: center; gap: 2px; padding: 2px 4px; background: var(--bar); color: var(--barfg); border: 1px solid var(--line); border-radius: 999px; -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); animation: ws-up .24s cubic-bezier(.2,.8,.2,1); }
+.reader-trail button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; font-size: 14px; color: var(--barfg) !important; background: transparent; white-space: nowrap; }
+.reader-trail button + button { border-left: 1px solid var(--line); }

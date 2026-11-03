@@ -1,3 +1,5 @@
+import { bestStart, pageAt, passagesOf, type Refs } from "./workspaceAnchors";
+
 const CHUNK = 1400;
 const FULL_LIMIT = 24_000;
 const BUDGET = 13_000;
@@ -41,7 +43,15 @@ export function needsEnglishKeywords(question: string, text: string) {
  * passage the reader is on, so answers do not depend on a fixed excerpt.
  */
 export function retrieveContext(text: string, terms: string[], offset: number) {
-  if (text.length <= FULL_LIMIT) return { context: text, coverage: "full" as const };
+  if (text.length <= FULL_LIMIT) {
+    // A short book goes in whole, as numbered passages the answer can point to.
+    const refs: Refs = {};
+    const context = passagesOf(text).map((passage, index) => {
+      refs[String(index + 1)] = { offset: passage.offset, ...(passage.page ? { page: passage.page } : {}), snippet: passage.text.slice(0, 90) };
+      return `[§${index + 1}]${passage.page ? ` (p.${passage.page})` : ""} ${passage.text}`;
+    }).join("\n\n");
+    return { context, coverage: "full" as const, refs };
+  }
   const chunks = chunkText(text);
   const lower = chunks.map((chunk) => chunk.text.toLowerCase());
   const df = new Map<string, number>();
@@ -74,8 +84,15 @@ export function retrieveContext(text: string, terms: string[], offset: number) {
       if (near >= 0 && near < chunks.length && size < BUDGET / 2 && !picked.has(near)) { picked.add(near); size += chunks[near].text.length; }
     }
   }
+  const refs: Refs = {};
   const context = [...picked].sort((a, b) => a - b)
-    .map((index) => `--- ${index === here ? "excerpt at the reader's current position" : "excerpt"} ---\n${chunks[index].text}`)
+    .map((index, n) => {
+      const id = String(n + 1);
+      const offset = bestStart(chunks[index].text, chunks[index].start, terms);
+      const page = pageAt(text, offset);
+      refs[id] = { offset, ...(page ? { page } : {}), snippet: chunks[index].text.replace(/\[Page \d+\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 90) };
+      return `[§${id}]${page ? ` (p.${page})` : ""}${index === here ? " (where the reader is now)" : ""}\n${chunks[index].text.replace(/\[Page \d+\]/g, " ").trim()}`;
+    })
     .join("\n\n");
-  return { context, coverage: "retrieved" as const };
+  return { context, coverage: "retrieved" as const, refs };
 }

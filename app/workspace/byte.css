@@ -255,13 +255,13 @@
 .ws-root[data-skin="byte"]:has(.reader[data-chrome="off"]) .sidebar:not([data-open]) { opacity: 0; transition: opacity .2s; }
 .ws-root[data-skin="byte"]:has(.reader[data-chrome="off"]) .sidebar:not([data-open]) * { pointer-events: none !important; }
 .ws-root[data-skin="byte"]:has(.reader[data-chrome="on"]) .sidebar:not([data-open]) { transition: opacity .2s; }
-/* Over a book the strip takes the book's colours, not the workspace's, so its words stay readable on every page theme. */
-.ws-root[data-skin="byte"]:has(.reader[data-theme="black"]) .sidebar:not([data-open]) { --bg: #000; --text: #f2f2f7; --text-2: #8e8e93; }
-.ws-root[data-skin="byte"]:has(.reader[data-theme="dark"]) .sidebar:not([data-open]) { --bg: #1c1c1e; --text: #e5e5ea; --text-2: #8e8e93; }
-.ws-root[data-skin="byte"]:has(.reader[data-theme="sepia"]) .sidebar:not([data-open]) { --bg: #f4ecd8; --text: #3b3226; --text-2: #8a7b64; }
-.ws-root[data-skin="byte"]:has(.reader[data-theme="white"]) .sidebar:not([data-open]) { --bg: #fff; --text: #1c1c1e; --text-2: #8e8e93; }
+/* Over a book the strip takes the book's palette (defined once in workspace.css), so its words stay readable on every page theme. */
+.ws-root[data-skin="byte"]:has(.reader) .sidebar:not([data-open]) { --bg: var(--rd-bg); --text: var(--rd-fg); --text-2: var(--rd-muted); }
 /* Buttons inside a book use the book's text colour (the workspace's own may be pale on a pale page). */
 .ws-root[data-skin="byte"] .reader .ws-text-button { color: var(--fg) !important; text-decoration: underline; text-underline-offset: 4px; }
 .ws-root[data-skin="byte"] .reader-scroll-end { padding: 40px 0 calc(var(--sab) + 110px); }
 /* Monospace text set justified opens wide gaps; keep it flush left. */
 .reader[data-font="mono"] .reader-pages p { text-align: left; hyphens: manual; -webkit-hyphens: manual; }
+.ws-root[data-skin="byte"] .reader-trail button { text-decoration: none; }
+/* The reader's own question bubble: the accent is pale here, so the text must be dark. */
+.ws-root[data-skin="byte"] .ws-message--user, .ws-root[data-skin="byte"] .ws-message--user * { color: var(--on-accent); }

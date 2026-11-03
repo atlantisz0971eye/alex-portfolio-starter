@@ -122,7 +122,7 @@ function App() {
   const [book, setBook] = useState<OpenedBook | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
-  const [citation, setCitation] = useState<{ seq: number; page: number } | null>(null);
+  const [citation, setCitation] = useState<{ seq: number; page?: number; offset?: number } | null>(null);
   const [tab, setTab] = useState<Tab>("today");
   const [mindstreamRefresh, setMindstreamRefresh] = useState(0);
   const [streamOpenId, setStreamOpenId] = useState<string | null>(null);
@@ -381,7 +381,7 @@ function App() {
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />
-      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(page) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, page })); }} />
+      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(target) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, ...target })); }} />
     </>}
     {error && <div className="ws-toast" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={16} /></button></div>}
   </>;

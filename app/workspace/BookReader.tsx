@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, ChevronLeft, Highlighter, Languages, List, MessageCircle, NotebookPen, ScanText, Type } from "lucide-react";
+import { Bookmark, ChevronLeft, Highlighter, Languages, List, MessageCircle, NotebookPen, ScanText, Type, Undo2, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { displayTitle } from "../lib/bookTitle";
@@ -42,7 +42,7 @@ type Props = {
   onError: (message: string) => void;
   stream: StreamFn;
   /** A page cited by the assistant; each request has a new `seq`. */
-  citation: { seq: number; page: number } | null;
+  citation: { seq: number; page?: number; offset?: number } | null;
   /** Changes when recognized text was saved, so the visible part is reloaded. */
   reloadKey: number;
   /** Pages still without text, and how to offer recognizing them. */
@@ -616,16 +616,23 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
   }, [marks]);
   const popoverMark = marks.find((mark) => mark.id === activeMark?.id) ?? null;
 
-  // A page cited in the assistant's answer: find it in the text and go there.
+  // A place the guide or an answer points to: remember where the reader was, so one tap goes back.
+  const [trail, setTrail] = useState<{ offset: number; label: string } | null>(null);
+  const placeLabel = useCallback(() => {
+    if (original) return `p. ${originalPage}`;
+    return currentPageRef.current ? `p. ${currentPageRef.current}` : `${Math.round((offsetRef.current / Math.max(1, segment.totalLength)) * 100)}%`;
+  }, [original, originalPage, segment.totalLength]);
   const lastCitation = useRef(0);
   useEffect(() => {
     if (!citation || citation.seq === lastCitation.current) return;
     lastCitation.current = citation.seq;
+    const origin = { offset: Math.max(0, Math.floor(offsetRef.current)), label: placeLabel() };
+    if (citation.offset !== undefined) { setTrail(origin); jumpTo(citation.offset); return; }
     void fetch(`/api/workspace/documents?id=${encodeURIComponent(documentId)}&page=${citation.page}`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() as Promise<{ offset: number }> : Promise.reject(new Error("missing")))
-      .then(({ offset: target }) => jumpTo(target))
+      .then(({ offset: target }) => { setTrail(origin); jumpTo(target); })
       .catch(() => onError(`Page ${citation.page} was not found in this book.`));
-  }, [citation, documentId, jumpTo, onError]);
+  }, [citation, documentId, jumpTo, onError, placeLabel]);
 
   // ---- bookmarks ------------------------------------------------------------
   // The stretch of text on screen: a bookmark inside it marks this page.
@@ -649,10 +656,12 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
       return;
     }
     const here = offsetRef.current;
-    const label = original ? "" : (blocks.find((block) => block.text && block.offset >= here)?.text ?? "").replace(/\s+/g, " ").slice(0, 110);
+    // A bookmark belongs to a paragraph, not to a screen: it takes the start of the first paragraph on this page, so it holds however the text is set.
+    const anchor = original ? null : (blocks.find((block) => block.text && block.offset >= viewStart) ?? blocks.find((block) => block.text && block.offset >= here) ?? null);
+    const label = original ? "" : (anchor?.text ?? "").replace(/\s+/g, " ").slice(0, 110);
     const created: WorkspaceBookmark = {
       id: crypto.randomUUID(),
-      offset: Math.max(0, Math.floor(here)),
+      offset: Math.max(0, Math.floor(anchor?.offset ?? here)),
       page: (original ? originalPage : currentPageRef.current) ?? undefined,
       chapter: currentChapter || undefined,
       label,
@@ -744,6 +753,12 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
         onKeyUp={() => { if (scrub !== null) { jumpTo(scrub); setScrub(null); } }} />}
       <div className="reader-bar__meta"><span>{currentChapter || displayTitle(book.document)}</span><span>{bilingual && translation.total > 0 && (translation.status === "error" ? <button type="button" className="reader-tr-status is-error" onClick={translation.retry}>Translation paused · Retry</button> : <span className="reader-tr-status">{translation.done < translation.total ? `译 ${translation.done}/${translation.total} · ` : ""}</span>)}{original ? `p. ${pageScrub ?? originalPage} / ${originalTotal || "…"}` : <>{isPdf && currentPage ? `p. ${currentPage} · ` : ""}{percent}%</>}</span></div>
     </footer>
+
+    {trail && <div className="reader-trail" role="group" aria-label="Return">
+      <button type="button" onClick={() => { const here = { offset: Math.max(0, Math.floor(offsetRef.current)), label: placeLabel() }; jumpTo(trail.offset); setTrail(here); }}><Undo2 size={15} /> Back to {trail.label}</button>
+      {!bookmarked && <button type="button" onClick={toggleBookmark}><Bookmark size={15} /> Keep this place</button>}
+      <button type="button" aria-label="Dismiss" onClick={() => setTrail(null)}><X size={14} /></button>
+    </div>}
 
     {bookmarked && <button type="button" className="reader-ribbon" aria-label="Bookmarks" onClick={() => { setContentsTab("bookmarks"); setSheet("contents"); }} />}
 

@@ -1,3 +1,4 @@
+import type { Refs } from "./workspaceAnchors";
 import { del, get, list, put } from "@vercel/blob";
 import { deleteTranslations } from "./translationStore";
 import { scopeRoot } from "./workspaceScope";
@@ -27,10 +28,12 @@ export type WorkspaceDocument = {
   enrichVersion?: number;
   guide?: string;
   guideCoverage?: "full" | "excerpts";
-  messages?: { role: "user" | "assistant"; content: string }[];
+  /** The places in the book that the guide's [§n] marks point to. */
+  guideRefs?: Refs;
+  messages?: { role: "user" | "assistant"; content: string; refs?: Refs }[];
 };
 
-type DocumentState = Pick<WorkspaceDocument, "guide" | "guideCoverage" | "messages" | "outline" | "outlineSource">;
+type DocumentState = Pick<WorkspaceDocument, "guide" | "guideCoverage" | "guideRefs" | "messages" | "outline" | "outlineSource">;
 export type WorkspaceDocumentSummary = Omit<WorkspaceDocument, keyof DocumentState>;
 
 // Guides and chats grow with use, so they live apart from the small metadata
@@ -120,7 +123,7 @@ export async function readDocumentText(id: string) {
 }
 
 export async function writeDocument(document: WorkspaceDocument, text?: string) {
-  const { guide, guideCoverage, messages, outline, outlineSource, ...meta } = document;
+  const { guide, guideCoverage, guideRefs, messages, outline, outlineSource, ...meta } = document;
   const p = await P();
   if (text !== undefined) {
     await put(p.text(document.id), text, {
@@ -129,8 +132,8 @@ export async function writeDocument(document: WorkspaceDocument, text?: string) 
       contentType: "text/plain; charset=utf-8",
     });
   }
-  if (guide !== undefined || guideCoverage !== undefined || messages !== undefined || outline !== undefined) {
-    await put(p.state(document.id), JSON.stringify({ guide, guideCoverage, messages, outline, outlineSource }), {
+  if (guide !== undefined || guideCoverage !== undefined || guideRefs !== undefined || messages !== undefined || outline !== undefined) {
+    await put(p.state(document.id), JSON.stringify({ guide, guideCoverage, guideRefs, messages, outline, outlineSource }), {
       access: "private",
       allowOverwrite: true,
       contentType: "application/json",
@@ -198,7 +201,7 @@ export async function listDocuments(): Promise<WorkspaceLibraryItem[]> {
     try {
       const meta = await readMeta(id);
       if (!meta) return null;
-      const { guide, guideCoverage, messages, outline, outlineSource, ...summary } = meta;
+      const { guide, guideCoverage, guideRefs, messages, outline, outlineSource, ...summary } = meta;
       const record = await readProgressRecord(id).catch(() => null);
       return { ...summary, progress: record?.offset ?? null, progressAt: record?.updatedAt ?? null };
     } catch { return null; }

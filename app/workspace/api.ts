@@ -70,7 +70,7 @@ export async function parseResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-export type StreamDone = { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"] };
+export type StreamDone = { coverage?: "full" | "excerpts" | "retrieved"; messages?: WorkspaceDocument["messages"]; /** A guide as the server settled it, with the places its [§n] marks point to. */ guide?: string; refs?: WorkspaceDocument["guideRefs"] };
 
 /** POSTs JSON and reads the newline-delimited events the assistant routes send, reporting text as it arrives. */
 export async function streamNdjson(url: string, body: Record<string, unknown>, onDelta: (text: string) => void, signal: AbortSignal, onEvent?: (event: { t: string; [key: string]: unknown }) => void): Promise<StreamDone> {
@@ -85,7 +85,7 @@ export async function streamNdjson(url: string, body: Record<string, unknown>, o
     const event = JSON.parse(line) as { t: string; v?: string; code?: string } & StreamDone;
     if (event.t === "delta" && event.v) onDelta(event.v);
     else if (event.t === "error") throw new Error(errors[event.code ?? ""] ?? errors.assistant_failed);
-    else if (event.t === "done") done = { coverage: event.coverage, messages: event.messages };
+    else if (event.t === "done") done = { coverage: event.coverage, messages: event.messages, guide: event.guide, refs: event.refs };
     else if (event.t !== "start") onEvent?.(event as { t: string });
   };
   for (;;) {
