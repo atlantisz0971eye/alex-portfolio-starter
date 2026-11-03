@@ -9,6 +9,7 @@ import { MailMessage, type MailItem } from "./Mail";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { PageTitle, TopRow, type Tab } from "./Shell";
 import { keepInNotebook } from "./keep";
+import { Paper } from "./Paper";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
@@ -106,6 +107,9 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
           <p className="today__date"><Sun size={15} /> {today.format(new Date())}</p>
           {layout?.kicker && <p className="today__kicker">{layout.kicker}</p>}
         </header>
+
+        <Paper onError={onError} />
+        <h2 className="section-label today__day">your day</h2>
 
         {view === null && <div className="mail-skeleton"><div><span className="skeleton skeleton--line" /><span className="skeleton skeleton--line skeleton--short" /></div></div>}
         {view && !view.configured && <div className="empty"><Inbox size={28} /><p>Mail is not set up yet.</p><small>Today builds your plan from your calendar and new email.</small></div>}
