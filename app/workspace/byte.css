@@ -245,3 +245,23 @@
 .ws-root[data-skin="byte"] .today__paper-toggle { position: relative; z-index: 2; display: block; margin: 0 0 14px; font-size: 13px; color: var(--text-2) !important; }
 .ws-root[data-skin="byte"] .today__paper-toggle:hover { color: var(--text) !important; }
 .ws-root[data-skin="byte"] .paper { margin-bottom: 0; }
+
+/* ---- reading: the corner strip and the book's own bars share the top without covering each other ---- */
+.ws-root[data-skin="byte"] { --strip: 50px; }
+/* The book's top bar sits under the corner strip while it is showing. */
+.ws-root[data-skin="byte"] .reader-bar--top { top: var(--strip); }
+.ws-root[data-skin="byte"] .reader-ribbon { top: var(--strip); }
+/* While reading with the bars hidden, the strip steps aside so it does not cover the first lines. Touching the top brings both back. */
+.ws-root[data-skin="byte"]:has(.reader[data-chrome="off"]) .sidebar:not([data-open]) { opacity: 0; transition: opacity .2s; }
+.ws-root[data-skin="byte"]:has(.reader[data-chrome="off"]) .sidebar:not([data-open]) * { pointer-events: none !important; }
+.ws-root[data-skin="byte"]:has(.reader[data-chrome="on"]) .sidebar:not([data-open]) { transition: opacity .2s; }
+/* Over a book the strip takes the book's colours, not the workspace's, so its words stay readable on every page theme. */
+.ws-root[data-skin="byte"]:has(.reader[data-theme="black"]) .sidebar:not([data-open]) { --bg: #000; --text: #f2f2f7; --text-2: #8e8e93; }
+.ws-root[data-skin="byte"]:has(.reader[data-theme="dark"]) .sidebar:not([data-open]) { --bg: #1c1c1e; --text: #e5e5ea; --text-2: #8e8e93; }
+.ws-root[data-skin="byte"]:has(.reader[data-theme="sepia"]) .sidebar:not([data-open]) { --bg: #f4ecd8; --text: #3b3226; --text-2: #8a7b64; }
+.ws-root[data-skin="byte"]:has(.reader[data-theme="white"]) .sidebar:not([data-open]) { --bg: #fff; --text: #1c1c1e; --text-2: #8e8e93; }
+/* Buttons inside a book use the book's text colour (the workspace's own may be pale on a pale page). */
+.ws-root[data-skin="byte"] .reader .ws-text-button { color: var(--fg) !important; text-decoration: underline; text-underline-offset: 4px; }
+.ws-root[data-skin="byte"] .reader-scroll-end { padding: 40px 0 calc(var(--sab) + 110px); }
+/* Monospace text set justified opens wide gaps; keep it flush left. */
+.reader[data-font="mono"] .reader-pages p { text-align: left; hyphens: manual; -webkit-hyphens: manual; }
