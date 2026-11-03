@@ -20,7 +20,8 @@ export async function GET(request: Request) {
   const me = await currentUser();
   const nonce = randomBytes(16).toString("base64url");
   const { verifier, challenge } = pkcePair();
-  const location = authUrl({ state: workspaceSign(`${me.id}.${nonce}`), challenge, redirectUri: `${url.origin}/api/workspace/mail/callback`, loginHint: hint });
+  // The state names who started the flow and is signed, so the callback can tell without the session cookie (which the browser does not send on a return from another site).
+  const location = authUrl({ state: `${me.id}.${nonce}.${workspaceSign(`${me.id}.${nonce}`)}`, challenge, redirectUri: `${url.origin}/api/workspace/mail/callback`, loginHint: hint });
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return new Response(null, {
     status: 302,
