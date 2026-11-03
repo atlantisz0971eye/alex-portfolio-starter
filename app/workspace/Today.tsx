@@ -38,6 +38,10 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   const [showAll, setShowAll] = useState(false);
   const [local, setLocal] = useState<Record<number, Status>>({});
   const [open, setOpen] = useState<MailItem | null>(null);
+  // The front page is off until the viewer turns it on, and a hidden one is never fetched, so it costs nothing.
+  const [paper, setPaper] = useState(false);
+  useEffect(() => { try { setPaper(localStorage.getItem("ws-front-page") === "on"); } catch { /* off */ } }, []);
+  const togglePaper = () => setPaper((current) => { const next = !current; try { localStorage.setItem("ws-front-page", next ? "on" : "off"); } catch { /* per-viewer convenience only */ } return next; });
 
   const load = useCallback(async () => {
     try {
@@ -108,7 +112,8 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
           {layout?.kicker && <p className="today__kicker">{layout.kicker}</p>}
         </header>
 
-        <Paper onError={onError} />
+        <button type="button" className="ws-text-button today__paper-toggle" aria-pressed={paper} onClick={togglePaper}>{paper ? "■" : "□"} front page · {paper ? "hide" : "show"}</button>
+        {paper && <Paper onError={onError} />}
         <h2 className="section-label today__day">your day</h2>
 
         {view === null && <div className="mail-skeleton"><div><span className="skeleton skeleton--line" /><span className="skeleton skeleton--line skeleton--short" /></div></div>}

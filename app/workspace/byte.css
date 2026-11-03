@@ -242,3 +242,6 @@
 .ws-root[data-skin="byte"] .today__day { margin-top: 4vw; }
 @media (max-width: 1100px) { .ws-root[data-skin="byte"] .paper__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ws-root[data-skin="byte"] .paper__col:nth-child(2n) { border-right: 0; margin-right: 0; padding-right: 0; } }
 @media (max-width: 640px) { .ws-root[data-skin="byte"] .paper__cols { grid-template-columns: minmax(0, 1fr); } .ws-root[data-skin="byte"] .paper__col { border-right: 0; margin-right: 0; padding-right: 0; border-bottom: 1px solid var(--line); } }
+.ws-root[data-skin="byte"] .today__paper-toggle { position: relative; z-index: 2; display: block; margin: 0 0 14px; font-size: 13px; color: var(--text-2) !important; }
+.ws-root[data-skin="byte"] .today__paper-toggle:hover { color: var(--text) !important; }
+.ws-root[data-skin="byte"] .paper { margin-bottom: 0; }
