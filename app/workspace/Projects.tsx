@@ -48,7 +48,7 @@ export function Projects({ onError }: { onError: (message: string) => void }) {
 
   const projects = [...(data?.projects ?? [])].sort((a, b) => (a.idleDays ?? 9999) - (b.idleDays ?? 9999));
   return <div className="projects">
-    <p className="self__lead">Where each project stands. Progress is counted: the ticked boxes in its own README, ROADMAP or TODO. Activity comes from commits, the notebook and the sync. Where a number cannot be counted, it says so instead of guessing.</p>
+    <p className="self__lead">Where each project stands, in a line. The counted signals are under “details”.</p>
     <div className="self__actions">
       <button type="button" className="ws-text-button" disabled={busy} onClick={() => void refresh()}>read everything again</button>
       {busy && <span className="self__busy"><Loader2 className="ws-spin" size={14} /> Reading repositories and notes…</span>}
@@ -61,19 +61,18 @@ export function Projects({ onError }: { onError: (message: string) => void }) {
       const s = project.signals;
       return <section key={project.name} className="mind__project projects__card">
         <h2 className="section-label">{project.name} <span>{project.devlogStatus} · {TREND[project.trend]}{project.idleDays !== null ? ` · last activity ${project.idleDays === 0 ? "today" : `${project.idleDays}d ago`}` : ""}</span></h2>
-        {project.progress
-          ? <p className="projects__bar"><span aria-hidden>{blocks(project.progress.done, project.progress.total)}</span> {project.progress.done} of {project.progress.total} ticked</p>
-          : <p className="projects__bar projects__bar--none">progress unknown: no checklist found</p>}
+        {project.progress && <p className="projects__bar"><span aria-hidden>{blocks(project.progress.done, project.progress.total)}</span> {project.progress.done} of {project.progress.total} ticked</p>}
         {project.assessment && <p className="mind__summary">{project.assessment}</p>}
         {project.next && <p className="projects__next">next: {project.next}</p>}
-        <ul className="projects__facts">
+        <details className="projects__open"><summary>details</summary><ul className="projects__facts">
           {s.commits.last30 > 0 || s.commits.lastAt ? <li>commits: {s.commits.last7} this week, {s.commits.prev7} the week before, {s.commits.last30} in 30 days{s.commits.lastAt ? `, last ${day.format(new Date(s.commits.lastAt.length === 10 ? `${s.commits.lastAt}T12:00:00Z` : s.commits.lastAt))}` : ""} ({s.commits.source === "github" ? "from GitHub" : "from saved devlog entries, may be incomplete"})</li> : null}
           {s.deploy && <li>deploy ({s.deploy.environment}): {s.deploy.state}, {day.format(new Date(s.deploy.at))}</li>}
           {s.notebook.last30 > 0 && <li>notebook: {s.notebook.last30} entries in 30 days{s.notebook.topics.length ? ` · ${s.notebook.topics.join(", ")}` : ""}</li>}
           {s.sync.map((folder) => <li key={folder.folder}>sync: {folder.folder}{folder.files !== null ? `, ${folder.files} files` : ""}{folder.lastOk ? `, synced ${ago(folder.lastOk)}` : ""}{folder.state !== "idle" ? ` (${folder.state})` : ""}</li>)}
           {s.docs.map((doc) => <li key={doc.file}>{doc.url ? <a href={doc.url} target="_blank" rel="noreferrer">{doc.file}</a> : doc.file}: {doc.done}/{doc.total} ticked</li>)}
           {s.repoError && <li>repository: could not read ({s.repoError})</li>}
-        </ul>
+          {!project.progress && <li>progress unknown: no checklist found</li>}
+        </ul></details>
         {s.docs.some((doc) => doc.open.length > 0) && <details className="projects__open"><summary>still open</summary><ul>{s.docs.flatMap((doc) => doc.open).slice(0, 6).map((item, index) => <li key={index}>{item}</li>)}</ul></details>}
       </section>;
     })}
