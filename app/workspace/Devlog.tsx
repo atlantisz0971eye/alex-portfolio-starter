@@ -1,13 +1,12 @@
 "use client";
 
-import { ChevronDown, ChevronRight, ExternalLink, FileText, GitCommitHorizontal, ImagePlus, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, ScrollText, Sparkles, Trash2, Waypoints, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, FileText, GitCommitHorizontal, ImagePlus, Loader2, MoreHorizontal, Pencil, Plus, ScrollText, Sparkles, Trash2, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { DevEntry, DevProject } from "../lib/devlogStore";
 import type { NoteMeta } from "../lib/notesStore";
 import { parseResponse } from "./api";
 import { shrink } from "./BoardCanvas";
-import { zone } from "./calendarFormat";
 import { Sheet } from "./Sheet";
 import { PageTitle, TopRow } from "./Shell";
 
@@ -45,14 +44,11 @@ function Strip({ entries }: { entries: DevEntry[] }) {
 export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
   const [data, setData] = useState<Data | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [note, setNote] = useState("");
   const [editing, setEditing] = useState<Partial<DevEntry> | null>(null);
   const [projectEdit, setProjectEdit] = useState<Partial<DevProject> | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<DevEntry | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const auto = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -63,38 +59,6 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
     }
   }, [onError]);
   useEffect(() => { void load(); }, [load]);
-
-  const sync = useCallback(async (projects: DevProject[], quiet = false) => {
-    const targets = projects.filter((project) => project.repo);
-    if (!targets.length) return;
-    setSyncing(true);
-    setNote("");
-    let days = 0;
-    let left = 0;
-    try {
-      for (const project of targets) {
-        try {
-          const result = await parseResponse<{ days: number; skippedDays: number }>(await fetch(`${api}/sync`, { method: "POST", headers: json, body: JSON.stringify({ projectId: project.id, zone: zone() }) }));
-          days += result.days;
-          left += result.skippedDays;
-        } catch (cause) {
-          if (!quiet) onError(`${project.name}: ${cause instanceof Error ? cause.message : "Could not sync."}`);
-        }
-      }
-      await load();
-      setNote(days || left ? `${days} day${days === 1 ? "" : "s"} written from commits${left ? `, ${left} more to go: sync again` : ""}` : "Commits are up to date");
-    } finally {
-      setSyncing(false);
-    }
-  }, [load, onError]);
-
-  // Pick up new commits when the page is opened, if a project has not been read for a few hours.
-  useEffect(() => {
-    if (!data || auto.current) return;
-    auto.current = true;
-    const stale = data.projects.filter((project) => project.repo && (!project.lastSync || Date.now() - Date.parse(project.lastSync) > 6 * 3_600_000));
-    if (stale.length) void sync(stale, true);
-  }, [data, sync]);
 
   const projects = data?.projects ?? [];
   const byId = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
@@ -126,7 +90,6 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
     <main className="page page--devlog">
       <TopRow onSignOut={onSignOut} />
       <PageTitle actions={<>
-        {projects.some((project) => project.repo) && <button type="button" className="ws-round" aria-label="Sync commits" onClick={() => void sync(current ? [current] : projects)} disabled={syncing}>{syncing ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button>}
         <button type="button" className="ws-round" aria-label="New entry" onClick={() => setEditing({ projectId: filter ?? projects[0]?.id, date: today(), kind: "note" })} disabled={!projects.length}><Plus size={20} /></button>
       </>}>Devlog</PageTitle>
 
@@ -144,7 +107,6 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
           <div><button type="button" className="ws-text-button" onClick={() => setReviewOpen(true)}><Sparkles size={15} /> Review</button><button type="button" className="ws-text-button" onClick={() => setProjectEdit(current)}><Pencil size={15} /> Edit</button></div>
         </div>}
         <Strip entries={visible} />
-        {note && <p className="dl-note" aria-live="polite">{note}</p>}
 
         {visible.length === 0 && <p className="ws-muted dl-empty">Nothing logged yet{current ? ` for ${current.name}` : ""}. Tap + to write the first entry{projects.some((project) => project.repo) ? ", or sync commits" : ""}.</p>}
         {grouped.map((group) => <section key={group.key} className="dl-month">
@@ -185,7 +147,7 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
       </div>}
     </Sheet>
     <EntrySheet entry={editing} projects={projects} onClose={() => setEditing(null)} onError={onError} onSaved={() => { setEditing(null); void load(); }} />
-    <ProjectSheet project={projectEdit} github={!!data?.github} onClose={() => setProjectEdit(null)} onError={onError} onSaved={(saved) => { setProjectEdit(null); setFilter(saved?.id ?? null); void load().then(() => { if (saved?.repo) void sync([saved]); }); }} />
+    <ProjectSheet project={projectEdit} github={!!data?.github} onClose={() => setProjectEdit(null)} onError={onError} onSaved={(saved) => { setProjectEdit(null); setFilter(saved?.id ?? null); void load(); }} />
     <ReviewSheet open={reviewOpen} project={current} onClose={() => setReviewOpen(false)} onError={onError} onSaved={() => { setReviewOpen(false); void load(); }} />
   </>;
 }
