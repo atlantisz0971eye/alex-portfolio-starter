@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
+import { CalendarPlus, ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
 import { PageTitle, TopRow } from "./Shell";
 import { keepInNotebook } from "./keep";
+import { MailSchedule } from "./MailSchedule";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { errors, parseResponse, streamNdjson } from "./api";
@@ -54,6 +55,7 @@ export function Mail({ onError, onSignOut }: { onError: (message: string) => voi
   const [loading, setLoading] = useState(false);
   const [more, setMore] = useState(false);
   const [open, setOpen] = useState<MailItem | null>(null);
+  const [scheduling, setScheduling] = useState(false);
   const request = useRef(0);
 
   const loadAccounts = useCallback(async () => {
@@ -123,7 +125,10 @@ export function Mail({ onError, onSignOut }: { onError: (message: string) => voi
   }
 
   const list = <>
-    <PageTitle actions={accounts.length > 0 ? <button type="button" className="ws-round" aria-label="Refresh" onClick={() => void load(query.trim(), account)} disabled={loading}>{loading ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button> : undefined}>Mail</PageTitle>
+    <PageTitle actions={accounts.length > 0 ? <>
+      <button type="button" className="ws-round" aria-label="Find events in mail" title="Find events in mail" onClick={() => setScheduling(true)}><CalendarPlus size={18} /></button>
+      <button type="button" className="ws-round" aria-label="Refresh" onClick={() => void load(query.trim(), account)} disabled={loading}>{loading ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button>
+    </> : undefined}>Mail</PageTitle>
 
     {state === "loading" && <MailSkeleton />}
     {state === "setup" && <div className="empty">
@@ -182,6 +187,7 @@ export function Mail({ onError, onSignOut }: { onError: (message: string) => voi
       </section>}
     </div>
     </main>
+    <MailSchedule open={scheduling} onClose={() => setScheduling(false)} onError={onError} />
     {!wide && open && <MailMessage key={`${open.account}-${open.id}`} summary={open} onClose={() => setOpen(null)} onError={onError} />}
   </>;
 }

@@ -504,6 +504,20 @@
 .ca-card--update { border-left: 3px solid var(--warn); }
 .ca-card--delete { border-left: 3px solid var(--danger); }
 .ca-card.is-dismissed { opacity: .5; }
+.ms-scan__wait { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+.ms-scan { list-style: none; margin: 14px 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.ms-scan__item { display: flex; gap: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--f2); }
+.ms-scan__item.is-picked { border-color: var(--text-2); }
+.ms-scan__item.is-added { opacity: .6; }
+.ms-scan__pick { flex: none; display: flex; align-items: flex-start; padding-top: 12px; }
+.ms-scan__pick input { width: 20px; height: 20px; margin: 0; accent-color: var(--text); }
+.ms-scan__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ms-scan__title { height: 44px; padding: 0 12px; border: 0; outline: 0; border-radius: 10px; background: var(--panel-2); color: var(--text); font-size: 16px; font-weight: 600; min-width: 0; }
+.ms-scan__body .ef__row input:not([type="checkbox"]) { flex: 1; }
+.ms-scan__warn { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--warn); font-size: 13px; }
+.ms-scan__warn svg { flex: none; margin-top: 2px; }
+.ms-scan__warn--error { color: var(--danger); }
+.ms-scan__source { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
 .ca-card__head { display: flex; align-items: baseline; justify-content: space-between; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
 .ca-card__head b { font-weight: 600; }
 .ca-card p { margin: 0; }

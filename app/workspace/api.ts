@@ -51,6 +51,8 @@ export const errors: Record<string, string> = {
   organize_failed: "DeepSeek could not organize this text. Try again, or shorten the text.",
   no_text_found: "No text was found in that image.",
   invalid_question: "Ask a slightly longer question.",
+  ai_failed: "DeepSeek could not read your mail just now. Try again.",
+  no_mail_accounts: "Connect a Gmail account first.",
 };
 
 export async function parseResponse<T>(response: Response): Promise<T> {
