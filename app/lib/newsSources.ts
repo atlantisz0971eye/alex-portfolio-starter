@@ -9,7 +9,7 @@ export type SectionSpec = { key: SectionKey; label: string; zh: string; picks: n
 
 export const SECTIONS: SectionSpec[] = [
   {
-    key: "science", label: "SCIENCE", zh: "科学", picks: 3, maxAgeHours: 24 * 5,
+    key: "science", label: "SCIENCE", zh: "科学", picks: 2, maxAgeHours: 24 * 5,
     brief: "Recent scientific results. Prefer a paper or a clear finding over a press-release claim. In `note` say what kind of evidence it is: 单项研究 / 综述 / 预印本 / 新闻稿 / 未说明. Spread across fields (physics, biology, earth, computing) when you can.",
     feeds: [
       { source: "Nature", url: "https://www.nature.com/nature.rss" },
@@ -20,7 +20,7 @@ export const SECTIONS: SectionSpec[] = [
     ],
   },
   {
-    key: "world", label: "WORLD", zh: "国际", picks: 3, maxAgeHours: 36,
+    key: "world", label: "WORLD", zh: "国际", picks: 2, maxAgeHours: 36,
     brief: "International politics and conflict. Take the three most consequential and different stories, from different outlets and, when possible, different regions. Prefer reporting over commentary. In `note` give the outlet's region if it matters (e.g. 日本媒体, 印度媒体, 卡塔尔媒体).",
     feeds: [
       { source: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" },
@@ -33,7 +33,7 @@ export const SECTIONS: SectionSpec[] = [
     ],
   },
   {
-    key: "money", label: "MONEY × TECH", zh: "科技与金融", picks: 3, maxAgeHours: 48,
+    key: "money", label: "MONEY × TECH", zh: "科技与金融", picks: 2, maxAgeHours: 48,
     brief: "Where large technology companies and traditional finance touch: filings, central banks and regulators, capital flows, funding, chips and energy as financial assets. Prefer primary sources (SEC, central banks) when they have something. A paywalled outlet may give only a headline; say so in `note` (仅标题).",
     feeds: [
       { source: "Federal Reserve", url: "https://www.federalreserve.gov/feeds/press_all.xml" },
@@ -48,7 +48,7 @@ export const SECTIONS: SectionSpec[] = [
     ],
   },
   {
-    key: "uk", label: "UK LOCAL", zh: "英国本地", picks: 3, maxAgeHours: 48,
+    key: "uk", label: "UK LOCAL", zh: "英国本地", picks: 2, maxAgeHours: 48,
     brief: "Ordinary life in Britain, away from Westminster theatre: councils and local budgets, housing, health services, transport, work, schools, regional news. Prefer concrete local facts (a place, a number, who decides) to national politics. Spread across different places. In `note` name the place.",
     feeds: [
       { source: "BBC England", url: "https://feeds.bbci.co.uk/news/england/rss.xml" },
