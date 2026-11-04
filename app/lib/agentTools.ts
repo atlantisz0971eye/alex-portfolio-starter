@@ -1,5 +1,5 @@
-import { buildFields, CalendarInputError, fieldsOf, listOccurrences, readCalendar } from "./calendarStore";
-import { expand, toInstant, validZone, type Occurrence } from "./calendarTime";
+import { CalendarInputError, listOccurrences } from "./calendarStore";
+import { toInstant, validZone, type Occurrence } from "./calendarTime";
 import { getMessage, listMessages, MailAuthError } from "./gmail";
 import { mailConfigured } from "./mailGuard";
 import { readAccounts } from "./mailStore";
@@ -31,20 +31,13 @@ const eventProps = {
 
 export const TOOLS: ToolSpec[] = [
   fn("calendar_list", "List calendar events between two local times. The next 30 days are already in the system prompt; use this for other ranges.", { from: { type: "string", description: 'Local "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm"' }, to: { type: "string" } }, ["from", "to"]),
-  fn("calendar_create", "Propose a new calendar event. Nothing is saved until the user confirms.", eventProps, ["title", "start"]),
-  fn("calendar_update", "Propose changes to an existing event. Only include the fields to change. Nothing is saved until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string", description: "YYYY-MM-DD, required for repeating events" }, event: { type: "object", properties: eventProps } }, ["id", "event"]),
-  fn("calendar_delete", "Propose deleting an event. Nothing is deleted until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string" } }, ["id"]),
   fn("mail_search", "Search the user's Gmail (read-only). Supports Gmail search syntax such as from:, subject:, newer_than:7d, is:unread. Returns sender, subject, date and a snippet.", { query: { type: "string" }, account: { type: "string", description: "Optional account id to limit the search" }, max: { type: "number" } }, ["query"]),
   fn("mail_read", "Read one email in full (text only, read-only). Use ids returned by mail_search.", { account: { type: "string" }, id: { type: "string" } }, ["account", "id"]),
   fn("notes_search", "Search the user's notes by words in the title or text. Returns note ids, titles and snippets.", { query: { type: "string" } }, ["query"]),
   fn("notes_list", "List the most recently edited notes (titles and ids).", {}),
   fn("notes_read", "Read one note in full as plain text. Use ids returned by notes_search or notes_list.", { id: { type: "string" } }, ["id"]),
-  fn("notes_create", "Propose a new note. The body is Markdown (headings, bullets, - [ ] tasks, quotes). Nothing is saved until the user confirms.", { title: { type: "string" }, markdown: { type: "string" }, parentId: { type: "string", description: "Optional id of a note to nest it under" } }, ["title", "markdown"]),
-  fn("notes_append", "Propose adding Markdown text to the end of an existing note. Nothing is saved until the user confirms.", { id: { type: "string" }, markdown: { type: "string" } }, ["id", "markdown"]),
   fn("mindstream_list", "List the user's mindstreams. A mindstream is a board of cards plus the one note paired with it.", {}),
   fn("mindstream_read", "Read one mindstream in full: its note text and its board as an outline where every card has an id. Use this before reviewing or editing a mindstream.", { id: { type: "string", description: "Mindstream id from mindstream_list or the system prompt" } }, ["id"]),
-  fn("mindstream_edit_note", "Propose changing the note of a mindstream: append new Markdown, or replace the whole note with a corrected version. Nothing changes until the user confirms.", { id: { type: "string" }, mode: { type: "string", enum: ["append", "replace"] }, markdown: { type: "string" }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "mode", "markdown"]),
-  fn("mindstream_edit_board", "Propose changes to the board of a mindstream. Operations: {op:'add', text, parentId?, ref?, shape?, kicker?, body?} adds a sticky card, or a diagram BLOCK when shape/kicker/body is given (shape: rect|round|diamond|cylinder|ellipse|hex|slant; kicker is a stereotype such as subsystem or ECU; body is properties, one per line). {op:'group', text, contains:[ids or refs], ref?} draws a labelled container around blocks. {op:'update', cardId, text?, kicker?, body?, shape?}. {op:'delete', cardId}. {op:'link', from, to, label?, color?: ink|blue|green|amber|red|violet, line?: solid|dashed|dotted, start?/end?: none|arrow|open|diamond|diamondFill|dot|bar}. Give each new item a short `ref` so later links and groups in the same batch can point at it; existing items use ids from mindstream_read. A batch that creates several blocks is laid out automatically, left to right. For a systems diagram: one block per component, a link per interface with a label saying what flows, and groups for subsystem boundaries. Nothing changes until the user confirms.", { id: { type: "string" }, ops: { type: "array", items: { type: "object" } }, why: { type: "string", description: "One sentence: what problem this fixes" } }, ["id", "ops"]),
   fn("library_list", "List the documents in the user's reading library with reading progress.", {}),
   fn("library_search", "Find the passages of one library document that are most relevant to a query. Write the query in the document's language.", { documentId: { type: "string" }, query: { type: "string" } }, ["documentId", "query"]),
 ];
@@ -66,8 +59,6 @@ export type Proposal = {
   ms?: { boardId: string; title: string; mode?: "replace" | "append"; markdown?: string; ops?: BoardOp[]; lines?: string[]; why?: string };
 };
 
-const summary = (event: Summary): Summary => ({ title: event.title, start: event.start, end: event.end, allDay: event.allDay, location: event.location, category: event.category, repeat: event.repeat ?? null });
-
 export function describeCall(name: string, rawArgs: string) {
   const args = parse(rawArgs);
   switch (name) {
@@ -76,12 +67,10 @@ export function describeCall(name: string, rawArgs: string) {
     case "mail_read": return "Reading an email";
     case "notes_search": return `Searching notes: ${String(args.query ?? "").slice(0, 60)}`;
     case "notes_list": case "notes_read": return "Reading your notes";
-    case "notes_create": case "notes_append": return "Preparing a note";
     case "mindstream_list": case "mindstream_read": return "Reading your mindstream";
-    case "mindstream_edit_note": case "mindstream_edit_board": return "Preparing mindstream changes";
     case "library_list": return "Looking through your library";
     case "library_search": return `Searching a book: ${String(args.query ?? "").slice(0, 60)}`;
-    default: return "Preparing a calendar change";
+    default: return "Working";
   }
 }
 
@@ -96,15 +85,6 @@ function parse(raw: string): Record<string, unknown> {
 
 const cut = (text: string) => text.length > RESULT_LIMIT ? `${text.slice(0, RESULT_LIMIT)}\n…(shortened)` : text;
 
-/** Titles of existing timed events that overlap the proposed time (all-day events are not counted). */
-async function conflictsFor(fields: { start: string; end: string; allDay: boolean }, ignoreId?: string) {
-  if (fields.allDay) return [];
-  const start = Date.parse(fields.start);
-  const end = Date.parse(fields.end);
-  const { occurrences } = await listOccurrences(start - 3_600_000, end + 3_600_000);
-  return occurrences.filter((entry) => !entry.allDay && entry.id !== ignoreId && Date.parse(entry.start) < end && Date.parse(entry.end) > start).map((entry) => entry.title).slice(0, 3);
-}
-
 export const calendarLines = (occurrences: Occurrence[], zone: string) => {
   const local = (iso: string, allDay: boolean) => allDay ? iso : new Intl.DateTimeFormat("sv-SE", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)).replace(" ", "T");
   return occurrences.map((item) => `- [${item.id}] ${item.title} | ${local(item.start, item.allDay)} → ${local(item.end, item.allDay)}${item.allDay ? " (all-day)" : ""} | ${item.category}${item.location ? ` | ${item.location}` : ""}${item.recurring ? ` | repeats (occurrence ${item.occurrenceDate})` : ""}`);
@@ -112,8 +92,12 @@ export const calendarLines = (occurrences: Occurrence[], zone: string) => {
 
 export type ToolContext = { zone: string; proposals: Proposal[] };
 
-/** Runs one tool call. Read tools return text for the model; calendar writes only record a proposal. */
+/** The assistant only reads and sums up: anything that writes is done by the person or by Claude over MCP. */
+const READ_ONLY = new Set(TOOLS.map((tool) => tool.function.name));
+
+/** Runs one read tool call and returns text for the model. Unknown or write tool names are refused. */
 export async function runTool(name: string, rawArgs: string, ctx: ToolContext): Promise<string> {
+  if (!READ_ONLY.has(name)) return `Error: ${name.slice(0, 40)} is not available. You can read and summarize, not change anything.`;
   const args = parse(rawArgs);
   const zone = validZone(ctx.zone);
   try {
@@ -124,36 +108,6 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (from === null || to === null || to <= from) return "Error: give valid from and to times.";
         const { occurrences } = await listOccurrences(from, Math.min(to, from + 60 * 86_400_000));
         return cut(occurrences.length ? calendarLines(occurrences.slice(0, 150), zone).join("\n") : "No events in that range.");
-      }
-      case "calendar_create": {
-        const doc = await readCalendar();
-        const fields = buildFields(args, zone, doc.categories);
-        const conflicts = await conflictsFor(fields);
-        ctx.proposals.push({ op: "create", event: args, after: summary(fields), conflicts });
-        return `Proposed creating "${fields.title}". Awaiting the user's confirmation.${conflicts.length ? ` It overlaps with: ${conflicts.join(", ")}.` : ""}`;
-      }
-      case "calendar_update":
-      case "calendar_delete": {
-        const doc = await readCalendar();
-        const series = doc.events.find((event) => event.id === args.id);
-        if (!series) return "Error: no event has that id. Use an id from the calendar list.";
-        const scope = args.scope === "this" ? "this" : "all";
-        const occurrenceDate = typeof args.occurrenceDate === "string" ? args.occurrenceDate : undefined;
-        let shown: Occurrence | undefined;
-        if (series.repeat) {
-          if (scope === "this" || occurrenceDate) shown = expand(series, 0, 8_640_000_000_000_000).find((entry) => entry.occurrenceDate === occurrenceDate);
-          if (scope === "this" && !shown) return "Error: for one occurrence of a repeating event, give its occurrenceDate (YYYY-MM-DD).";
-        }
-        const before = summary(fieldsOf(shown ?? series));
-        if (name === "calendar_delete") {
-          ctx.proposals.push({ op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [] });
-          return `Proposed deleting "${before.title}". Awaiting the user's confirmation.`;
-        }
-        const patch = args.event && typeof args.event === "object" ? args.event as Record<string, unknown> : {};
-        const fields = buildFields(patch, zone, doc.categories, fieldsOf(shown && scope === "this" ? shown : series));
-        const conflicts = await conflictsFor(fields, series.id);
-        ctx.proposals.push({ op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts });
-        return `Proposed changing "${before.title}". Awaiting the user's confirmation.${conflicts.length ? ` It would overlap with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "mail_search": {
         if (!mailConfigured()) return "Mail is not set up.";
@@ -184,22 +138,6 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (!found || found.note.deletedAt) return "Error: no note has that id.";
         return cut(`${found.note.title || "Untitled"}\n\n${jsonToText(found.content)}`);
       }
-      case "notes_create": {
-        const title = String(args.title ?? "").trim().slice(0, 200);
-        const markdown = String(args.markdown ?? "").slice(0, 20_000);
-        if (!title) return "Error: give the note a title.";
-        const parentId = typeof args.parentId === "string" && validNoteId(args.parentId) ? args.parentId : null;
-        ctx.proposals.push({ op: "note_create", note: { title, markdown, parentId }, conflicts: [] });
-        return `Proposed creating the note "${title}". Awaiting the user's confirmation.`;
-      }
-      case "notes_append": {
-        const found = typeof args.id === "string" && validNoteId(args.id) ? await readNote(args.id) : null;
-        if (!found || found.note.deletedAt) return "Error: no note has that id.";
-        const markdown = String(args.markdown ?? "").slice(0, 20_000);
-        if (!markdown.trim()) return "Error: there is nothing to add.";
-        ctx.proposals.push({ op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
-        return `Proposed adding text to "${found.note.title || "Untitled"}". Awaiting the user's confirmation.`;
-      }
       case "mindstream_list": {
         const streams = await listStreams();
         return cut(streams.length ? streams.slice(0, 40).map((note) => `- [${note.id}] ${note.icon} ${note.title || "Untitled"}${note.parentId ? " (subpage)" : ""} | updated ${note.updatedAt.slice(0, 10)}`).join("\n") : "There are no mindstreams yet.");
@@ -208,40 +146,6 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (typeof args.id !== "string" || !validBoardId(args.id)) return "Error: no mindstream has that id.";
         const stream = await readMindstream(await resolveBoardId(args.id));
         return cut(`Mindstream: ${stream.title}\nPhotos on the board: ${stream.photos}\n\n## NOTE\n${stream.noteText.trim() || "(empty)"}\n\n## BOARD (card ids in brackets)\n${stream.withIds || "(no text cards)"}`);
-      }
-      case "mindstream_edit_note": {
-        if (typeof args.id !== "string" || !validBoardId(args.id)) return "Error: no mindstream has that id.";
-        const markdown = String(args.markdown ?? "").slice(0, 20_000);
-        if (!markdown.trim()) return "Error: there is nothing to write.";
-        const boardId = await resolveBoardId(args.id);
-        const stream = await readMindstream(boardId);
-        const mode = args.mode === "replace" ? "replace" : "append";
-        ctx.proposals.push({ op: "ms_note", conflicts: [], ms: { boardId, title: stream.title, mode, markdown, why: typeof args.why === "string" ? args.why.slice(0, 200) : undefined } });
-        return `Proposed ${mode === "replace" ? "rewriting" : "adding to"} the note of "${stream.title}". Awaiting the user's confirmation.`;
-      }
-      case "mindstream_edit_board": {
-        if (typeof args.id !== "string" || !validBoardId(args.id)) return "Error: no mindstream has that id.";
-        const boardId = await resolveBoardId(args.id);
-        const stream = await readMindstream(boardId);
-        const known = new Map(stream.withIds.split("\n").map((line) => line.match(/\[([0-9a-f-]{36})\]\s*(.*)$/)).filter((m): m is RegExpMatchArray => !!m).map((m) => [m[1], m[2]]));
-        // Things created earlier in the same batch can be referred to by their `ref` before they have an id.
-        const refText = new Map<string, string>();
-        const exists = (id: unknown) => typeof id === "string" && (known.has(id) || refText.has(id));
-        const ops: BoardOp[] = [];
-        for (const op of (Array.isArray(args.ops) ? args.ops : []).slice(0, 60)) {
-          const o = op as Record<string, unknown>;
-          const named = (value: unknown) => typeof value === "string" && !!value.trim();
-          if (o?.op === "add" && named(o.text) && (!o.parentId || exists(o.parentId))) { if (named(o.ref)) refText.set(String(o.ref), String(o.text)); ops.push(o as BoardOp); }
-          else if (o?.op === "group" && named(o.text) && Array.isArray(o.contains) && o.contains.length && o.contains.every(exists)) { if (named(o.ref)) refText.set(String(o.ref), String(o.text)); ops.push(o as BoardOp); }
-          else if (o?.op === "update" && known.has(String(o.cardId)) && (named(o.text) || named(o.kicker) || named(o.body) || named(o.shape))) ops.push(o as BoardOp);
-          else if (o?.op === "delete" && known.has(String(o.cardId))) ops.push(o as BoardOp);
-          else if (o?.op === "link" && exists(o.from) && exists(o.to)) ops.push(o as BoardOp);
-        }
-        if (!ops.length) return "Error: none of those changes refer to cards that exist. Use ids from mindstream_read.";
-        const name = (id: string) => known.get(id) ?? refText.get(id) ?? id;
-        const lines = ops.map((op) => op.op === "add" ? `+ ${op.kicker ? `«${op.kicker}» ` : ""}${op.text}${op.parentId ? ` (under “${name(op.parentId)}”)` : ""}` : op.op === "group" ? `▣ ${op.text} ⊃ ${op.contains.map(name).join(", ")}` : op.op === "update" ? `✎ “${name(op.cardId)}” → ${[op.text, op.kicker ? `«${op.kicker}»` : "", op.body].filter(Boolean).join(" · ")}` : op.op === "delete" ? `− ${name(op.cardId)}` : `⟷ “${name(op.from)}” → “${name(op.to)}”${op.label ? ` (${op.label})` : ""}`);
-        ctx.proposals.push({ op: "ms_board", conflicts: [], ms: { boardId, title: stream.title, ops, lines, why: typeof args.why === "string" ? args.why.slice(0, 200) : undefined } });
-        return `Proposed ${ops.length} change(s) to the board of "${stream.title}". Awaiting the user's confirmation.`;
       }
       case "library_list": {
         const documents = await listDocuments();
