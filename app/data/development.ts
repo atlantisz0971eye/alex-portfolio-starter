@@ -24,10 +24,14 @@ type DevelopmentContent = { title: string; eyebrow: string; intro: string; liveL
 
 const NIGHT_URL = "https://night-8looming-jasmine.vercel.app/web/";
 const GA1A_URL = "https://leaf-exhibition.vercel.app/";
+const TRYIN_URL = "https://tryin-pi.vercel.app/";
 
 // A red and black night, and the green of the leaf archive, to echo the sections around them.
 const NIGHT_FIELD = "radial-gradient(circle at 24% 28%, rgba(214,40,40,.62), transparent 36%), radial-gradient(circle at 80% 72%, rgba(122,12,18,.6), transparent 44%), linear-gradient(145deg, #0a0204, #2a0609 55%, #060102)";
 const LEAF_FIELD = "radial-gradient(circle at 72% 24%, rgba(181,203,154,.5), transparent 34%), radial-gradient(circle at 22% 76%, rgba(74,105,69,.55), transparent 42%), linear-gradient(145deg, #0b100a, #1a2a17 55%, #060806)";
+
+// A dark photographic print with a trace of ember, the colour of the burnt shadow the piece leaves behind the foreground.
+const TRYIN_FIELD = "radial-gradient(circle at 74% 38%, rgba(192,100,58,.4), transparent 34%), radial-gradient(circle at 24% 80%, rgba(230,225,214,.1), transparent 44%), linear-gradient(145deg, #0b0a09, #1b1a18 55%, #070605)";
 
 export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
   en: {
@@ -67,6 +71,21 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         host: "leaf-exhibition.vercel.app",
         field: LEAF_FIELD,
       },
+      {
+        slug: "tryin",
+        index: "03",
+        title: "Tryin'",
+        subtitle: "Walk-in photograph",
+        type: "Interactive web piece",
+        summary: "Upload a photo or a short video and it becomes a particle space you can walk into. What the camera never recorded stays missing: the burnt shadow behind each foreground and the ash hanging between are left as shapes, not filled in by AI.",
+        quote: { text: "freeze a moment, then walk into it", note: "Stand where it was taken and everything lines up. Step aside and the shadow shows." },
+        poster: "/development/tryin-cover.webp",
+        posterPosition: "right center",
+        tags: ["Interactive web", "Photograph", "Relativity", "Particles"],
+        href: TRYIN_URL,
+        host: "tryin-pi.vercel.app",
+        field: TRYIN_FIELD,
+      },
     ],
   },
   zh: {
@@ -105,6 +124,21 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         href: GA1A_URL,
         host: "leaf-exhibition.vercel.app",
         field: LEAF_FIELD,
+      },
+      {
+        slug: "tryin",
+        index: "03",
+        title: "Tryin'",
+        subtitle: "走进去的照片",
+        type: "互动网页作品",
+        summary: "上传一张照片或一段短视频，它会变成一个可以走进去的粒子空间。相机没记录到的地方保持缺失：前景身后焦黑的影子和悬停的灰烬只给形状，不用 AI 补全。",
+        quote: { text: "freeze a moment, then walk into it", note: "站在拍摄点，一切都对得上；往旁边走，被挡住的影子就露出来。" },
+        poster: "/development/tryin-cover.webp",
+        posterPosition: "right center",
+        tags: ["互动网页", "照片", "相对论", "粒子"],
+        href: TRYIN_URL,
+        host: "tryin-pi.vercel.app",
+        field: TRYIN_FIELD,
       },
     ],
   },
