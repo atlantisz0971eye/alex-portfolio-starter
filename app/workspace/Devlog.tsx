@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronRight, ExternalLink, FileText, GitCommitHorizontal, ImagePlus, Loader2, MoreHorizontal, Pencil, Plus, ScrollText, Sparkles, Trash2, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCarcosa } from "./Carcosa";
 import ReactMarkdown from "react-markdown";
 import type { DevEntry, DevProject } from "../lib/devlogStore";
 import type { NoteMeta } from "../lib/notesStore";
@@ -42,6 +43,14 @@ function Strip({ entries }: { entries: DevEntry[] }) {
 }
 
 export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
+  // opening the devlog reads the new entries
+  const { eatKind, items: hot } = useCarcosa();
+  const hotDevlog = hot.some((item) => item.kind === "devlog" && !item.eaten);
+  useEffect(() => {
+    if (!hotDevlog) return;
+    const timer = window.setTimeout(() => eatKind("devlog"), 3000);
+    return () => window.clearTimeout(timer);
+  }, [hotDevlog, eatKind]);
   const [data, setData] = useState<Data | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
   const [editing, setEditing] = useState<Partial<DevEntry> | null>(null);
@@ -118,7 +127,7 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
                 const project = byId.get(entry.projectId)!;
                 const Kind = KIND[entry.kind];
                 const expanded = open.has(entry.id);
-                return <article key={entry.id} className={`dl-entry dl-entry--${entry.kind}`} style={{ "--c": project.color } as React.CSSProperties}>
+                return <article key={entry.id} data-carcosa={`devlog:${entry.id}`} className={`dl-entry dl-entry--${entry.kind}`} style={{ "--c": project.color } as React.CSSProperties}>
                   <header>
                     <span className="dl-entry__who"><i />{project.name}<Kind.icon size={13} aria-hidden="true" /><small>{Kind.label}</small></span>
                     <button type="button" className="ntree__act" aria-label="Entry options" onClick={() => setMenuFor(entry)}><MoreHorizontal size={16} /></button>

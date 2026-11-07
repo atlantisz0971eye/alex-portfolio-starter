@@ -10,6 +10,7 @@ import { applyProposal, ProposalCard, type Proposal, type Status } from "./Propo
 import { PageTitle, TopRow, type Tab } from "./Shell";
 import { keepInNotebook } from "./keep";
 import { Paper } from "./Paper";
+import { useCarcosa } from "./Carcosa";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
@@ -57,6 +58,14 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   useEffect(() => { void load(); }, [load, refresh]);
 
   const plan = view?.plan ?? null;
+  // a plan that has been on screen for a few seconds has been read
+  const { eatKind, items: hot } = useCarcosa();
+  const hotPlan = hot.some((item) => item.kind === "plan" && !item.eaten);
+  useEffect(() => {
+    if (!plan || !hotPlan) return;
+    const timer = window.setTimeout(() => eatKind("plan"), 4000);
+    return () => window.clearTimeout(timer);
+  }, [plan, hotPlan, eatKind]);
   const layout = view?.layout ?? null;
   // The model arranges the blocks; this only reads its answer. `order` places a block, `data-focus` stresses one.
   const place = (block: Block) => ({ "data-block": block, "data-focus": layout?.focus === block ? "" : undefined, style: layout ? { order: layout.order.indexOf(block) } : undefined });
@@ -122,7 +131,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
 
         {view && view.connected && <div className="today__grid" data-directed={layout ? "" : undefined}>
           <div className="today__main">
-            <section className="ws-card today__plan" aria-live="polite" {...place("plan")}>
+            <section className="ws-card today__plan" aria-live="polite" data-carcosa={plan ? `plan:${plan.generatedAt}` : undefined} {...place("plan")}>
               <div className="ws-card__head"><span><Sparkles size={15} /> Suggested plan</span>{plan && <small>{ago(Date.parse(plan.generatedAt))}</small>}</div>
               {planning && !plan ? <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading your mail and calendar…</p>
                 : plan ? <>
@@ -157,7 +166,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
             <section aria-label="New mail" {...place("mail")}>
             <h2 className="section-label">New mail {mail.length > 0 && <span>{mail.length}</span>}</h2>
             {mail.length === 0 ? <p className="today__none"><Check size={14} /> You’re all caught up.</p> : <ul className="today__mail">
-              {mail.slice(0, showAll ? 40 : 5).map((message) => <li key={`${message.account}-${message.id}`}>
+              {mail.slice(0, showAll ? 40 : 5).map((message) => <li key={`${message.account}-${message.id}`} data-carcosa={`mail:${message.account}:${message.id}`}>
                 <button type="button" onClick={() => setOpen(message)}>
                   <span className="mail-dot is-unread" />
                   <span className="mail-row">

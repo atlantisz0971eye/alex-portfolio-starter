@@ -3,6 +3,7 @@
 import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
+import { CarcosaGauge, CarcosaIndex } from "./Carcosa";
 
 export type Theme = "light" | "dark";
 export const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({ theme: "light", toggle: () => undefined });
@@ -62,6 +63,7 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
       {user?.role === "owner" && <SyncButton />}
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </div>
+    {open ? <CarcosaIndex /> : <CarcosaGauge />}
   </aside>;
 }
 

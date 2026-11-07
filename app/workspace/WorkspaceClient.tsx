@@ -19,6 +19,7 @@ import { Mind } from "./Mind";
 import { Members } from "./Members";
 import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
+import { CarcosaProvider, CarcosaSpores } from "./Carcosa";
 
 type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
 
@@ -361,7 +362,8 @@ function App() {
 
   const updateDocument = (document: WorkspaceDocument) => setBook((current) => current && { ...current, document });
 
-  return <>
+  return <CarcosaProvider>
+    <CarcosaSpores />
     <div className="shell">
       <Sidebar tab={tab} onTab={go} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
       <div className="shell__main">
@@ -384,5 +386,5 @@ function App() {
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(target) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, ...target })); }} />
     </>}
     {error && <div className="ws-toast" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={16} /></button></div>}
-  </>;
+  </CarcosaProvider>;
 }
