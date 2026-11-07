@@ -1,7 +1,7 @@
 /**
  * Carcosa's two bodies, drawn in code so they can be tuned and animated. Every pixel is a palette letter.
  * The yak wears a tattered yellow cloak and a pale mask pushed up on its forehead (the King in Yellow); the dormant form
- * is the dried yellow lump a slime mould turns into when it is left without food, marked with a sign of three arcs.
+ * is the dried grey lump a slime mould turns into when it is left without food, with a yellow sign of three arcs pressed into it.
  */
 export const W = 34;
 export const H = 26;
@@ -26,6 +26,9 @@ export const PALETTE: Record<string, [number, number, number]> = {
   m: [38, 30, 26],      // mask slits
   H: [40, 30, 24],      // hoof
   S: [255, 224, 90],    // sun
+  G: [150, 150, 145],   // dried mould
+  g: [110, 110, 106],   // dried mould, shade
+  L: [190, 190, 184],   // dried mould, lit
 };
 
 type Grid = string[][];
@@ -101,17 +104,17 @@ export function yak(frame: 0 | 1 = 0, blink = false, masked = false): string[] {
   return out.map((row) => row.join(""));
 }
 
-/** The dried lump of a dormant slime mould, with a sign of three arcs pressed into it. */
+/** The dried lump of a dormant slime mould: grey, with the one yellow thing on it a sign of three arcs. */
 export function lump(): string[] {
   const g = blank();
-  ellipse(g, 17, 17, 9, 5.5, (x, y) => (y < 15 ? "Y" : y > 19 ? "y" : (x + y) % 5 === 0 ? "y" : "Y"));
-  ellipse(g, 14, 15, 3, 1.6, "S");
+  ellipse(g, 17, 17, 9, 5.5, (x, y) => (y < 15 ? "G" : y > 19 ? "g" : (x + y) % 5 === 0 ? "g" : "G"));
+  ellipse(g, 14, 15, 3, 1.6, "L");
   // three arcs, each a small curve, set around a centre
   const arc = (cx: number, cy: number, quarter: number) => {
     const pts: [number, number][] = [[1, 0], [1, 1], [0, 2]];
     pts.forEach(([dx, dy]) => {
       const rot = [[dx, dy], [-dy, dx], [-dx, -dy], [dy, -dx]][quarter];
-      put(g, cx + rot[0], cy + rot[1], "K");
+      put(g, cx + rot[0], cy + rot[1], "Y");
     });
   };
   arc(17, 17, 0); arc(17, 17, 1); arc(17, 17, 2);
