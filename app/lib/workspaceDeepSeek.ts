@@ -108,7 +108,7 @@ export async function* streamDeepSeek(system: string, user: string, maxTokens: n
 }
 
 /** One short, non-streamed call, used to turn a question into search keywords. */
-export async function quickDeepSeek(system: string, user: string, maxTokens: number, timeoutMs: number) {
+export async function quickDeepSeek(system: string, user: string, maxTokens: number, timeoutMs: number, temperature = 0) {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) return null;
   // Callers of this helper treat "no answer" as a soft failure, so a used-up allowance reads the same way.
@@ -121,7 +121,7 @@ export async function quickDeepSeek(system: string, user: string, maxTokens: num
         model: MODEL,
         thinking: { type: "disabled" },
         messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        temperature: 0,
+        temperature,
         max_tokens: maxTokens,
         stream: false,
       }),

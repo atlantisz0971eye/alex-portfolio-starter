@@ -50,6 +50,17 @@ async function recentInbox(days = 2, max = 25): Promise<MailSummary[]> {
 
 const relevant = (message: MailSummary) => message.category === "primary" || message.category === "updates";
 
+/** Mail worth reading from the last two days, for Carcosa. Nothing when mail is not connected. */
+export async function hotMail() {
+  if (!mailConfigured() || !(await readAccounts()).length) return [];
+  return (await recentInbox(2, 20)).filter(relevant);
+}
+
+/** The saved plan for today, if there is one. */
+export async function readPlan() {
+  return (await readState()).plan ?? null;
+}
+
 const PLAN_TASK = `你现在要为用户制定“今天的日程建议”，不是聊天。
 任务：
 1. 先用 calendar_list 查今天 00:00 到 24:00 已有的安排。
