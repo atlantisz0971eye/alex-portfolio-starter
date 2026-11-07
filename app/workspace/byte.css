@@ -199,7 +199,8 @@
 .ws-root[data-skin="byte"] .mind__topic > summary b { font-weight: 700; }
 .ws-root[data-skin="byte"] .mind__topic > summary::before { content: "□"; color: var(--text-2); }
 .ws-root[data-skin="byte"] .mind__topic[open] > summary::before { content: "■"; color: var(--blue); }
-.ws-root[data-skin="byte"] .mind__back { top: 14px; z-index: 55; }
+/* The archive's way back lives at the bottom left: the top right belongs to the page's own buttons, and the strip to the corner words. */
+.ws-root[data-skin="byte"] .mind__back { top: auto; right: auto; bottom: 18px; left: 2.2vw; z-index: 55; padding: 6px 10px; background: color-mix(in srgb, var(--bg) 86%, transparent); flex-wrap: wrap; }
 .ws-root[data-skin="byte"] .page--mind .pagetitle { margin-bottom: 2.4vw; }
 .ws-root[data-skin="byte"] .mind__hint { margin: 6px 0 2vw; }
 .ws-root[data-skin="byte"] .mind__overview { margin-bottom: 1.6vw; }
@@ -267,11 +268,13 @@
 .ws-root[data-skin="byte"] .ws-message--user, .ws-root[data-skin="byte"] .ws-message--user * { color: var(--on-accent); }
 
 /* ---- Carcosa: a grey hairline under the corner strip; in the open index, the yak once everything is eaten ---- */
-.ws-root[data-skin="byte"] .carcosa-line { position: absolute; left: 2.2vw; right: 2.2vw; bottom: -10px; width: calc(100% - 4.4vw); height: 12px; image-rendering: pixelated; pointer-events: none; }
-.ws-root[data-skin="byte"] .carcosa-lump { position: absolute; right: 2.2vw; top: 10px; width: 34px; height: 26px; image-rendering: pixelated; pointer-events: none; display: none; }
+/* inside the strip, along its bottom edge: hanging below it, the line would cross the giant page titles */
+.ws-root[data-skin="byte"] .carcosa-line { position: absolute; left: 2.2vw; right: 2.2vw; bottom: 0; width: calc(100% - 4.4vw); height: 12px; image-rendering: pixelated; pointer-events: none; }
+/* The count and the lump follow "index" on the left: the right end of the strip belongs to each page's own buttons. */
+.ws-root[data-skin="byte"] .carcosa-lump { position: static; align-self: center; width: 34px; height: 26px; margin: -6px 0 -6px -1ch; image-rendering: pixelated; pointer-events: none; display: none; }
 .ws-root[data-skin="byte"] .carcosa-lump[data-on] { display: block; }
-.ws-root[data-skin="byte"] .carcosa-count { position: absolute; right: 2.2vw; top: 17px; font-size: 11px; color: var(--text-2); pointer-events: auto; }
-.ws-root[data-skin="byte"] .carcosa-lump[data-on] + .carcosa-count { right: calc(2.2vw + 44px); }
+.ws-root[data-skin="byte"] .carcosa-count { position: static; order: 3; font-size: 11px; color: var(--text-2); white-space: nowrap; pointer-events: auto; }
+.ws-root[data-skin="byte"] .carcosa-lump { order: 4; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .carcosa-line, .ws-root[data-skin="byte"] .sidebar[data-open] .carcosa-count { display: none; }
 @media (max-width: 640px) { .ws-root[data-skin="byte"] .carcosa-count { display: none; } }
 

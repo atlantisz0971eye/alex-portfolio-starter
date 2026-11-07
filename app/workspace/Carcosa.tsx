@@ -229,6 +229,8 @@ export function CarcosaSpores() {
         if (!item) continue;
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.bottom < 0 || r.top > window.innerHeight) continue;
+        // a spore needs a margin to sit in; on a narrow screen there is none, and the top line says enough
+        if (r.left < 18) continue;
         const y = r.top + Math.min(r.height / 2, 18);
         // only where the item is really on top: a sheet, the reader or a pop-up over it hides its spore
         const probe = document.elementFromPoint(Math.max(1, r.left + 6), Math.max(1, Math.min(window.innerHeight - 1, y)));
