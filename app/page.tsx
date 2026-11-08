@@ -7,7 +7,7 @@ import { BioSection } from "./components/BioSection";
 import { DevelopmentSection } from "./components/DevelopmentSection";
 import { GallerySection } from "./components/GallerySection";
 import { HeaderBar } from "./components/HeaderBar";
-import { IntroOverlay } from "./components/IntroOverlay";
+import { ScanIntro } from "./components/ScanIntro";
 import { SiteFooter } from "./components/SiteFooter";
 import SidebarNav from "./components/SidebarNav";
 import { ThemeSection } from "./components/ThemeSection";
@@ -121,7 +121,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen text-white relative font-satoshi" onClick={() => search.setSearchOpen(false)}>
-      <IntroOverlay open={intro.isOpen} onClose={intro.close} />
+      <ScanIntro open={intro.isOpen} onClose={intro.close} />
       <SidebarNav lang={lang} />
 
       <HeaderBar

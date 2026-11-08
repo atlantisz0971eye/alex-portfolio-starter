@@ -9,7 +9,9 @@ export function useIntroOverlay() {
 
   useEffect(() => {
     try {
-      setIsOpen(!localStorage.getItem(INTRO_STORAGE_KEY) && !window.location.hash && !new URLSearchParams(window.location.search).has("focus"));
+      const params = new URLSearchParams(window.location.search);
+      // ?scan opens the scanner again on purpose, even after it has been seen.
+      setIsOpen(params.has("scan") || (!localStorage.getItem(INTRO_STORAGE_KEY) && !window.location.hash && !params.has("focus")));
     } catch {
       setIsOpen(false);
     }
@@ -23,15 +25,6 @@ export function useIntroOverlay() {
     }
     setIsOpen(false);
   }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [close, isOpen]);
 
   return { isOpen, close };
 }

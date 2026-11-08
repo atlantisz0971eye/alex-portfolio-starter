@@ -2387,118 +2387,69 @@ a {
 .development-section .gallery-kicker { margin-bottom: 4px; }
 
 
-/* ---------- Welcome: frosted, etched glass over the whole page, with an oil film drifting on it ---------- */
-.liquid-intro {
+/* ---------- Welcome: an opaque scanner that reads the page underneath as ASCII and techno ---------- */
+.scan-intro {
   position: fixed;
   inset: 0;
   z-index: 400;
-  cursor: pointer;
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: opacity .65s cubic-bezier(.2,.8,.2,1);
-}
-.liquid-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
-.liquid-glass {
-  position: relative;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: clamp(14px, 2.4vw, 30px);
-  width: 100%;
-  height: 100%;
   overflow: hidden;
-  background: rgba(214, 220, 224, .045);
-  -webkit-backdrop-filter: blur(11px) saturate(1.35) brightness(1.05);
-  backdrop-filter: blur(11px) saturate(1.35) brightness(1.05);
+  outline: none;
+  cursor: crosshair;
+  overscroll-behavior: contain;
+  touch-action: none;
+  color: #f2f2f0;
+  background-color: #0b0b0c;
+  background-image: radial-gradient(circle, rgba(255,255,255,.09) 1px, transparent 1.6px);
+  background-size: 20px 22px;
+  background-position: 10px 11px;
+  font: 12px/1.4 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "PingFang SC", monospace;
+  -webkit-tap-highlight-color: transparent;
 }
-.liquid-glass.is-liquid {
-  -webkit-backdrop-filter: url(#liquid-glass) blur(4.5px) saturate(1.5) brightness(1.06) contrast(1.05);
-  backdrop-filter: url(#liquid-glass) blur(4.5px) saturate(1.5) brightness(1.06) contrast(1.05);
-}
-
-/* The oil film: soft pools of thin-film colour that slide over each other and turn slowly. */
-.liquid-film { position: absolute; inset: 0; overflow: hidden; pointer-events: none; mix-blend-mode: screen; }
-.liquid-film i {
+.scan-intro__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scan-intro__hud {
   position: absolute;
-  width: 64vmax;
-  height: 64vmax;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: .7;
-  animation: oil-drift 26s ease-in-out infinite alternate;
-}
-.liquid-film i:nth-child(1) { left: -18vmax; top: -24vmax; background: radial-gradient(circle, rgba(255,90,190,.7), transparent 62%); }
-.liquid-film i:nth-child(2) { right: -22vmax; bottom: -26vmax; background: radial-gradient(circle, rgba(40,210,255,.62), transparent 62%); animation-duration: 31s; animation-delay: -9s; }
-.liquid-film i:nth-child(3) { left: 24vw; top: 30vh; background: radial-gradient(circle, rgba(255,200,80,.5), transparent 60%); animation-duration: 37s; animation-delay: -16s; }
-.liquid-film i:nth-child(4) { right: 6vw; top: -30vmax; background: radial-gradient(circle, rgba(140,100,255,.62), transparent 62%); animation-duration: 29s; animation-delay: -4s; }
-.liquid-film b {
-  position: absolute;
-  inset: -40%;
-  background: conic-gradient(from 20deg at 50% 50%, rgba(255,120,200,.0), rgba(255,120,200,.28), rgba(255,214,120,.22), rgba(90,220,255,.28), rgba(150,120,255,.26), rgba(255,120,200,.0));
-  filter: blur(80px);
-  opacity: .55;
-  animation: oil-turn 70s linear infinite;
-}
-@keyframes oil-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(9vw, 7vh, 0) scale(1.18); }
-  100% { transform: translate3d(-8vw, 12vh, 0) scale(.92); }
-}
-@keyframes oil-turn { to { transform: rotate(360deg); } }
-
-/* Frosting: fine, uneven grain, like sandblasted glass. */
-.liquid-grain {
-  position: absolute;
-  inset: 0;
+  top: 14px;
+  left: 2.2vw;
+  right: 2.2vw;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 3ch;
+  color: #6b6d72;
   pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 220px 220px;
-  opacity: .22;
-  mix-blend-mode: overlay;
+  text-shadow: 0 0 6px #0b0b0c, 0 0 2px #0b0b0c;
 }
-
-.liquid-title {
-  position: relative;
-  margin: 0;
-  text-align: center;
-  font-size: clamp(46px, 10vw, 156px);
-  font-weight: 300;
-  line-height: .98;
-  letter-spacing: .02em;
-  text-wrap: balance;
-  user-select: none;
-  /* Etched: cut into the glass, so the upper-left wall is dark and the lower-right wall catches light. */
-  color: rgba(255,255,255,.12);
-  -webkit-text-stroke: .5px rgba(255,255,255,.22);
-  text-shadow:
-    0 -1.5px 1px rgba(0,0,0,.62),
-    0 -3px 6px rgba(0,0,0,.28),
-    0 1.5px 1px rgba(255,255,255,.55),
-    0 4px 10px rgba(255,255,255,.14),
-    0 0 40px rgba(255,255,255,.08);
+.scan-intro__hud b { color: #f2f2f0; font-weight: 700; }
+.scan-intro__hud .is-on { color: #5af08a; }
+.scan-intro__title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12vh;
+  z-index: 1;
+  padding: 0 2.2vw;
+  pointer-events: none;
 }
-.liquid-title span { display: inline-block; }
-.liquid-hint {
-  position: relative;
-  margin: 0;
-  font-size: clamp(10px, 1vw, 13px);
-  font-weight: 400;
-  letter-spacing: .42em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,.14);
-  text-shadow: 0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.4);
-  animation: liquid-breathe 3.8s ease-in-out infinite;
+.scan-intro__title h1 { margin: 0 0 0 -1vw; font-size: 31vw; font-weight: 800; line-height: .76; letter-spacing: -.07em; white-space: nowrap; color: #f2f2f0; }
+.scan-intro__title p { margin-top: 2.4vh; color: #6b6d72; animation: scan-blink 1.6s steps(2, jump-none) infinite; }
+@keyframes scan-blink { 50% { opacity: .35; } }
+.scan-intro__exits { position: absolute; right: 2.2vw; bottom: 14px; z-index: 2; display: flex; gap: 3ch; }
+.scan-intro__exits button {
+  padding: 6px 10px;
+  color: #0b0b0c;
+  background: #f2f2f0;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: .04em;
+  cursor: pointer;
 }
-@keyframes liquid-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
-.liquid-intro.is-leaving { opacity: 0; pointer-events: none; }
-@media (max-width: 640px) {
-  .liquid-title { font-size: clamp(58px, 21vw, 120px); }
-  .liquid-title span { display: block; }
-  .liquid-film i { filter: blur(50px); }
-}
+.scan-intro__exits button:hover { background: #5af08a; }
+/* Leaving: the scanner is wiped away band by band, like scan lines. */
+.scan-intro.is-leaving { pointer-events: none; animation: scan-wipe .7s steps(14, end) forwards; }
+@keyframes scan-wipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
 @media (prefers-reduced-motion: reduce) {
-  .liquid-intro { transition: none; }
-  .liquid-film i, .liquid-film b, .liquid-hint { animation: none; }
+  .scan-intro.is-leaving { animation: none; opacity: 0; }
+  .scan-intro__title p { animation: none; }
 }
 
 /* ===== Workbench: a plate cut into the page, with each project's architecture etched into it ===== */
