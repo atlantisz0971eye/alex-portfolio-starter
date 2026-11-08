@@ -9,6 +9,7 @@ import { SOURCES } from "../lib/sonicSignals";
 import { SonicSynth } from "../lib/sonicSynth";
 import { prefersReducedMotion } from "../utils/environment";
 import { SonicDeck, type DeckState, type EnterLabels, type PerformState } from "./SonicDeck";
+import "./sonicLab.css";
 
 type SonicLabProps = {
   open: boolean;
