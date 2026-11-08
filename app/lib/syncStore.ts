@@ -19,6 +19,8 @@ export type SyncFolder = {
   transferred?: number;
   /** Boxes ticked in the folder's own README, ROADMAP, TODO or PLAN: counts and a few open items, never the files. */
   checklist?: { file: string; done: number; total: number; open: string[] }[];
+  /** Where the folder's git repository stands (drivesync 1.3): the commit checked out and what is not yet committed or pushed. */
+  git?: { branch: string; head: string; headAt?: string; dirty: number; ahead: number; behind: number; repo?: string };
 };
 export type SyncCommand = { id: string; type: "sync" | "pause" | "resume"; folder?: string; at: string };
 export type SyncDevice = {
@@ -97,13 +99,24 @@ const cleanChecklist = (value: unknown) => (Array.isArray(value) ? value : []).s
   return [{ file, done, total, open: (Array.isArray(c.open) ? c.open : []).slice(0, 5).flatMap((line) => { const t = text(line, 100); return t ? [t] : []; }) }];
 });
 
+/** A folder's git state as reported, or nothing: a full sha, short text, small counts, an owner/name repository. */
+function cleanGit(value: unknown): SyncFolder["git"] {
+  if (!value || typeof value !== "object") return undefined;
+  const g = value as Record<string, unknown>;
+  const head = typeof g.head === "string" && /^[0-9a-f]{40}$/.test(g.head) ? g.head : null;
+  if (!head) return undefined;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v), 100000) : 0);
+  const repo = typeof g.repo === "string" && /^[\w.-]{1,100}\/[\w.-]{1,100}$/.test(g.repo) ? g.repo : undefined;
+  return { branch: text(g.branch, 60) ?? "", head, headAt: iso(g.headAt), dirty: n(g.dirty), ahead: n(g.ahead), behind: n(g.behind), repo };
+}
+
 export function cleanReport(body: Record<string, unknown>) {
   const folders = (Array.isArray(body.folders) ? body.folders : []).slice(0, 30).flatMap((item): SyncFolder[] => {
     const f = item as Record<string, unknown>;
     const name = text(f?.name, 80);
     const path = text(f?.path, 300);
     if (!name || !path || !STATES.includes(f.state as SyncState)) return [];
-    return [{ name, path, state: f.state as SyncState, mode: f.mode === "copy" ? "copy" : "sync", lastOk: iso(f.lastOk), lastError: text(f.lastError, 400), lastDurationMs: count(f.lastDurationMs), files: count(f.files), bytes: count(f.bytes), transferred: count(f.transferred), checklist: cleanChecklist(f.checklist) }];
+    return [{ name, path, state: f.state as SyncState, mode: f.mode === "copy" ? "copy" : "sync", lastOk: iso(f.lastOk), lastError: text(f.lastError, 400), lastDurationMs: count(f.lastDurationMs), files: count(f.files), bytes: count(f.bytes), transferred: count(f.transferred), checklist: cleanChecklist(f.checklist), git: cleanGit(f.git) }];
   });
   const events = (Array.isArray(body.events) ? body.events : []).slice(-20).flatMap((item) => {
     const e = item as Record<string, unknown>;

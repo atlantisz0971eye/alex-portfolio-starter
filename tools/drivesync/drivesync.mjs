@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // drivesync: keeps marked folders mirrored to Google Drive with rclone, and reports to the Workspace.
 // No dependencies beyond Node 18+ and rclone. Run `drivesync help`.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import http from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const HOME = process.env.DRIVESYNC_HOME || path.join(os.homedir(), ".drivesync");
 const FAST = process.env.DRIVESYNC_FAST === "1"; // seconds instead of minutes, for tests
 const FILE = {
@@ -267,8 +267,34 @@ function folderReport() {
     else if (runtime.queue.some((item) => item.name === folder.name)) phase = "queued";
     else if (st.lastError && st.failedAt) phase = "error";
     else if (all.paused) phase = "paused";
-    return { name: folder.name, path: folder.path, state: phase, mode, lastOk: st.lastOk, lastError: st.lastError, lastDurationMs: st.lastDurationMs, files: st.files, bytes: st.bytes, transferred: st.transferred, checklist: phase === "unmounted" ? [] : checklistOf(folder.path) };
+    return { name: folder.name, path: folder.path, state: phase, mode, lastOk: st.lastOk, lastError: st.lastError, lastDurationMs: st.lastDurationMs, files: st.files, bytes: st.bytes, transferred: st.transferred, git: phase === "unmounted" ? undefined : gitOf(folder.path), checklist: phase === "unmounted" ? [] : checklistOf(folder.path) };
   });
+}
+
+// Where a folder's git repository stands: branch, the commit checked out, how many files are changed and not committed, and how far
+// it is ahead of or behind what it last fetched. Only these leave the computer, never a file or a diff. Asked at most once a minute.
+const gitMemo = new Map();
+function gitOf(dir) {
+  const memo = gitMemo.get(dir);
+  if (memo && Date.now() - memo.at < 60_000) return memo.value;
+  const git = (...args) => execFileSync("git", args, { cwd: dir, timeout: 4000, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  let value;
+  try {
+    if (git("rev-parse", "--is-inside-work-tree") !== "true") throw new Error("not a repository");
+    const remote = (() => { try { return git("config", "--get", "remote.origin.url"); } catch { return ""; } })();
+    const repo = remote.match(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/)?.[1];
+    let ahead = 0, behind = 0;
+    try { [behind, ahead] = git("rev-list", "--left-right", "--count", "@{upstream}...HEAD").split(/\s+/).map(Number); } catch { /* no upstream */ }
+    value = {
+      branch: git("rev-parse", "--abbrev-ref", "HEAD"),
+      head: git("rev-parse", "HEAD"),
+      headAt: git("log", "-1", "--format=%cI"),
+      dirty: git("status", "--porcelain").split("\n").filter(Boolean).length,
+      ahead, behind, repo,
+    };
+  } catch { value = undefined; }
+  gitMemo.set(dir, { at: Date.now(), value });
+  return value;
 }
 
 // Counts the "- [ ]" and "- [x]" boxes in a folder's own README, ROADMAP, TODO or PLAN, so the Workspace can say how far a local project is.

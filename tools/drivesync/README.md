@@ -58,6 +58,12 @@ drivesync sync ANTs --dry-run      # 只显示会传什么、删什么，不真�
 
 电脑每 90 秒主动向 `/api/workspace/sync` 报一次：是否在线、每个文件夹的状态、最近发生了什么。Workspace 在回复里带回待办命令（侧栏的 **Sync now**、**Pause**、**Resume**）。只有电脑向外连接，没有任何入站端口；令牌只存在 `~/.drivesync/config.json`（权限 600）和 Vercel 环境变量里。4 分钟没有消息就显示离线。
 
+### 给 Carcosa 的开发记录（1.3.0 起）
+
+如果某个标记的文件夹是 git 仓库，每次上报会多带几项：当前分支、检出的提交（sha）、有多少文件改了还没提交、领先或落后远程几个提交、对应的 GitHub 仓库名。**只上报这些计数和 sha，不上报任何文件内容或改动细节。** Workspace 用它和 GitHub 的提交、Vercel 的部署按 sha 对照，生成 Carcosa 页里的开发账本，并据此自动写 devlog。git 状态最多每分钟读一次。
+
+升级后需要重启后台进程（打开 Drive Sync 应用时会提示一次性更新）。
+
 ## 命令
 
 ```
