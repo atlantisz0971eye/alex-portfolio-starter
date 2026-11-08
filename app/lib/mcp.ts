@@ -9,6 +9,8 @@ import { deleteDocument, readDocument, writeDocument } from "./workspaceStore";
 import { markdownToDoc } from "./notesText";
 import { MindError, addMindEntry, deleteMindEntry, readGraph, readMindEntries, MAX_TEXT } from "./mindStore";
 import { editEntry, organizeLater, readInputs } from "./mindOrganize";
+import { audit, ledgerView, pollRepos } from "./carcosa/ledger";
+import { writeDevlog } from "./carcosa/scribe";
 
 /**
  * A small MCP server (Streamable HTTP, JSON responses) that lets Claude act as the steward of the workspace.
@@ -126,6 +128,20 @@ const TOOLS: Tool[] = [
     const noteId = (await readBoard(id))?.board.noteId ?? id;
     await setTrashed(noteId, !args.restore);
     return args.restore ? "Restored the mindstream from the trash." : "Moved the mindstream to the trash.";
+  } },
+  { name: "carcosa_ledger", readOnly: true, description: "Read Carcosa's ledger: what really happened in development, from the working folders (as Drive Sync reports them), GitHub commits and production deployments, compared by commit. Gives where each repository stands on all three, what does not line up (unpushed or uncommitted work, failed or pending deploys, days with commits but no devlog entry) and the last days. Use it before writing a devlog entry, so the entry matches the facts.", inputSchema: obj({ days: { type: "number", description: "How many work days back; default 7. A work day starts at 05:00 London time." } }), run: async (args) => {
+    const v = await ledgerView(Math.min(30, Math.max(1, Number(args.days) || 7)));
+    const s = (sha?: string) => (sha ? sha.slice(0, 7) : "-");
+    const align = v.alignment.map((a) => `- ${a.repo}: local ${a.local ? `${s(a.local.head)} (${a.local.dirty} uncommitted, ${a.local.ahead} unpushed, on ${a.local.device})` : "unknown (drivesync 1.3 not installed)"} | GitHub ${s(a.main)} | production ${s(a.prod?.sha)}${a.lastDeploy && a.lastDeploy.state !== "success" ? ` (last deploy ${a.lastDeploy.state})` : ""}${a.aligned ? " | aligned" : ""}`).join("\n");
+    const issues = v.issues.map((i) => `- ${i.text}`).join("\n") || "(none)";
+    const days = v.days.slice(0, 20).map((d) => `- ${d.day} ${d.label}: ${d.commits} commits${d.withClaude ? ` (${d.withClaude} with Claude)` : ""}, deploys ok ${d.deploysOk} failed ${d.deploysFailed}, ${d.syncs} syncs (${d.changed} files), ticked ${d.ticks}, devlog ${d.repo && d.commits ? (d.devlog ? "yes" : "MISSING") : "-"}`).join("\n");
+    return `GitHub last read: ${v.polledAt ?? "never"}\n\nWhere each repository stands:\n${align || "(none)"}\n\nNot lining up:\n${issues}\n\nWork days:\n${days || "(none)"}`;
+  } },
+  { name: "carcosa_check", readOnly: false, description: "Have Carcosa read GitHub now (new commits and deployment results) and let its scribe write devlog entries for work days that went quiet and have none yet. It only adds or refreshes its own entries (marked Logged by Carcosa); a day someone else wrote about is left alone. Recorded in Carcosa's audit list.", inputSchema: obj({}), run: async () => {
+    await pollRepos(true);
+    const { written } = await writeDevlog(3);
+    await audit("mcp-agent", "check", written.length ? `asked for a check; scribe wrote ${written.join(", ")}` : "asked for a check; nothing to write");
+    return written.length ? `Checked. The scribe wrote: ${written.join(", ")}.` : "Checked. Nothing new to write.";
   } },
   { name: "devlog_read", readOnly: true, description: "Read the devlog: projects (with ids, status and repository) and recent entries, newest first.", inputSchema: obj({ project: { type: "string", description: "Optional project name or id" }, days: { type: "number", description: "How many days back; default 14" } }), run: async (args) => {
     const [projects, entries] = await Promise.all([readProjects(), readEntries()]);

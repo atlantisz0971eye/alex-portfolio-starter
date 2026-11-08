@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { workspaceUser } from "../../../lib/workspaceAuth";
 import { workspaceStorageConfigured } from "../../../lib/workspaceStore";
+import { recordSync } from "../../../lib/carcosa/ledger";
 import { cleanReport, deleteCommands, listCommands, listDevices, pushCommand, readDevice, validDevice, writeDevice, type SyncCommand, type SyncDevice } from "../../../lib/syncStore";
 
 export const runtime = "nodejs";
@@ -41,8 +42,11 @@ export async function POST(request: Request) {
   calls.set(body.device, { count: count + 1, until: now + 60_000 });
   try {
     const report = cleanReport(body);
+    const before = await readDevice(body.device).catch(() => null);
     const device: SyncDevice = { device: body.device, name: report.name, platform: report.platform, version: report.version, rclone: report.rclone, paused: report.paused, lastSeen: new Date().toISOString(), folders: report.folders, events: report.events, commands: [] };
     await writeDevice(device);
+    // what changed since the last report goes into Carcosa's ledger (files synced, boxes ticked, a new commit checked out)
+    await recordSync(before, device).catch(() => undefined);
     // Commands stay queued until the computer acknowledges them, so an answer that got lost is simply sent again.
     await deleteCommands(body.device, report.acks);
     const waiting = (await listCommands(body.device)).filter((command) => !report.acks.includes(command.id));
