@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { calendarGuard } from "../../../lib/calendarGuard";
-import { refreshSelfReport } from "../../../lib/carcosa/selfReport";
+import { refreshSelfReportNoting } from "../../../lib/carcosa/selfReport";
 import { GeminiError } from "../../../lib/gemini";
 import { analyzeSome, buildSelf, hideConcept } from "../../../lib/selfGraph";
 import { SelfError, importPieces, readPieces, readSelf, wipeSelf } from "../../../lib/selfStore";
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     if (body.action === "build") {
       const graph = await buildSelf();
       // new writing has been read: Carcosa's report is written again, after the response, and only if something is new
-      if (user.role === "owner") after(() => runAs(user, refreshSelfReport).catch(() => undefined));
+      if (user.role === "owner") after(() => runAs(user, refreshSelfReportNoting));
       return Response.json({ nodes: graph.nodes.length, edges: graph.edges.length });
     }
     if (body.action === "hide" && typeof body.id === "string") { const graph = await hideConcept(body.id.slice(0, 80)); return Response.json({ nodes: graph.nodes.length }); }

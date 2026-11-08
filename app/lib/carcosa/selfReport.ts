@@ -96,3 +96,25 @@ export async function refreshSelfReport(): Promise<SelfReport | null> {
 
 /** What other code may see of the report: everything except the list of piece ids. */
 export const publicReport = (r: SelfReport | null) => (r ? { generatedAt: r.generatedAt, range: r.range, baseline: r.baseline, recent: r.recent, helps: r.helps, drains: r.drains, gentle: r.gentle, risk: r.risk, confidence: r.confidence, journal: r.journal.slice(-60) } : null);
+
+// ---- failures: remembered so the page can say the report did not come, instead of waiting for it forever ----------
+
+export type ReportError = { at: string; code: string };
+const errorPath = async () => `${await scopeRoot()}carcosa/self-report-error.json`;
+export async function readReportError(): Promise<ReportError | null> {
+  try {
+    const result = await get(await errorPath(), { access: "private", useCache: false });
+    if (result && result.statusCode === 200) return JSON.parse(await new Response(result.stream).text()) as ReportError;
+  } catch { /* none */ }
+  return null;
+}
+
+/** Writes the report and remembers a failure (its code only, never any text). */
+export async function refreshSelfReportNoting() {
+  try { return await refreshSelfReport(); }
+  catch (error) {
+    const code = error instanceof Error && "code" in error && typeof (error as { code: unknown }).code === "string" ? (error as { code: string }).code : "report_failed";
+    await put(await errorPath(), JSON.stringify({ at: new Date().toISOString(), code }), { access: "private", allowOverwrite: true, contentType: "application/json" }).catch(() => undefined);
+    return null;
+  }
+}

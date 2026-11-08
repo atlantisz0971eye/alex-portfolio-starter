@@ -1,4 +1,5 @@
 import { get, put } from "@vercel/blob";
+import { updateJson } from "../blobJson";
 import { listMessages, type MailSummary } from "../gmail";
 import { mailConfigured } from "../mailGuard";
 import { readAccounts } from "../mailStore";
@@ -25,6 +26,17 @@ export async function readReading(): Promise<Reading | null> {
     if (result && result.statusCode === 200) return JSON.parse(await new Response(result.stream).text()) as Reading;
   } catch { /* none yet */ }
   return null;
+}
+
+/** Counts one reading against the day's four; false when they are used up. */
+export async function takeReading(day: string) {
+  let ok = false;
+  await updateJson<{ day: string; count: number }>(`${await scopeRoot()}carcosa/reading-uses.json`, { day, count: 0 }, (u) => {
+    const count = u.day === day ? u.count : 0;
+    ok = count < 4;
+    return ok ? { day, count: count + 1 } : undefined;
+  });
+  return ok;
 }
 
 // Words that mean the conversation must stop being a story. Matched loosely; a false alarm costs one plain message.

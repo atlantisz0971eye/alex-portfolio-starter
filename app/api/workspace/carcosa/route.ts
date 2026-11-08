@@ -1,7 +1,7 @@
 import { calendarGuard } from "../../../lib/calendarGuard";
 import { saveCheckin, setRest, wipeNotes } from "../../../lib/carcosa/checkins";
 import { workDay } from "../../../lib/carcosa/ledger";
-import { writeReading } from "../../../lib/carcosa/reading";
+import { takeReading, writeReading } from "../../../lib/carcosa/reading";
 import { carcosaView, dream } from "../../../lib/carcosa/state";
 import { currentUser } from "../../../lib/workspaceScope";
 
@@ -18,7 +18,6 @@ export async function GET() {
   }
 }
 
-const readings = new Map<string, { count: number; day: string }>();
 
 /**
  * "checkin" saves today's mood, energy, sleep and word; "rest" marks today or tomorrow as a rest day; "reading" writes
@@ -45,10 +44,8 @@ export async function POST(request: Request) {
     if (body.action === "reading") {
       const user = await currentUser();
       if (user.role !== "owner") return Response.json({ error: "forbidden" }, { status: 403 });
-      const used = readings.get(user.id);
-      const count = used?.day === today ? used.count : 0;
-      if (count >= 4) return Response.json({ error: "rate_limited", message: "今天已经读过几次了，明天再来。" }, { status: 429 });
-      readings.set(user.id, { count: count + 1, day: today });
+      // kept in storage, so a new server instance does not hand out four more
+      if (!(await takeReading(today))) return Response.json({ error: "rate_limited", message: "今天已经读过几次了，明天再来。" }, { status: 429 });
       await writeReading();
       return Response.json(await carcosaView());
     }

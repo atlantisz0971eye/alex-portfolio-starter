@@ -6,7 +6,7 @@ import { currentUser, scopeRoot } from "../workspaceScope";
 import { readNotes, type DayNote } from "./checkins";
 import { creatureView, type CreatureView } from "./creature";
 import { readReading, type Reading } from "./reading";
-import { readSelfReport } from "./selfReport";
+import { readReportError, readSelfReport, type SelfReport } from "./selfReport";
 
 /**
  * What the Carcosa page reads: the creature, computed from the owner's development ledger, and the day's dream. Members
@@ -29,14 +29,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const RESTING: CreatureView = { phase: "sleeping", sky: "suns", theme: "dark", satiety: 0, lastFedAt: null, routine: { hours: Array(24).fill(0), start: null, end: null, days: 0, medianLoad: 0 }, today: { day: today(), load: 0, firstAt: null, lastAt: null, rest: false }, streak: 0, suggestRest: false, signals: [], bites: [], learning: true, findings: [], checkins: 0 };
 
-async function creature() {
+async function creature(notes?: Record<string, DayNote>, report?: SelfReport | null) {
   if ((await currentUser()).role !== "owner") return RESTING;
-  const report = await readSelfReport().catch(() => null);
-  return creatureView({ journal: report?.journal });
+  return creatureView({ journal: (report === undefined ? await readSelfReport().catch(() => null) : report)?.journal, notes });
 }
 
+/** One read of each file per view: the check-ins and the report are passed down instead of read again. */
 export async function carcosaView() {
-  const [view, state, notes, reading, report] = await Promise.all([creature(), readState(), readNotes().catch(() => ({} as Record<string, DayNote>)), readReading().catch((): Reading | null => null), readSelfReport().catch(() => null)]);
+  const [state, notes, reading, report, reportError] = await Promise.all([readState(), readNotes().catch(() => ({} as Record<string, DayNote>)), readReading().catch((): Reading | null => null), readSelfReport().catch(() => null), readReportError()]);
+  const view = await creature(notes, report);
   const tomorrow = new Date(Date.parse(`${view.today.day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
   return {
     ...view,
@@ -46,6 +47,7 @@ export async function carcosaView() {
     reading: reading?.day === view.today.day ? reading : null,
     // only when it was written and how far it reaches; the report itself stays on the server
     report: report ? { generatedAt: report.generatedAt, to: report.range[1], wroteLately: report.journal.filter((j) => j.day >= new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)).length } : null,
+    reportError: reportError && (!report || reportError.at > report.generatedAt) ? reportError : null,
   };
 }
 

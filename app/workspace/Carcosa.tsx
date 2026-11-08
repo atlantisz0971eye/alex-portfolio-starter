@@ -25,6 +25,7 @@ export type Creature = {
   streak: number; suggestRest: boolean; signals: Signal[]; bites: Bite[]; learning: boolean; dream: string | null;
   findings: Finding[]; checkins: number; checkin: DayNote | null; restTomorrow: boolean; reading: Reading | null;
   report: { generatedAt: string; to: string; wroteLately: number } | null;
+  reportError: { at: string; code: string } | null;
 };
 type Ctx = { creature: Creature | null; requestDream: () => Promise<string | null>; reload: () => void; act: (body: Record<string, unknown>) => Promise<string | null> };
 
@@ -251,6 +252,8 @@ function Checkin({ creature }: { creature: Creature }) {
   </div>;
 }
 
+const REPORT_ERRORS: Record<string, string> = { gemini_not_configured: "Gemini 没有配置", gemini_forbidden: "Gemini 拒绝了请求", gemini_billing: "Gemini 账单问题", gemini_failed: "Gemini 没有给出可读的结果", ai_quota: "今天的 AI 额度用完了" };
+
 const HELP = [["Samaritans", "116 123", "tel:116123"], ["SHOUT（短信）", "85258", "sms:85258&body=SHOUT"], ["NHS", "111", "tel:111"], ["紧急", "999", "tel:999"]];
 
 /** Today's reading: her whisper, then the same said plainly, then one small thing. */
@@ -311,6 +314,7 @@ export function CarcosaPet() {
     <h2 className="section-label">what she learned about you</h2>
     {c.findings.length ? <ul className="carcosa-audit">{c.findings.map((f) => <li key={f.key}>{f.text}</li>)}</ul> : <p className="carcosa-muted">还没有足够的自报（现在 {c.checkins} 天）。每种情况各攒满 3 天，她就会开始对照节律和你的心情、精力。</p>}
     <p className="carcosa-muted">{c.report ? `日记报告写于 ${day.format(new Date(c.report.generatedAt))}，读到 ${c.report.to}${c.report.wroteLately ? `；最近 7 天写了 ${c.report.wroteLately} 天日记` : ""}。只有在 Self 加了新内容时才会重写。` : "还没有日记报告：在 Self 导入新内容后，Gemini 会写一份。"}</p>
+    {c.reportError && <p className="carcosa-muted">上次写日记报告没成功（{day.format(new Date(c.reportError.at))} · {REPORT_ERRORS[c.reportError.code] ?? c.reportError.code}）。下次在 Self 导入新内容时会再试。</p>}
 
     <h2 className="section-label">what she ate</h2>
     <p className="carcosa-muted">提交 3 · 同步每个文件 0.4（最多 12 个）· 勾选每项 1 · 生产部署 2 · 按时收工 4 · 休息日 8；六小时消化一半。</p>

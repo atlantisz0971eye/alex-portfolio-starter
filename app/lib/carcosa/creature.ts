@@ -53,9 +53,9 @@ const median = (xs: number[]) => { if (!xs.length) return 0; const s = [...xs].s
 const quantile = (xs: number[], q: number) => { const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; };
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
-export async function creatureView(options: { journal?: JournalDay[]; now?: number } = {}): Promise<CreatureView> {
+export async function creatureView(options: { journal?: JournalDay[]; notes?: Notes; now?: number } = {}): Promise<CreatureView> {
   const now = options.now ?? Date.now();
-  const [events, notes] = await Promise.all([readEvents(now - 60 * DAY_MS), readNotes().catch((): Notes => ({}))]);
+  const [events, notes] = await Promise.all([readEvents(now - 60 * DAY_MS), options.notes ?? readNotes().catch((): Notes => ({}))]);
   const work = events.map(bite).filter((b): b is Bite => !!b).sort((a, b) => a.at.localeCompare(b.at));
   const today = workDay(now);
   const restDays = new Set(Object.entries(notes).filter(([, n]) => n.rest).map(([d]) => d));
