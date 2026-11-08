@@ -425,7 +425,7 @@ a {
   mask-image: linear-gradient(to bottom, transparent, black 22%, black 78%, transparent);
 }
 
-/* The leaf venation canvas sits under the grid, the orbits and the cards; it fades out at the top and bottom edges. */
+/* The leaf venation canvas sits under the grid and the cards; it fades out at the top and bottom edges. */
 .gallery-veins {
   position: absolute;
   inset: 0;
@@ -435,27 +435,6 @@ a {
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 14%, black 86%, transparent);
   mask-image: linear-gradient(to bottom, transparent, black 14%, black 86%, transparent);
-}
-
-.gallery-orbit {
-  position: absolute;
-  border: 1px solid rgba(181, 203, 154, .13);
-  border-radius: 9999px;
-  pointer-events: none;
-}
-
-.gallery-orbit-one {
-  width: min(68vw, 920px);
-  aspect-ratio: 1;
-  right: -24vw;
-  top: -42%;
-}
-
-.gallery-orbit-two {
-  width: min(42vw, 580px);
-  aspect-ratio: 1;
-  left: -18vw;
-  bottom: -38%;
 }
 
 .gallery-kicker {
@@ -2382,15 +2361,6 @@ a {
   mask-image: linear-gradient(to bottom, transparent, black 22%, black 78%, transparent);
 }
 
-.dev-orbit {
-  position: absolute;
-  z-index: -1;
-  border: 1px solid rgba(190, 196, 238, .12);
-  border-radius: 9999px;
-  pointer-events: none;
-}
-.dev-orbit-one { width: min(66vw, 900px); aspect-ratio: 1; left: -22vw; top: -40%; }
-.dev-orbit-two { width: min(40vw, 560px); aspect-ratio: 1; right: -16vw; bottom: -36%; }
 
 .dev-badge { gap: 6px; }
 .dev-badge i { width: 6px; height: 6px; border-radius: 50%; background: #8fd19e; box-shadow: 0 0 8px rgba(143,209,158,.8); }

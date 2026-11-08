@@ -105,8 +105,6 @@ export function DevelopmentSection({ lang }: { lang: Language }) {
   return (
     <section id="development" className="section-wrap development-section relative overflow-hidden snap-child min-h-[100svh] w-full">
       <div className="dev-grid" aria-hidden />
-      <div className="dev-orbit dev-orbit-one" aria-hidden />
-      <div className="dev-orbit dev-orbit-two" aria-hidden />
       <div className="theme-noise section-noise" aria-hidden />
 
       <div className="section-content content-grid py-16 md:py-24">

@@ -54,8 +54,6 @@ export function GallerySection({ lang }: { lang: Language }) {
   return (
     <section id="gallery" className="gallery-section relative min-h-[100svh] snap-child overflow-hidden border-t border-white/10">
       <GalleryVeins />
-      <div className="gallery-orbit gallery-orbit-one" aria-hidden />
-      <div className="gallery-orbit gallery-orbit-two" aria-hidden />
 
       <div className="gallery-shell relative z-10 mx-auto flex min-h-[100svh] w-full max-w-screen-xl flex-col justify-center px-5 py-24 md:px-10 lg:px-28">
         <header
