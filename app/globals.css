@@ -2516,6 +2516,54 @@ a {
 }
 .workbench-section .section-content { min-height: 100svh; align-content: center; }
 .workbench-section .gallery-kicker { margin-bottom: 4px; }
+
+/* Background: the toolpath canvas, the cutter on it, and a raking light that sweeps across the milled passes. */
+.workbench-mill { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; pointer-events: none; }
+.workbench-mill__head {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  z-index: -1;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px 2px rgba(255, 244, 226, .55), 0 0 18px 6px rgba(255, 232, 200, .12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .6s ease;
+  will-change: transform;
+}
+.workbench-mill__head.is-cutting { opacity: .85; }
+/* color-dodge brightens only what is already lit (the cut lines) and leaves the black field black. */
+.workbench-mill__light {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+}
+.workbench-mill__light::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(100deg, transparent 0%, rgba(150, 150, 150, .07) 44%, rgba(170, 170, 170, .13) 50%, rgba(150, 150, 150, .07) 56%, transparent 100%);
+  transform: translateX(-110%) skewX(-14deg);
+  animation: workbench-rake 42s cubic-bezier(.45, 0, .55, 1) infinite;
+  animation-play-state: paused;
+  will-change: transform;
+}
+.workbench-section.is-lit .workbench-mill__light::before { animation-play-state: running; }
+/* One slow pass across the plate, then a long rest in the dark. */
+@keyframes workbench-rake {
+  0% { transform: translateX(-110%) skewX(-14deg); }
+  55% { transform: translateX(290%) skewX(-14deg); }
+  100% { transform: translateX(290%) skewX(-14deg); }
+}
 .workbench-section .cards-col { width: 100%; max-width: min(980px, 92vw); }
 
 /* The cut: a chamfered opening whose bevel is dark where the light cannot reach and bright on the far edge. */
@@ -2646,5 +2694,6 @@ a {
 .workbench-legend__item--external i { border-style: dashed; }
 
 @media (prefers-reduced-motion: reduce) {
+  .workbench-mill__light::before { animation: none; }
   .workbench-row__bar, .workbench-row__body, .workbench-etching__edges path, .workbench-node > rect, .workbench-node > path { transition: none; }
 }
