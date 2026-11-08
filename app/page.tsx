@@ -11,6 +11,7 @@ import { IntroOverlay } from "./components/IntroOverlay";
 import { SiteFooter } from "./components/SiteFooter";
 import SidebarNav from "./components/SidebarNav";
 import { ThemeSection } from "./components/ThemeSection";
+import { WorkbenchSection } from "./components/WorkbenchSection";
 import { CONTENT } from "./data/content";
 import { useIntroOverlay } from "./hooks/useIntroOverlay";
 import { useMediaHub } from "./hooks/useMediaHub";
@@ -159,6 +160,7 @@ export default function Page() {
         ))}
         <DevelopmentSection lang={lang} />
         <GallerySection lang={lang} />
+        <WorkbenchSection lang={lang} />
         <BioSection lang={lang} />
       </main>
 
