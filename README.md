@@ -71,6 +71,7 @@ app/
 - **MCP**：站主用 `WORKSPACE_MCP_TOKEN`；成员可用自己的访问密钥作为 Bearer 令牌，只能看到自己的空间，也看不到邮件工具。
 - 站主在技术上能读到成员存放在 Blob 里的文件，所以只邀请信任的人。可选环境变量 `WORKSPACE_OWNER_NAME`（侧栏显示的名字，默认 Alex）。
 - 站主的会话沿用旧登录；更换 `WORKSPACE_SESSION_SECRET` 会让所有人重新登录。
+- **登录限流**：代码里对同一 IP 连续输错 5 次锁 15 分钟，但这个计数只存在单个服务器实例的内存里，冷启动或换实例就会清零，挡不住真正的暴力尝试。实际起作用的是在 Vercel Firewall 里手动配置的限流规则（不在代码里），换项目或重建时记得一起配。
 
 ## Alex Workspace · 邮件（Gmail 只读）
 
@@ -108,7 +109,7 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 
 ## Alex Workspace · Mindstreams
 
-Mindstreams 取代了原来的 Notes 标签：它是一棵页面树（保留子页面、收藏、废纸篓、搜索、导出 Markdown），而每个页面都是一篇笔记加一块与它配对的白板，两者保持同步，由 DeepSeek 互相转换。子页面本身也是完整的 Mindstream，有自己的白板（sub board）。宽屏时左边页面树、中间笔记、右边白板；窄一些的窗口和手机上顶部切换 Note / Board。白板在第一次打开页面时才会创建，所以只写笔记不会变重。词汇本、助手的笔记工具和今天面板仍然使用同一个笔记存储。早先单独创建的白板会在打开 Mindstreams 时自动在页面树里补上一页。
+Mindstreams 现在是 **Carcosa → Notebook** 分页（旧的 Mindstreams 链接会自动打开这里）。它取代了原来的 Notes 标签：它是一棵页面树（保留子页面、收藏、废纸篓、搜索、导出 Markdown），而每个页面都是一篇笔记加一块与它配对的白板，两者保持同步，由 DeepSeek 互相转换。子页面本身也是完整的 Mindstream，有自己的白板（sub board）。宽屏时左边页面树、中间笔记、右边白板；窄一些的窗口和手机上顶部切换 Note / Board。白板在第一次打开页面时才会创建，所以只写笔记不会变重。词汇本、助手的笔记工具和今天面板仍然使用同一个笔记存储。早先单独创建的白板会在打开 Mindstreams 时自动在页面树里补上一页。
 
 **白板**：无限画布，文字卡、照片、PDF 页都能摆上去，自动保存。**Scan notes** 直接拍纸质笔记（自动去阴影、提亮），**Photo** 从相册导入，**PDF** 从资料库或小文件（≤4 MB）导入页面。选中照片后点 **Read notes**：识别文字（可手动改错字），再整理成层级卡片，预览确认后才加到画布并连线。
 
@@ -122,15 +123,37 @@ Mindstreams 取代了原来的 Notes 标签：它是一棵页面树（保留子�
 
 ## Alex Workspace · Devlog
 
-各个项目的开发日志，按时间线浏览，可按项目筛选，顶部有最近 18 周的活动格。每个项目有名称、状态、颜色，以及可选的 GitHub 仓库和文件夹范围（同一个仓库里的几个项目可以用各自的文件夹区分，只统计相关提交）。
+Devlog 现在是 **Carcosa → Ledger** 分页（旧链接会自动打开这里）。各个项目的开发日志按时间线浏览，可按项目筛选，顶部有最近 18 周的活动格。每个项目有名称、状态、颜色，以及可选的 GitHub 仓库和文件夹范围。
 
-条目有四种：**手写条目**（日期、标题、Markdown 正文、最多 6 张照片），**提交摘要**（读取仓库提交，由 DeepSeek 每天归纳成一条：主题加要点，附提交列表；打开页面时若超过 6 小时没读取会自动更新，也可点同步按钮，每次最多处理最近 14 天，已处理且没变化的日子不会重复生成），**Mindstream 快照**（把某个 Mindstream 钉到某一天，点开直接跳过去），**回顾**（选择最近 30 / 90 天或全部，DeepSeek 起草一篇可编辑的项目回顾，适合放进过程文档）。自动生成的提交摘要不能直接改，想补充就在那天加一条手写条目。
+条目有四种：**手写条目**（日期、标题、Markdown 正文、最多 6 张照片），**Carcosa 的记录**（见下一节，由账本自动写，末尾标 `_Logged by Carcosa_`），**Mindstream 快照**（把某个 Mindstream 钉到某一天），**回顾**（选择最近 30 / 90 天或全部，DeepSeek 起草一篇可编辑的项目回顾）。Claude 通过 MCP 写的条目标 `_Logged by Claude_`。某一天已经有人手写或 Claude 写过，Carcosa 就不会再写。
 
-配置：公开仓库不需要任何设置；私有仓库在 Vercel 加 `GITHUB_TOKEN`（Fine-grained token，只给该仓库的 Contents 只读权限）。数据存在私有 Blob 里。
+配置：公开仓库不需要任何设置；私有仓库在 Vercel 加 `GITHUB_TOKEN`（Fine-grained token，Repository access 选需要的仓库，权限给 **Contents** 和 **Deployments** 只读）。数据存在私有 Blob 里。
+
+## Alex Workspace · Carcosa
+
+侧栏的 **Carcosa** 标签有四个分页：**Yak**（宠物本身）、**Now**（三方比对）、**Ledger**（Devlog）、**Notebook**（Mindstreams）。
+
+**账本（Now）**：把三个来源按提交号对齐，保证 Devlog 里看到的是真的。
+- 本地：Drive Sync 1.3 起每次上报会带上每个文件夹的 git 状态（当前分支、HEAD、未提交和未推送的数量）；
+- GitHub：主分支的提交，每 10 分钟随 `/api/cron/today` 读一次；
+- 生产：Vercel 写到 GitHub 的部署记录。
+
+对不上的地方会列出来（未推送、未提交、本地落后需要 pull、部署失败、生产落后、某天缺 devlog、令牌读不到某个仓库）。一个工作日从伦敦时间 05:00 算起，熬夜算前一天。安静 30 分钟后，书记员用 DeepSeek 把一天的提交写成 Devlog 条目，证据行由代码生成；同一时间只有一个书记员在写（Blob 里有一把 3 分钟的锁），所以定时任务、“check now” 和 MCP 同时触发也不会重复写。智能体的每次写入记在 `audit.json`，在 Now 页底部可见。
+
+**宠物（Yak）**：Carcosa 只吃账本里的开发记录（提交 3、同步每个文件 0.4、勾选 1、生产部署 2），六小时消化一半；在平时收工时间附近停手（+4）和宣布的休息日（+8）也算喂它。单日工作量超过平时 2 倍时会“吃撑了”。从最近 28 天学你的作息（通常几点开始、几点收工、一天多少量），据此显示阶段（吃、牦牛、菌核、睡、休息、吃撑）和天空：双日表示节律如常，黑星表示明显偏离（远超平时收工、远超平时的量、连续很多天），两者同框表示正在偏离。主题开关的“自动”模式跟着天空切换浅色和深色。
+
+**自报和校准**：每天可以记心情、精力（1–5）、睡眠和一个词，也可以宣布今天或明天休息。自报攒够后（每种情况各 3 天），会算出属于你自己的规律，比如“前一天收工晚一小时以上的日子，心情平均低 1.2”，并用这些规律调整天空。
+
+**每日一读**：一段“卡尔克萨的低语”加几句直说和一个小动作，由 DeepSeek 写，一天最多 4 次。数据流向：
+- **Gemini** 只读 Self 的日记原文，只在 Self 导入新内容并构建后写一份提炼过的报告（不含原文和人名，另给每个新写日记的日子打强度和情绪方向分）；
+- **DeepSeek** 收到的是节律、自报、最近的提交信息、`@rca.ac.uk` 学校邮件的主题和摘要（教职工只写“RCA staff”）、其他邮件的条数，以及上面那份报告；收不到日记原文；
+- 自报、报告和每日一读都存在站主自己的 Blob 文件夹里，MCP 读不到；页面上可以删除所有自报。
+
+**安全边界**：自报的那个词里出现自伤或轻生的字眼、报告标记为紧急、或模型自己判断有风险时，不写低语，直接显示一段平实的话和求助电话（Samaritans 116 123、SHOUT 85258、NHS 111、999）。
 
 ## Alex Workspace · MCP（让 Claude 管理 Workspace）
 
-`/api/mcp` 是一个 MCP 服务（Streamable HTTP），Claude Code 等客户端连上后可以读写 Workspace。读取：Mindstreams、Devlog、日历、资料库；写入只做“新增或追加”：新建 Mindstream、在笔记末尾追加、在白板上加/改卡片和连线、写 Devlog 条目和项目、添加或修改日程。**没有任何删除或覆盖类工具**。邮件默认不开放，设置 `MCP_ALLOW_MAIL=1` 才会提供只读的邮件搜索和阅读。
+`/api/mcp` 是一个 MCP 服务（Streamable HTTP），Claude Code 等客户端连上后可以读写 Workspace。读取：笔记本、Mindstreams、Devlog、日历、资料库、Carcosa 账本（`carcosa_ledger`）；写入：新建 Mindstream、在笔记末尾追加、在白板上加/改卡片和连线、写和修改 Devlog 条目和项目、添加或修改日程、让 Carcosa 立即比对并补写 Devlog（`carcosa_check`）。**站主令牌也有删除类工具**：`notebook_delete`、`mindstream_trash`（进废纸篓）、`devlog_delete_entry`、`devlog_delete_project`、`calendar_delete_event`、`library_delete`，服务端提示要求删除前先跟站主确认，除非站主明确要求。所以 `WORKSPACE_MCP_TOKEN` 泄露的后果是数据可能被删，要像密码一样保管，怀疑泄露就立即在 Vercel 换掉。Self、自报和每日一读不通过 MCP 开放。邮件默认不开放，设置 `MCP_ALLOW_MAIL=1` 才会提供只读的邮件搜索和阅读。
 
 配置：
 1. 生成一个至少 32 位的随机密钥（例如 `python3 -c "import secrets;print(secrets.token_urlsafe(40))"`）。
