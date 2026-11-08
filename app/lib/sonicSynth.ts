@@ -27,12 +27,15 @@ export class SonicSynth {
   private timer = 0;
   private nextTime = 0;
   private step = 0;
+  /** Sixteenths scheduled since the start, for loops and rolls. */
+  private count = 0;
+  private recorder: MediaRecorder | null = null;
   private lastBass = 0;
   private sends = { delay: 0.5, reverb: 0.5 };
   private scheduled: { time: number; step: number }[] = [];
   onBar: (style: SonicStyle) => void = () => {};
 
-  constructor(style: SonicStyle, private compose: (style: SonicStyle, step: number) => Hit[]) {
+  constructor(style: SonicStyle, private compose: (style: SonicStyle, step: number, count: number) => Hit[]) {
     this.style = style;
     this.context = new AudioContext({ latencyHint: "interactive" });
     const ctx = this.context;
@@ -108,11 +111,12 @@ export class SonicSynth {
         }
         if (this.step === 0) this.onBar(this.style);
         const swing = this.step % 2 === 1 ? this.style.swing * this.stepTime : 0;
-        for (const hit of this.compose(this.style, this.step)) this.play(hit, this.nextTime + swing);
+        for (const hit of this.compose(this.style, this.step, this.count)) this.play(hit, this.nextTime + swing);
         this.scheduled.push({ time: this.nextTime, step: this.step });
         if (this.scheduled.length > 32) this.scheduled.shift();
         this.nextTime += this.stepTime;
         this.step = (this.step + 1) % 16;
+        this.count += 1;
       }
     };
     pump();
@@ -166,6 +170,40 @@ export class SonicSynth {
     return age < 0 ? 0 : Math.exp(-age / 0.22);
   }
 
+  /** The next sixteenth to be scheduled, counted from the start. */
+  get nextCount() {
+    return this.count;
+  }
+
+  /** Record the mix as it is heard. Resolves with the recording when `stopRecording` is called. */
+  startRecording(): Promise<Blob> | null {
+    if (typeof MediaRecorder === "undefined" || this.recorder) return null;
+    const destination = this.context.createMediaStreamDestination();
+    this.output.connect(destination);
+    const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((t) => MediaRecorder.isTypeSupported(t));
+    const recorder = new MediaRecorder(destination.stream, type ? { mimeType: type } : undefined);
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
+    const done = new Promise<Blob>((resolve) => {
+      recorder.onstop = () => {
+        try {
+          this.output.disconnect(destination);
+        } catch {
+          // The context may already be closed.
+        }
+        resolve(new Blob(chunks, { type: recorder.mimeType }));
+      };
+    });
+    recorder.start(1000);
+    this.recorder = recorder;
+    return done;
+  }
+
+  stopRecording() {
+    this.recorder?.stop();
+    this.recorder = null;
+  }
+
   /** The sixteenth sounding now, for the step lights. */
   playhead() {
     const now = this.context.currentTime;
@@ -176,6 +214,7 @@ export class SonicSynth {
 
   stop(fade = 0.8) {
     const ctx = this.context;
+    this.stopRecording();
     window.clearInterval(this.timer);
     this.output.gain.cancelScheduledValues(ctx.currentTime);
     this.output.gain.setTargetAtTime(0, ctx.currentTime, fade / 4);

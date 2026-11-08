@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { PLAYERS, STYLES, type PlayerId, type StyleId } from "../data/sonicStyles";
+import type { PixelMode } from "../lib/sonicPerformance";
+import type { Routes } from "../lib/sonicPlayers";
 
 /**
  * The DJ deck of alexsonicLAb, drawn as a real grid of monospace characters with box-drawing borders. The style
@@ -17,6 +19,33 @@ export type DeckState = {
   solos: PlayerId[];
   delay: number;
   reverb: number;
+  /** Which source each player reads: its own by default, rewired for a remix. */
+  routes: Routes;
+};
+
+/** Live performance state that is not part of a saved setup. */
+export type PerformState = {
+  hold: boolean;
+  loopBars: number;
+  roll: number;
+  pixel: PixelMode;
+  carved: number;
+  recording: boolean;
+  take: { audio: boolean; link: boolean } | null;
+  replay: "ready" | "playing" | null;
+};
+
+export type PerformActions = {
+  onHold: () => void;
+  onLoopBars: (bars: number) => void;
+  onRoll: (sixteenths: number) => void;
+  onPixel: (mode: PixelMode) => void;
+  onClearCarve: () => void;
+  onRecord: () => void;
+  onSaveAudio: () => void;
+  onCopyLink: () => Promise<boolean>;
+  onPoster: () => void;
+  onRoute: (player: PlayerId) => void;
 };
 
 type DeckProps = {
@@ -35,18 +64,31 @@ type DeckProps = {
   status: { label: string; y: number; height: number; percent: number; section: string };
   powered: boolean;
   onEnter: () => void;
+  perform: PerformState;
+  actions: PerformActions;
+  build: string;
 };
 
-type Cell = { text: string; className?: string; title?: string; onClick?: () => void; fader?: { player: PlayerId; level: number }; live?: string };
+type Cell = {
+  text: string;
+  className?: string;
+  title?: string;
+  onClick?: () => void;
+  /** Keys that act while held down, like a roll. */
+  hold?: { down: () => void; up: () => void };
+  fader?: { player: PlayerId; level: number };
+  live?: string;
+};
 
 const FADER_ROWS = 5;
 const pad = (text: string, width: number) => (text.length >= width ? text.slice(0, width) : text + " ".repeat(width - text.length));
 
-export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSends, onShare, registerLive, scopeRef, status, powered, onEnter }: DeckProps) {
+export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSends, onShare, registerLive, scopeRef, status, powered, onEnter, perform, actions, build }: DeckProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const probeRef = useRef<HTMLSpanElement | null>(null);
   const [cols, setCols] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const dragging = useRef<PlayerId | null>(null);
 
   // How many characters fit across: the deck is laid out in whole characters.
@@ -69,6 +111,12 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
     window.addEventListener("pointerup", stop);
     return () => window.removeEventListener("pointerup", stop);
   }, []);
+
+  const copyLink = async () => {
+    const ok = await actions.onCopyLink();
+    setLinkCopied(ok);
+    window.setTimeout(() => setLinkCopied(false), 1600);
+  };
 
   const share = async () => {
     const ok = await onShare();
@@ -98,6 +146,34 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
   const muted = (player: PlayerId) => state.mutes.includes(player) || (state.solos.length > 0 && !state.solos.includes(player));
   const enterKey: Cell = { text: powered ? "[ENTER HERE ↵]" : "[ENTER SILENTLY ↵]", className: "is-key", title: "Go to the portfolio, where the read head is", onClick: onEnter };
   const sound: Cell = { text: powered ? "● SOUND" : "○ CLICK FOR SOUND", className: powered ? "is-meter" : "is-blink" };
+  const press = (label: string, on: boolean, onClick: () => void, title?: string): Cell => ({ text: label, className: on ? "is-on" : "is-key", onClick, title });
+  const loopCells: Cell[] = [
+    text(" LOOP ", "is-dim"),
+    press("[HOLD]", perform.hold, actions.onHold, "Hold the last bars as a loop (H); scroll scrubs inside it"),
+    text(" "),
+    ...[1, 2, 4, 8].flatMap((bars) => [press(`[${bars}]`, perform.loopBars === bars, () => actions.onLoopBars(bars), `${bars} bar loop`), text(" ")]),
+    text("  ROLL ", "is-dim"),
+    ...([[4, "1/4", "Z"], [2, "1/8", "X"], [1, "1/16", "C"]] as const).flatMap(([steps, label, k]) => [
+      { text: `[${label}]`, className: perform.roll === steps ? "is-on" : "is-key", title: `Hold to repeat ${label} (${k})`, hold: { down: () => actions.onRoll(steps), up: () => actions.onRoll(0) } },
+      text(" "),
+    ]),
+    text(perform.hold ? "  SCROLL SCRUBS THE LOOP" : "", "is-blink"),
+  ];
+  const pixelCells: Cell[] = [
+    text(" PIXEL ", "is-dim"),
+    ...(["normal", "sort", "melt"] as const).flatMap((mode) => [press(`[${mode.toUpperCase()}]`, perform.pixel === mode, () => actions.onPixel(mode), `Pixel ${mode} (P cycles)`), text(" ")]),
+    text("  CARVE ", "is-dim"),
+    text(perform.carved ? `${perform.carved} cols ` : "click the axis ", perform.carved ? "is-bright" : "is-dim"),
+    ...(perform.carved ? [press("[CLEAR]", false, actions.onClearCarve), text(" ")] : []),
+  ];
+  const takeCells: Cell[] = [
+    press(perform.recording ? "[■ STOP]" : "[● REC]", perform.recording, actions.onRecord, "Record the sound and the performance"),
+    text(" "),
+    ...(perform.take?.audio ? [press("[AUDIO ↓]", false, actions.onSaveAudio, "Save the recording"), text(" ")] : []),
+    ...(perform.take?.link ? [{ text: linkCopied ? "[COPIED]" : "[LINK ⧉]", className: "is-key", title: "Copy a link that replays this performance", onClick: () => void copyLink() }, text(" ")] : []),
+    press("[POSTER ↓]", false, actions.onPoster, "Save the scan as a pixel-sorted image"),
+    text(" "),
+  ];
 
   if (cols >= 96) {
     // Six columns: five players and the master.
@@ -116,7 +192,7 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
     const bar = (value: number, cells: number, set: (v: number) => void): Cell[] =>
       Array.from({ length: cells }, (_, k) => ({ text: k < Math.round(value * cells) ? "█" : "░", className: "is-bar", onClick: () => set((k + 1) / cells) }));
 
-    const title = " alexsonicLAb · DECK ";
+    const title = ` alexsonicLAb · DECK · build ${build} `;
     lines.push([text("┌─" + title + "─".repeat(Math.max(0, cols - 3 - title.length)) + "┐", "is-frame")]);
     lines.push(row(
       [
@@ -131,10 +207,16 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
     lines.push({ scope: 3 });
     lines.push([text("├" + "─".repeat(Math.max(0, cols - 2)) + "┤", "is-frame")]);
     lines.push(row([text(" STYLE ", "is-dim"), ...styleKeys()], [text(`${bpm} BPM `, "is-bright")]));
+    lines.push(row(loopCells));
+    lines.push(row(pixelCells, takeCells));
     lines.push([rule("├", "┬", "┤")]);
     lines.push(columns((i) => (i < 5 ? [text(" " + PLAYERS[i].name, muted(PLAYERS[i].id) ? "is-dim" : "is-bright")] : [text(" MASTER", "is-bright")])));
     lines.push(columns((i) => (i < 5
-      ? [text(` ${PLAYERS[i].reads}→${PLAYERS[i].plays}`, "is-dim")]
+      ? [
+          text(" "),
+          { text: `[${state.routes[PLAYERS[i].id]}]`, className: state.routes[PLAYERS[i].id] === PLAYERS[i].reads ? "is-key" : "is-on", title: "Click to rewire what this player reads", onClick: () => actions.onRoute(PLAYERS[i].id) },
+          text(`→${PLAYERS[i].plays}`, "is-dim"),
+        ]
       : [text(" FILTER ", "is-dim"), { text: pad("", Math.max(4, inner(i) - 9)), live: "filter", className: "is-meter" }])));
     for (let r = 0; r < FADER_ROWS; r += 1) {
       const threshold = (FADER_ROWS - r) / FADER_ROWS;
@@ -190,6 +272,15 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
       players.push(cell, text(" "));
     }
     if (players.length) lines.push(row(players));
+    lines.push(row([
+      press("[HOLD]", perform.hold, actions.onHold),
+      text(" "),
+      { text: "[ROLL]", className: perform.roll ? "is-on" : "is-key", hold: { down: () => actions.onRoll(2), up: () => actions.onRoll(0) } },
+      text(" "),
+      press(`[${perform.pixel.toUpperCase()}]`, perform.pixel !== "normal", () => actions.onPixel(perform.pixel === "normal" ? "sort" : perform.pixel === "sort" ? "melt" : "normal")),
+      text(" "),
+      press(perform.recording ? "[■]" : "[●]", perform.recording, actions.onRecord),
+    ]));
     lines.push([text("└" + "─".repeat(Math.max(0, cols - 2)) + "┘", "is-frame")]);
   }
 
@@ -215,6 +306,25 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
         >
           {cell.text}
         </span>
+      );
+    }
+    if (cell.hold) {
+      const { down, up } = cell.hold;
+      return (
+        <button
+          key={key}
+          type="button"
+          className={cell.className}
+          title={cell.title}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            down();
+          }}
+          onPointerUp={up}
+          onPointerLeave={up}
+        >
+          {cell.text}
+        </button>
       );
     }
     if (cell.onClick) {
