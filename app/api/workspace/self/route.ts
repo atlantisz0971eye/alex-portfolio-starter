@@ -1,8 +1,10 @@
+import { after } from "next/server";
 import { calendarGuard } from "../../../lib/calendarGuard";
+import { refreshSelfReport } from "../../../lib/carcosa/selfReport";
 import { GeminiError } from "../../../lib/gemini";
 import { analyzeSome, buildSelf, hideConcept } from "../../../lib/selfGraph";
 import { SelfError, importPieces, readPieces, readSelf, wipeSelf } from "../../../lib/selfStore";
-import { currentUser } from "../../../lib/workspaceScope";
+import { currentUser, runAs } from "../../../lib/workspaceScope";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -53,7 +55,12 @@ export async function POST(request: Request) {
   try {
     if (body.action === "import") return Response.json(await importPieces(body.pieces));
     if (body.action === "analyze") return Response.json(await analyzeSome(3));
-    if (body.action === "build") { const graph = await buildSelf(); return Response.json({ nodes: graph.nodes.length, edges: graph.edges.length }); }
+    if (body.action === "build") {
+      const graph = await buildSelf();
+      // new writing has been read: Carcosa's report is written again, after the response, and only if something is new
+      if (user.role === "owner") after(() => runAs(user, refreshSelfReport).catch(() => undefined));
+      return Response.json({ nodes: graph.nodes.length, edges: graph.edges.length });
+    }
     if (body.action === "hide" && typeof body.id === "string") { const graph = await hideConcept(body.id.slice(0, 80)); return Response.json({ nodes: graph.nodes.length }); }
     if (body.action === "wipe") { await wipeSelf(); return Response.json({ ok: true }); }
     return Response.json({ error: "invalid_request" }, { status: 400 });

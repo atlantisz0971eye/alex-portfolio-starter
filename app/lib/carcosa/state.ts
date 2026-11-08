@@ -3,7 +3,10 @@ import { organizeLater } from "../mindOrganize";
 import { addMindEntry } from "../mindStore";
 import { quickDeepSeek } from "../workspaceDeepSeek";
 import { currentUser, scopeRoot } from "../workspaceScope";
+import { readNotes, type DayNote } from "./checkins";
 import { creatureView, type CreatureView } from "./creature";
+import { readReading, type Reading } from "./reading";
+import { readSelfReport } from "./selfReport";
 
 /**
  * What the Carcosa page reads: the creature, computed from the owner's development ledger, and the day's dream. Members
@@ -24,15 +27,26 @@ const writeState = async (state: State) => put(await path(), JSON.stringify(stat
 const clip = (value: string, max: number) => [...value.replace(/\s+/g, " ").trim()].slice(0, max).join("");
 const today = () => new Date().toISOString().slice(0, 10);
 
-const RESTING: CreatureView = { phase: "sleeping", sky: "suns", theme: "dark", satiety: 0, lastFedAt: null, routine: { hours: Array(24).fill(0), start: null, end: null, days: 0, medianLoad: 0 }, today: { day: today(), load: 0, firstAt: null, lastAt: null }, streak: 0, signals: [], bites: [], learning: true };
+const RESTING: CreatureView = { phase: "sleeping", sky: "suns", theme: "dark", satiety: 0, lastFedAt: null, routine: { hours: Array(24).fill(0), start: null, end: null, days: 0, medianLoad: 0 }, today: { day: today(), load: 0, firstAt: null, lastAt: null, rest: false }, streak: 0, suggestRest: false, signals: [], bites: [], learning: true, findings: [], checkins: 0 };
 
 async function creature() {
-  return (await currentUser()).role === "owner" ? creatureView() : RESTING;
+  if ((await currentUser()).role !== "owner") return RESTING;
+  const report = await readSelfReport().catch(() => null);
+  return creatureView({ journal: report?.journal });
 }
 
 export async function carcosaView() {
-  const [view, state] = await Promise.all([creature(), readState()]);
-  return { ...view, dream: state.dream?.date === today() ? state.dream.text : null };
+  const [view, state, notes, reading, report] = await Promise.all([creature(), readState(), readNotes().catch(() => ({} as Record<string, DayNote>)), readReading().catch((): Reading | null => null), readSelfReport().catch(() => null)]);
+  const tomorrow = new Date(Date.parse(`${view.today.day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  return {
+    ...view,
+    dream: state.dream?.date === today() ? state.dream.text : null,
+    checkin: notes[view.today.day] ?? null,
+    restTomorrow: !!notes[tomorrow]?.rest,
+    reading: reading?.day === view.today.day ? reading : null,
+    // only when it was written and how far it reaches; the report itself stays on the server
+    report: report ? { generatedAt: report.generatedAt, to: report.range[1], wroteLately: report.journal.filter((j) => j.day >= new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)).length } : null,
+  };
 }
 
 const DREAM = `你是 Carcosa：一团住在开发者工作区里的黏菌，吃饱了会长成一只小牦牛，披着破旧的黄色斗篷，额头推着一张苍白的面具。你吃的是主人今天的开发记录：同步的文件、提交、部署。此刻你趴着反刍。
