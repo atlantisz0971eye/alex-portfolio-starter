@@ -1,6 +1,7 @@
 import { readEntries, readProjects, saveEntry } from "../devlogStore";
 import { quickDeepSeek } from "../workspaceDeepSeek";
-import { audit, ledgerView, londonTime, readLedgerJson, workDay, writeLedgerJson, type DayRow } from "./ledger";
+import { updateJson, withLease } from "../blobJson";
+import { audit, ledgerPath, ledgerView, londonTime, readLedgerJson, workDay, type DayRow } from "./ledger";
 
 /**
  * Carcosa's scribe: writes the devlog from the ledger, so what you see there matches what was really committed and
@@ -32,6 +33,12 @@ function evidence(r: DayRow) {
 
 /** Writes or refreshes devlog entries for recent work days (or, with `dry`, returns what it would write). At most `maxCalls` model calls per run. Needs the owner's scope. */
 export async function writeDevlog(maxCalls = 3, dry = false) {
+  if (dry) return scribe(maxCalls, true);
+  // the cron, "check now" and MCP may all ask at once; only one writes, or the same day would be logged twice
+  return (await withLease(ledgerPath("scribe.lock"), 3 * 60_000, () => scribe(maxCalls, false))) ?? { written: [] as string[], drafts: [] };
+}
+
+async function scribe(maxCalls: number, dry: boolean) {
   const [view, projects, entries, book] = await Promise.all([ledgerView(4), readProjects(), readEntries(), readLedgerJson<Book>("scribe.json", {})]);
   const today = workDay(Date.now());
   let calls = 0;
@@ -83,7 +90,7 @@ export async function writeDevlog(maxCalls = 3, dry = false) {
   }
 
   if (written.length) {
-    await writeLedgerJson("scribe.json", book);
+    await updateJson<Book>(ledgerPath("scribe.json"), {}, (current) => ({ ...current, ...book }));
     await audit("carcosa-scribe", "devlog", `wrote ${written.join(", ")}`);
   }
   return { written, drafts };

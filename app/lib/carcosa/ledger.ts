@@ -1,4 +1,5 @@
-import { get, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { readJsonSafe, updateJson } from "../blobJson";
 import { readEntries, readProjects } from "../devlogStore";
 import { listDevices, type SyncDevice } from "../syncStore";
 
@@ -26,26 +27,7 @@ export const calendarDay = (ms: number) => dayFormat.format(new Date(ms));
 const timeFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false });
 export const londonTime = (ms: number) => timeFormat.format(new Date(ms));
 
-/**
- * A missing file is the fallback; any other failure is retried and then thrown. Reading a month as empty because of a
- * passing network error would drop days from the routine, and appending to it would overwrite the month.
- */
-async function readJson<T>(path: string, fallback: T): Promise<T> {
-  let last: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const result = await get(ROOT + path, { access: "private", useCache: false });
-      if (!result) return fallback;
-      if (result.statusCode === 200) return JSON.parse(await new Response(result.stream).text()) as T;
-      last = new Error(`blob_${result.statusCode}`);
-    } catch (error) {
-      if (error instanceof Error && /not.?found/i.test(`${error.name} ${error.message}`)) return fallback;
-      last = error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
-  }
-  throw last instanceof Error ? last : new Error("ledger_read_failed");
-}
+const readJson = <T>(path: string, fallback: T) => readJsonSafe<T>(ROOT + path, fallback);
 const writeJson = (path: string, value: unknown) => put(ROOT + path, JSON.stringify(value), { access: "private", allowOverwrite: true, contentType: "application/json" });
 
 const keyOf = (e: LedgerEvent) => e.kind === "commit" ? `commit|${e.repo}|${e.sha}` : e.kind === "deploy" ? `deploy|${e.repo}|${e.id}|${e.state}` : e.kind === "head" ? `head|${e.source}|${e.sha}` : `${e.kind}|${e.source}|${e.at}`;
@@ -56,10 +38,12 @@ export async function appendEvents(events: LedgerEvent[]) {
   const byMonth = new Map<string, LedgerEvent[]>();
   for (const e of events) byMonth.set(monthOf(e.at), [...(byMonth.get(monthOf(e.at)) ?? []), e]);
   for (const [month, fresh] of byMonth) {
-    const current = await readJson<LedgerEvent[]>(`events/${month}.json`, []);
-    const seen = new Set(current.map(keyOf));
-    const added = fresh.filter((e) => !seen.has(keyOf(e)) && (seen.add(keyOf(e)), true));
-    if (added.length) await writeJson(`events/${month}.json`, [...current, ...added].sort((a, b) => a.at.localeCompare(b.at)));
+    // written only if no one else appended in between; otherwise read again and add once more
+    await updateJson<LedgerEvent[]>(ROOT + `events/${month}.json`, [], (current) => {
+      const seen = new Set(current.map(keyOf));
+      const added = fresh.filter((e) => !seen.has(keyOf(e)) && (seen.add(keyOf(e)), true));
+      return added.length ? [...current, ...added].sort((a, b) => a.at.localeCompare(b.at)) : undefined;
+    });
   }
 }
 
@@ -152,7 +136,8 @@ export async function pollRepos(force = false) {
   }
   if (events.length) await appendEvents(events);
   state.polledAt = Date.now();
-  await writeJson("poll.json", state);
+  // a poll that ran at the same time keeps the repositories this one did not reach
+  await updateJson<PollState>(ROOT + "poll.json", { polledAt: 0, repos: {} }, (current) => ({ polledAt: state.polledAt, repos: { ...current.repos, ...state.repos } }));
   return state;
 }
 
@@ -205,6 +190,8 @@ export async function ledgerView(days = 14) {
     r.devlog = entries.some((e) => ids.has(e.projectId) && (e.date === r.day || e.date === r.date));
   }
 
+  const commitAt = new Map(events.filter((e): e is Extract<LedgerEvent, { kind: "commit" }> => e.kind === "commit").map((e) => [`${e.repo}|${e.sha}`, e.at]));
+  const olderOnMain = (repo: string, sha: string, main: string) => { const a = commitAt.get(`${repo}|${sha}`); const b = commitAt.get(`${repo}|${main}`); return !!a && (!b || a < b); };
   const repos = new Set<string>([...Object.keys(poll.repos), ...folderRepo.values()]);
   const alignment: Alignment[] = [];
   const issues: Issue[] = [];
@@ -223,7 +210,9 @@ export async function ledgerView(days = 14) {
     if (err) issues.push({ repo, kind: "unreadable", text: err === "no_access" ? `${name}：GitHub 令牌读不到这个仓库，提交和部署都看不到` : err === "rate_limited" ? `${name}：GitHub 请求次数暂时用完，稍后会再读` : `${name}：上次读取 GitHub 失败` });
     if (local?.ahead) issues.push({ repo, kind: "unpushed", text: `${name}：本地有 ${local.ahead} 个提交还没推送` });
     // the checkout is on a commit GitHub's default branch has moved past (pulled nothing since), and has nothing of its own to push
-    else if (local && main && ["main", "master"].includes(local.branch) && local.head !== main && !local.ahead) issues.push({ repo, kind: "behind", text: `${name}：本地停在 ${short(local.head)}，GitHub 已到 ${short(main)}，需要 pull` });
+    // only when the checked-out commit is one GitHub already had before main moved on; a commit GitHub has not been
+    // read for yet (pushed in the last ten minutes) is newer, not behind
+    else if (local && main && ["main", "master"].includes(local.branch) && local.head !== main && !local.ahead && olderOnMain(repo, local.head, main)) issues.push({ repo, kind: "behind", text: `${name}：本地停在 ${short(local.head)}，GitHub 已到 ${short(main)}，需要 pull` });
     if (local?.dirty) issues.push({ repo, kind: "uncommitted", text: `${name}：${local.dirty} 个文件改了还没提交` });
     if (last && (last.state === "failure" || last.state === "error")) issues.push({ repo, kind: "deploy_failed", text: `${name}：最近一次生产部署失败（${short(last.sha)}）` });
     else if (last && !FINAL.has(last.state)) issues.push({ repo, kind: "deploying", text: `${name}：${short(last.sha)} 正在部署` });
@@ -246,8 +235,9 @@ export async function ledgerView(days = 14) {
 
 export type AuditRow = { at: string; actor: string; action: string; detail: string };
 export async function audit(actor: string, action: string, detail: string) {
-  const rows = await readJson<AuditRow[]>("audit.json", []);
-  await writeJson("audit.json", [{ at: new Date().toISOString(), actor, action, detail: detail.slice(0, 300) }, ...rows].slice(0, 200));
+  await updateJson<AuditRow[]>(ROOT + "audit.json", [], (rows) => [{ at: new Date().toISOString(), actor, action, detail: detail.slice(0, 300) }, ...rows].slice(0, 200));
 }
 export const readAudit = () => readJson<AuditRow[]>("audit.json", []);
 export { readJson as readLedgerJson, writeJson as writeLedgerJson };
+/** Where a ledger file lives, for callers that update it with the safe helpers. */
+export const ledgerPath = (path: string) => ROOT + path;
