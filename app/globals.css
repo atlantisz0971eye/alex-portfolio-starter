@@ -2585,6 +2585,17 @@ a {
 @media (max-width: 640px) { .workbench-row__body-inner { padding-left: 4px; } }
 
 .workbench-row__floor { padding: 10px 0 4px; }
+.workbench-row__views { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.workbench-row__views button {
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: rgba(255,255,255,.45);
+  transition: color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.workbench-row__views button:hover { color: rgba(255,255,255,.8); }
+.workbench-row__views button.is-active { color: #fff; background: rgba(0,0,0,.45); box-shadow: inset 0 1px 2px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.06); }
 .workbench-etching { display: block; width: 100%; max-width: 820px; height: auto; overflow: visible; filter: drop-shadow(0 1px 0 rgba(255,255,255,.07)) drop-shadow(0 -1px 0 rgba(0,0,0,.9)); }
 @media (max-width: 640px) {
   .workbench-row__floor { overflow-x: auto; margin-inline: -4px; padding-inline: 4px; }

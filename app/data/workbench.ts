@@ -27,8 +27,15 @@ export type WorkbenchProject = {
   workSlug?: string;
   stack: string[];
   copy: Record<Language, WorkbenchCopy>;
-  diagram: WorkbenchDiagram;
-};
+} & (
+  | { diagram: WorkbenchDiagram; views?: never }
+  /** Several diagrams for one project, switched by tabs, when it has more than one system worth drawing. */
+  | { views: WorkbenchView[]; diagram?: never }
+);
+export type WorkbenchView = { label: Record<Language, string>; diagram: WorkbenchDiagram };
+/** Every diagram a project draws, in tab order. */
+export const projectViews = (project: WorkbenchProject): WorkbenchView[] =>
+  project.views ?? [{ label: { en: project.title, zh: project.title }, diagram: project.diagram }];
 
 type WorkbenchContent = {
   kicker: string;
@@ -91,37 +98,76 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     repo: "night-8looming-jasmine",
     href: "https://night-8looming-jasmine.vercel.app/web/",
     hrefKind: "visit",
-    stack: ["MapLibre", "Vercel functions", "DeepSeek", "ElevenLabs", "React Three Fiber"],
+    stack: ["Growing Neural Gas", "Node daemon", "MapLibre", "Vercel functions", "DeepSeek", "ElevenLabs", "React Three Fiber"],
     copy: {
-      en: { status: "Running prototype", summary: "Yasmine walks the map naming the places she passes; a mind daemon learns from place facts, gets hungry and dreams, and Jasmine can only change her world." },
-      zh: { status: "可运行原型", summary: "Yasmine 在地图上走，说出经过的地点；后台心智靠地点事实学习、会饿、会做梦，Jasmine 只能改变她的世界。" },
+      en: { status: "Running prototype", summary: "Two characters. Yasmine is a small mind that learns on the CPU: she walks the real map, is fed Wikipedia facts, grows concepts, forgets, gets hungry and dreams. Jasmine is her twin and narrator: she sees all of Yasmine, talks with you, and can change only her world." },
+      zh: { status: "可运行原型", summary: "两个角色。Yasmine 是在 CPU 上真正学习的小心智：她在真实地图上走，被喂 Wikipedia 事实，长出概念、会遗忘、会饿、会做梦。Jasmine 是她的双生和叙述者：看得见 Yasmine 的一切，能和你对话，但只能改变她的世界。" },
     },
-    diagram: {
-      nodes: [
-        { id: "tiles", label: "OpenFreeMap", sub: "OSM vector tiles", kind: "external", col: 0, row: 0 },
-        { id: "listener", label: "Listener", sub: "phone · GPS", kind: "actor", col: 0, row: 1 },
-        { id: "phone", label: "Phone page", sub: "map · heat · guide", kind: "app", col: 1, row: 0 },
-        { id: "stage", label: "Exhibition stage", sub: "body · camera", kind: "app", col: 1, row: 2 },
-        { id: "narrate", label: "/api/narrate", sub: "one stream of speech", kind: "app", col: 2, row: 0 },
-        { id: "knowledge", label: "/api/knowledge", sub: "facts · filter", kind: "app", col: 2, row: 1 },
-        { id: "mind", label: "Mind daemon", sub: "hunger · affect · dream", kind: "app", col: 2, row: 2 },
-        { id: "deepseek", label: "DeepSeek", sub: "narration", kind: "external", col: 3, row: 0 },
-        { id: "wiki", label: "Wikipedia", sub: "Wikidata · place facts", kind: "external", col: 3, row: 1 },
-        { id: "jasmine", label: "Jasmine", sub: "changes her world", kind: "actor", col: 3, row: 2 },
-      ],
-      edges: [
-        { from: "tiles", to: "phone" },
-        { from: "listener", to: "phone" },
-        { from: "listener", to: "stage" },
-        { from: "phone", to: "narrate" },
-        { from: "narrate", to: "deepseek" },
-        { from: "narrate", to: "knowledge" },
-        { from: "knowledge", to: "wiki" },
-        { from: "stage", to: "mind" },
-        { from: "mind", to: "knowledge", dashed: true },
-        { from: "jasmine", to: "mind" },
-      ],
-    },
+    views: [
+      {
+        label: { en: "Yasmine · the mind", zh: "Yasmine · 心智" },
+        diagram: {
+          nodes: [
+            { id: "wiki", label: "Wikipedia", sub: "any language · Wikidata", kind: "external", col: 0, row: 0 },
+            { id: "walk", label: "Her walk", sub: "heat · hunger · food sense", kind: "actor", col: 0, row: 1 },
+            { id: "senses", label: "Senses", sub: "simulated · ESP later", kind: "actor", col: 0, row: 2 },
+            { id: "api", label: "/api/knowledge", sub: "one fact a window", kind: "app", col: 1, row: 0 },
+            { id: "predictor", label: "Predictor", sub: "guesses the next senses", kind: "app", col: 1, row: 2 },
+            { id: "known", label: "Knowledge", sub: "counts only new facts", kind: "store", col: 2, row: 0 },
+            { id: "gng", label: "Growing Neural Gas", sub: "concepts · associations", kind: "app", col: 2, row: 1 },
+            { id: "recall", label: "Recall · forgetting", sub: "attention · dreams", kind: "app", col: 2, row: 2 },
+            { id: "parent", label: "Parent", sub: "DeepSeek · numbers only", kind: "external", col: 3, row: 0 },
+            { id: "affect", label: "Affect", sub: "feeling · mood · hunger", kind: "app", col: 3, row: 1 },
+            { id: "body", label: "Body", sub: "flesh → walking figure", kind: "app", col: 4, row: 1 },
+            { id: "rows", label: "Memory rows", sub: "daemon state · rows.csv", kind: "store", col: 4, row: 2 },
+          ],
+          edges: [
+            { from: "wiki", to: "api" },
+            { from: "walk", to: "api" },
+            { from: "api", to: "known" },
+            { from: "api", to: "gng" },
+            { from: "senses", to: "predictor" },
+            { from: "predictor", to: "affect" },
+            { from: "known", to: "affect" },
+            { from: "gng", to: "affect" },
+            { from: "gng", to: "recall" },
+            { from: "affect", to: "parent", dashed: true },
+            { from: "affect", to: "body" },
+            { from: "affect", to: "rows" },
+          ],
+        },
+      },
+      {
+        label: { en: "Jasmine · the voice", zh: "Jasmine · 声音" },
+        diagram: {
+          nodes: [
+            { id: "tiles", label: "OpenFreeMap", sub: "OSM vector tiles", kind: "external", col: 0, row: 0 },
+            { id: "listener", label: "Listener", sub: "phone · GPS", kind: "actor", col: 0, row: 1 },
+            { id: "visitor", label: "Visitor", sub: "voice or text", kind: "actor", col: 0, row: 2 },
+            { id: "phone", label: "Phone page", sub: "map · heat · trace", kind: "app", col: 1, row: 0 },
+            { id: "twin", label: "Twin packet", sub: "all of Yasmine", kind: "app", col: 1, row: 2 },
+            { id: "narrate", label: "/api/narrate", sub: "one stream of speech", kind: "app", col: 2, row: 0 },
+            { id: "knowledge", label: "/api/knowledge", sub: "place facts · filter", kind: "app", col: 2, row: 1 },
+            { id: "agent", label: "Jasmine agent", sub: "answers · ElevenLabs", kind: "app", col: 2, row: 2 },
+            { id: "deepseek", label: "DeepSeek", sub: "language model", kind: "external", col: 3, row: 0 },
+            { id: "wikipedia", label: "Wikipedia", sub: "place facts", kind: "external", col: 3, row: 1 },
+            { id: "world", label: "Yasmine's world", sub: "place · food · light · rain", kind: "app", col: 3, row: 2 },
+          ],
+          edges: [
+            { from: "tiles", to: "phone" },
+            { from: "listener", to: "phone" },
+            { from: "phone", to: "narrate" },
+            { from: "narrate", to: "deepseek" },
+            { from: "narrate", to: "knowledge" },
+            { from: "knowledge", to: "wikipedia" },
+            { from: "visitor", to: "twin" },
+            { from: "twin", to: "agent" },
+            { from: "agent", to: "deepseek" },
+            { from: "agent", to: "world" },
+          ],
+        },
+      },
+    ],
   },
   {
     slug: "tryin",
