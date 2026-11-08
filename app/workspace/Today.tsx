@@ -40,9 +40,6 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   const [local, setLocal] = useState<Record<number, Status>>({});
   const [open, setOpen] = useState<MailItem | null>(null);
   // The front page is off until the viewer turns it on, and a hidden one is never fetched, so it costs nothing.
-  const [paper, setPaper] = useState(false);
-  useEffect(() => { try { setPaper(localStorage.getItem("ws-front-page") === "on"); } catch { /* off */ } }, []);
-  const togglePaper = () => setPaper((current) => { const next = !current; try { localStorage.setItem("ws-front-page", next ? "on" : "off"); } catch { /* per-viewer convenience only */ } return next; });
 
   const load = useCallback(async () => {
     try {
@@ -59,7 +56,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
 
   const plan = view?.plan ?? null;
   // a plan that has been on screen for a few seconds has been read
-  const { eatKind, items: hot } = useCarcosa();
+  const { eatKind, items: hot, paperOn: paper, togglePaper } = useCarcosa();
   const hotPlan = hot.some((item) => item.kind === "plan" && !item.eaten);
   useEffect(() => {
     if (!plan || !hotPlan) return;

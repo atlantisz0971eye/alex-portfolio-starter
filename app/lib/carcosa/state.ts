@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { readEntries } from "../devlogStore";
 import { organizeLater } from "../mindOrganize";
 import { addMindEntry } from "../mindStore";
-import { readEdition } from "../newsEdition";
+import { ensureEdition, readEdition } from "../newsEdition";
 import { hotMail, readPlan } from "../today";
 import { quickDeepSeek } from "../workspaceDeepSeek";
 import { currentUser, runAs, scopeRoot } from "../workspaceScope";
@@ -15,6 +15,8 @@ import { currentUser, runAs, scopeRoot } from "../workspaceScope";
  */
 export type HotKind = "mail" | "news" | "plan" | "devlog";
 export type HotItem = { id: string; kind: HotKind; title: string; arrived: number };
+/** Items that were already read somewhere else when they were gathered (mail opened in Gmail itself). */
+type Gathered = { items: HotItem[]; readElsewhere: string[] };
 type Dream = { date: string; text: string; at: string };
 type State = { checkedAt: number; items: HotItem[]; eaten: Record<string, number>; dream?: Dream };
 
@@ -34,7 +36,7 @@ const writeState = async (state: State) => put(await path(), JSON.stringify(stat
 const clip = (value: string, max: number) => [...value.replace(/\s+/g, " ").trim()].slice(0, max).join("");
 
 /** Everything that arrived in the last day and a half, from each source; a source that fails is skipped. */
-async function gather(): Promise<HotItem[]> {
+async function gather(): Promise<Gathered> {
   const since = Date.now() - WINDOW_MS;
   const [mail, edition, plan, entries] = await Promise.all([
     hotMail().catch(() => []),
@@ -43,20 +45,32 @@ async function gather(): Promise<HotItem[]> {
     readEntries().catch(() => []),
   ]);
   const items: HotItem[] = [];
-  for (const m of mail) if (m.date >= since) items.push({ id: `mail:${m.account}:${m.id}`, kind: "mail", title: clip(m.subject || "(no subject)", 120), arrived: m.date });
+  const readElsewhere: string[] = [];
+  for (const m of mail) {
+    if (m.date < since) continue;
+    const id = `mail:${m.account}:${m.id}`;
+    items.push({ id, kind: "mail", title: clip(m.subject || "(no subject)", 120), arrived: m.date });
+    // a message that is no longer unread in Gmail has been read; it does not matter where
+    if (!m.unread) readElsewhere.push(id);
+  }
   if (edition && Date.parse(edition.generatedAt) >= since) {
     for (const section of edition.sections) for (const item of section.items) items.push({ id: `news:${item.url}`, kind: "news", title: clip(item.zh || item.title, 120), arrived: Date.parse(edition.generatedAt) });
   }
   if (plan && Date.parse(plan.generatedAt) >= since) items.push({ id: `plan:${plan.generatedAt}`, kind: "plan", title: "今天的计划", arrived: Date.parse(plan.generatedAt) });
-  for (const e of entries) { const at = Date.parse(e.createdAt); if (at >= since) items.push({ id: `devlog:${e.id}`, kind: "devlog", title: clip(e.title || e.body, 120), arrived: at }); }
-  return items.sort((a, b) => b.arrived - a.arrived).slice(0, 80);
+  for (const e of entries) {
+    const at = Date.parse(e.createdAt);
+    // what Claude logged about its own work is not new information for the reader
+    if (at >= since && !/Logged by Claude/.test(e.body)) items.push({ id: `devlog:${e.id}`, kind: "devlog", title: clip(e.title || e.body, 120), arrived: at });
+  }
+  return { items: items.sort((a, b) => b.arrived - a.arrived).slice(0, 80), readElsewhere };
 }
 
 async function refresh() {
   const state = await readState();
-  const items = await gather();
+  const { items, readElsewhere } = await gather();
   const keep = new Set(items.map((i) => i.id));
   const eaten = Object.fromEntries(Object.entries(state.eaten).filter(([id]) => keep.has(id)));
+  for (const id of readElsewhere) eaten[id] ??= Date.now();
   const next = { ...state, checkedAt: Date.now(), items, eaten };
   await writeState(next);
   return next;
@@ -65,6 +79,8 @@ async function refresh() {
 let refreshing = false;
 /** What the page shows. A stale list is returned at once and gathered again after the response. */
 export async function carcosaView(force = false) {
+  // the front page is food too, so it must not depend on the schedule alone: when it is old, the owner's visit makes a new one
+  await ensureEdition(await readEdition().catch(() => null)).catch(() => undefined);
   let state = await readState();
   if (force || !state.checkedAt) state = await refresh();
   else if (Date.now() - state.checkedAt > REFRESH_MS && !refreshing) {

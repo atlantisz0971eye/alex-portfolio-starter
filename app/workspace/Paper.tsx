@@ -61,6 +61,21 @@ export function Paper({ onError }: { onError: (message: string) => void }) {
   }
 
   const { eat } = useCarcosa();
+  // a story that has been on screen for three seconds has been seen
+  useEffect(() => {
+    if (!edition) return;
+    const timers = new Map<Element, number>();
+    const watch = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).dataset.carcosa;
+        if (!id) continue;
+        if (entry.isIntersecting) { if (!timers.has(entry.target)) timers.set(entry.target, window.setTimeout(() => eat([id]), 3000)); }
+        else { const timer = timers.get(entry.target); if (timer) { window.clearTimeout(timer); timers.delete(entry.target); } }
+      }
+    }, { threshold: 0.6 });
+    document.querySelectorAll(".paper__story[data-carcosa]").forEach((el) => watch.observe(el));
+    return () => { watch.disconnect(); timers.forEach((timer) => window.clearTimeout(timer)); };
+  }, [edition, eat]);
   const keep = (item: Item) => { eat([`news:${item.url}`]); return void keepInNotebook(`${item.zh}\n${item.summary}\n${item.source} · ${item.url}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it.")); };
 
   return <section className="paper" aria-label="Front page">

@@ -50,10 +50,10 @@ async function recentInbox(days = 2, max = 25): Promise<MailSummary[]> {
 
 const relevant = (message: MailSummary) => message.category === "primary" || message.category === "updates";
 
-/** Mail worth reading from the last two days, for Carcosa. Nothing when mail is not connected. */
+/** Personal mail from the last two days (not receipts or notifications), for Carcosa, with whether it is still unread in Gmail. Nothing when mail is not connected. */
 export async function hotMail() {
   if (!mailConfigured() || !(await readAccounts()).length) return [];
-  return (await recentInbox(2, 20)).filter(relevant);
+  return (await recentInbox(2, 25)).filter((message) => message.category === "primary");
 }
 
 /** The saved plan for today, if there is one. */

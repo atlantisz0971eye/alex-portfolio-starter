@@ -13,9 +13,9 @@ import { ThemeContext } from "./Shell";
  */
 type Kind = "mail" | "news" | "plan" | "devlog";
 export type CarcosaItem = { id: string; kind: Kind; title: string; arrived: number; eaten: number | null };
-type Ctx = { items: CarcosaItem[]; left: number; total: number; fill: number; dormant: boolean; dream: string | null; eat: (ids: string[]) => void; eatKind: (kind: Kind) => void; requestDream: () => Promise<string | null> };
+type Ctx = { items: CarcosaItem[]; left: number; total: number; fill: number; dormant: boolean; loaded: boolean; dream: string | null; eat: (ids: string[]) => void; eatKind: (kind: Kind) => void; requestDream: () => Promise<string | null>; paperOn: boolean; togglePaper: () => void };
 
-const CarcosaContext = createContext<Ctx>({ items: [], left: 0, total: 0, fill: 0, dormant: false, dream: null, eat: () => undefined, eatKind: () => undefined, requestDream: async () => null });
+const CarcosaContext = createContext<Ctx>({ items: [], left: 0, total: 0, fill: 0, dormant: false, loaded: false, dream: null, eat: () => undefined, eatKind: () => undefined, requestDream: async () => null, paperOn: false, togglePaper: () => undefined });
 export const useCarcosa = () => useContext(CarcosaContext);
 
 const TEN_MINUTES = 10 * 60_000;
@@ -24,14 +24,19 @@ export function CarcosaProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CarcosaItem[]>([]);
   const [dream, setDream] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [loaded, setLoaded] = useState(false);
   const loadedAt = useRef(0);
+  // the front page is hidden until the viewer turns it on; while it is hidden its stories cannot be read, so they are not food
+  const [paperOn, setPaperOn] = useState(false);
+  useEffect(() => { try { setPaperOn(localStorage.getItem("ws-front-page") === "on"); } catch { /* off */ } }, []);
+  const togglePaper = useCallback(() => setPaperOn((current) => { const next = !current; try { localStorage.setItem("ws-front-page", next ? "on" : "off"); } catch { /* per-viewer convenience only */ } return next; }), []);
 
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/workspace/carcosa", { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json() as { items: CarcosaItem[]; dream: string | null };
-      setItems(data.items); setDream(data.dream); loadedAt.current = Date.now(); setNow(Date.now());
+      setItems(data.items); setDream(data.dream); loadedAt.current = Date.now(); setNow(Date.now()); setLoaded(true);
     } catch { /* she can wait */ }
   }, []);
 
@@ -44,18 +49,16 @@ export function CarcosaProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", back); };
   }, [load]);
 
-  const eat = useCallback((ids: string[]) => {
-    let fresh: string[] = [];
-    setItems((current) => {
-      fresh = ids.filter((id) => current.some((item) => item.id === id && !item.eaten));
-      return fresh.length ? current.map((item) => (fresh.includes(item.id) ? { ...item, eaten: Date.now() } : item)) : current;
-    });
-    queueMicrotask(() => {
-      if (!fresh.length) return;
-      void fetch("/api/workspace/carcosa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "eat", ids: fresh }) }).catch(() => undefined);
-    });
-  }, []);
   const itemsRef = useRef(items); itemsRef.current = items;
+  const eat = useCallback((ids: string[]) => {
+    // decided from the current list right now, not inside a state updater (which React may run later), so the report is never skipped
+    const fresh = ids.filter((id) => itemsRef.current.some((item) => item.id === id && !item.eaten));
+    if (!fresh.length) return;
+    const at = Date.now();
+    itemsRef.current = itemsRef.current.map((item) => (fresh.includes(item.id) ? { ...item, eaten: at } : item));
+    setItems(itemsRef.current);
+    void fetch("/api/workspace/carcosa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "eat", ids: fresh }) }).catch(() => undefined);
+  }, []);
   const eatKind = useCallback((kind: Kind) => eat(itemsRef.current.filter((item) => item.kind === kind && !item.eaten).map((item) => item.id)), [eat]);
 
   const requestDream = useCallback(async () => {
@@ -68,10 +71,12 @@ export function CarcosaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<Ctx>(() => {
-    const f = items.map((item) => freshness({ id: item.id, arrived: item.arrived, read: !!item.eaten }, now));
+    const food = paperOn ? items : items.filter((item) => item.kind !== "news");
+    const f = food.map((item) => freshness({ id: item.id, arrived: item.arrived, read: !!item.eaten, kind: item.kind }, now));
     const left = f.filter((v) => v >= HOT).length;
-    return { items, left, total: items.length, fill: items.length ? f.reduce((a, b) => a + b, 0) / items.length : 0, dormant: left === 0, dream, eat, eatKind, requestDream };
-  }, [items, now, dream, eat, eatKind, requestDream]);
+    // she sleeps only once the list has loaded and nothing is still fresh; an empty list is "read everything", not "not loaded yet"
+    return { items, left, total: food.length, fill: food.length ? f.reduce((a, b) => a + b, 0) / food.length : 0, dormant: loaded && left === 0, loaded, dream, eat, eatKind, requestDream, paperOn, togglePaper };
+  }, [items, now, dream, eat, eatKind, requestDream, loaded, paperOn, togglePaper]);
 
   return <CarcosaContext.Provider value={value}>{children}</CarcosaContext.Provider>;
 }
@@ -81,7 +86,7 @@ const GREY_LIGHT: [number, number, number] = [70, 70, 68];
 
 /** The hairline under the corner strip, or, when everything is eaten, the dried lump at its end. */
 export function CarcosaGauge() {
-  const { fill, left, total, dormant } = useCarcosa();
+  const { fill, left, total, dormant, loaded } = useCarcosa();
   const { theme } = useContext(ThemeContext);
   const line = useRef<HTMLCanvasElement>(null);
   const body = useRef<HTMLCanvasElement>(null);
@@ -110,7 +115,7 @@ export function CarcosaGauge() {
   return <>
     <canvas ref={line} className="carcosa-line" aria-hidden="true" />
     <canvas ref={body} className="carcosa-lump" aria-hidden="true" data-on={dormant || undefined} />
-    <span className="carcosa-count" title="Carcosa: today's hot information still fresh">{dormant ? "carcosa · asleep" : `carcosa · ${left} / ${total}`}</span>
+    {loaded && <span className="carcosa-count" title="Carcosa: today's hot information still fresh">{dormant ? "carcosa · asleep" : `carcosa · ${left} / ${total}`}</span>}
   </>;
 }
 
@@ -239,7 +244,7 @@ export function CarcosaSpores() {
         const key = Math.round(sx / 8);
         const col = columns.get(key) ?? { x: sx, spots: [] };
         col.x = Math.min(col.x, sx);
-        col.spots.push({ id: item.id, y: Math.round(y / SPORE_CELL), fresh: freshness({ id: item.id, arrived: item.arrived, read: !!item.eaten }, now) });
+        col.spots.push({ id: item.id, y: Math.round(y / SPORE_CELL), fresh: freshness({ id: item.id, arrived: item.arrived, read: !!item.eaten, kind: item.kind }, now) });
         columns.set(key, col);
       }
       for (const col of columns.values()) {

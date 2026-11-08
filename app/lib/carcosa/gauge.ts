@@ -3,16 +3,18 @@
  * strip is the gauge; a vein in the left margin branches to each hot item and ends in a spore sized by how fresh the
  * item still is. Nothing moves; it is redrawn only when something arrives, is read, or ages.
  */
-export type Hot = { id: string; arrived: number; read: boolean };
+export type Hot = { id: string; arrived: number; read: boolean; kind?: string };
 export type Spot = { id: string; y: number; fresh: number };
 
 export const HALF_LIFE_MS = 12 * 3_600_000;
+/** The front page changes twice a day and is browsed, not answered, so its stories go cold in twelve hours, not twenty-four. */
+export const HALF_LIFE_NEWS_MS = 6 * 3_600_000;
 /** Below this an item no longer counts as hot. */
 export const HOT = 0.25;
 
 /** 1 when it has just arrived, halving every twelve hours; nearly nothing once read. */
 export function freshness(item: Hot, now: number) {
-  const aged = 0.5 ** (Math.max(0, now - item.arrived) / HALF_LIFE_MS);
+  const aged = 0.5 ** (Math.max(0, now - item.arrived) / (item.kind === "news" ? HALF_LIFE_NEWS_MS : HALF_LIFE_MS));
   return item.read ? Math.min(aged, 0.08) : aged;
 }
 
