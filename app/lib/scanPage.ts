@@ -123,9 +123,16 @@ export function snapshotPage(root: HTMLElement, options: SnapshotOptions = PORTF
     }
   } else if (options.sectionSelector) {
     // Landmarks of any page: wide and tall enough to be a part of it, at least a few rows apart, at most 48.
+    // A landmark is named by its first heading, its label, or a readable id (not a generated one), else its tag.
+    const slug = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 16);
     const label = (element: Element) => {
-      const raw = element.id || element.getAttribute("aria-label") || element.getAttribute("role") || element.tagName;
-      return raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 16) || "part";
+      const heading = (element.querySelector("h1, h2, h3")?.textContent ?? "").trim();
+      const id = /\d|^[a-z]{1,4}$/i.test(element.id) ? "" : element.id;
+      for (const raw of [heading.length <= 40 ? heading : "", element.getAttribute("aria-label") ?? "", id, element.getAttribute("role") ?? "", element.tagName]) {
+        const name = slug(raw);
+        if (name) return name;
+      }
+      return "part";
     };
     let lastTop = -Infinity;
     const found = Array.from(root.querySelectorAll(options.sectionSelector))
