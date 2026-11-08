@@ -2387,118 +2387,106 @@ a {
 .development-section .gallery-kicker { margin-bottom: 4px; }
 
 
-/* ---------- Welcome: frosted, etched glass over the whole page, with an oil film drifting on it ---------- */
-.liquid-intro {
+/* ---------- alexsonicLAb: an opaque instrument that reads the page underneath as ASCII and techno ---------- */
+.sonic-lab {
   position: fixed;
   inset: 0;
   z-index: 400;
-  cursor: pointer;
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: opacity .65s cubic-bezier(.2,.8,.2,1);
-}
-.liquid-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
-.liquid-glass {
-  position: relative;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: clamp(14px, 2.4vw, 30px);
-  width: 100%;
-  height: 100%;
   overflow: hidden;
-  background: rgba(214, 220, 224, .045);
-  -webkit-backdrop-filter: blur(11px) saturate(1.35) brightness(1.05);
-  backdrop-filter: blur(11px) saturate(1.35) brightness(1.05);
+  outline: none;
+  cursor: crosshair;
+  overscroll-behavior: contain;
+  touch-action: none;
+  color: #f2f2f0;
+  background-color: #0b0b0c;
+  background-image: radial-gradient(circle, rgba(255,255,255,.09) 1px, transparent 1.6px);
+  background-size: 20px 22px;
+  background-position: 10px 11px;
+  font: 12px/1.4 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "PingFang SC", monospace;
+  -webkit-tap-highlight-color: transparent;
 }
-.liquid-glass.is-liquid {
-  -webkit-backdrop-filter: url(#liquid-glass) blur(4.5px) saturate(1.5) brightness(1.06) contrast(1.05);
-  backdrop-filter: url(#liquid-glass) blur(4.5px) saturate(1.5) brightness(1.06) contrast(1.05);
-}
-
-/* The oil film: soft pools of thin-film colour that slide over each other and turn slowly. */
-.liquid-film { position: absolute; inset: 0; overflow: hidden; pointer-events: none; mix-blend-mode: screen; }
-.liquid-film i {
+.sonic-lab__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+@keyframes sonic-blink { 50% { opacity: .35; } }
+/* Leaving: the instrument is wiped away band by band, like scan lines. */
+.sonic-lab.is-leaving { pointer-events: none; animation: sonic-wipe .7s steps(14, end) forwards; }
+@keyframes sonic-wipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
+/* The DJ deck: a grid of monospace characters. Its keys are characters too. */
+/* The bottom of the Lab: the way in, then the console. */
+.sonic-lab__bottom {
   position: absolute;
-  width: 64vmax;
-  height: 64vmax;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: .7;
-  animation: oil-drift 26s ease-in-out infinite alternate;
+  left: 2.2vw;
+  right: 2.2vw;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
-.liquid-film i:nth-child(1) { left: -18vmax; top: -24vmax; background: radial-gradient(circle, rgba(255,90,190,.7), transparent 62%); }
-.liquid-film i:nth-child(2) { right: -22vmax; bottom: -26vmax; background: radial-gradient(circle, rgba(40,210,255,.62), transparent 62%); animation-duration: 31s; animation-delay: -9s; }
-.liquid-film i:nth-child(3) { left: 24vw; top: 30vh; background: radial-gradient(circle, rgba(255,200,80,.5), transparent 60%); animation-duration: 37s; animation-delay: -16s; }
-.liquid-film i:nth-child(4) { right: 6vw; top: -30vmax; background: radial-gradient(circle, rgba(140,100,255,.62), transparent 62%); animation-duration: 29s; animation-delay: -4s; }
-.liquid-film b {
-  position: absolute;
-  inset: -40%;
-  background: conic-gradient(from 20deg at 50% 50%, rgba(255,120,200,.0), rgba(255,120,200,.28), rgba(255,214,120,.22), rgba(90,220,255,.28), rgba(150,120,255,.26), rgba(255,120,200,.0));
-  filter: blur(80px);
-  opacity: .55;
-  animation: oil-turn 70s linear infinite;
-}
-@keyframes oil-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(9vw, 7vh, 0) scale(1.18); }
-  100% { transform: translate3d(-8vw, 12vh, 0) scale(.92); }
-}
-@keyframes oil-turn { to { transform: rotate(360deg); } }
-
-/* Frosting: fine, uneven grain, like sandblasted glass. */
-.liquid-grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 220px 220px;
-  opacity: .22;
-  mix-blend-mode: overlay;
-}
-
-.liquid-title {
+.sonic-enter {
   position: relative;
-  margin: 0;
-  text-align: center;
-  font-size: clamp(46px, 10vw, 156px);
-  font-weight: 300;
-  line-height: .98;
-  letter-spacing: .02em;
-  text-wrap: balance;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 13px 26px 12px;
+  border: 0;
+  color: #0b0b0c;
+  background: #f2f2f0;
+  font: 800 17px/1 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace;
+  letter-spacing: .08em;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #f2f2f0, 0 0 0 5px #0b0b0c, 0 0 0 6px rgba(242,242,240,.35), 0 0 42px rgba(242,242,240,.18);
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.sonic-enter b { font-size: 20px; animation: sonic-blink 1.1s steps(2, jump-none) infinite; }
+.sonic-enter small { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; font-size: 10px; font-weight: 500; letter-spacing: .06em; color: #6b6d72; }
+.sonic-enter:hover { background: #5af08a; box-shadow: 0 0 0 1px #5af08a, 0 0 0 5px #0b0b0c, 0 0 0 6px rgba(90,240,138,.5), 0 0 48px rgba(90,240,138,.28); }
+.sonic-enter:focus-visible { outline: 2px solid #5af08a; outline-offset: 8px; }
+.sonic-deck {
+  position: relative;
+  width: 100%;
+  margin-top: 14px;
+  background: #0b0b0c;
+  color: #8a8d94;
+  font: 12px/1.45 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace;
+  white-space: pre;
+  cursor: default;
   user-select: none;
-  /* Etched: cut into the glass, so the upper-left wall is dark and the lower-right wall catches light. */
-  color: rgba(255,255,255,.12);
-  -webkit-text-stroke: .5px rgba(255,255,255,.22);
-  text-shadow:
-    0 -1.5px 1px rgba(0,0,0,.62),
-    0 -3px 6px rgba(0,0,0,.28),
-    0 1.5px 1px rgba(255,255,255,.55),
-    0 4px 10px rgba(255,255,255,.14),
-    0 0 40px rgba(255,255,255,.08);
 }
-.liquid-title span { display: inline-block; }
-.liquid-hint {
-  position: relative;
-  margin: 0;
-  font-size: clamp(10px, 1vw, 13px);
-  font-weight: 400;
-  letter-spacing: .42em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,.14);
-  text-shadow: 0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.4);
-  animation: liquid-breathe 3.8s ease-in-out infinite;
-}
-@keyframes liquid-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
-.liquid-intro.is-leaving { opacity: 0; pointer-events: none; }
+.sonic-deck__probe { position: absolute; visibility: hidden; pointer-events: none; }
+.sonic-deck__line { height: 1.45em; overflow: hidden; }
+.sonic-deck button { padding: 0; border: 0; background: none; color: inherit; font: inherit; line-height: inherit; cursor: pointer; white-space: pre; }
+.sonic-deck .is-frame { color: #3c3f45; }
+.sonic-deck .is-dim { color: #55585e; }
+.sonic-deck .is-bright { color: #f2f2f0; }
+.sonic-deck .is-key { color: #c9ccd2; }
+.sonic-deck .is-key:hover { color: #0b0b0c; background: #f2f2f0; }
+.sonic-deck .is-on { color: #0b0b0c; background: #5af08a; }
+.sonic-deck .is-pending { color: #5af08a; animation: sonic-blink .5s steps(2, jump-none) infinite; }
+.sonic-deck .is-bar { color: #8a8d94; }
+.sonic-deck .is-bar:hover { color: #f2f2f0; }
+.sonic-deck .is-meter { color: #5af08a; }
+.sonic-deck .is-blink { color: #c9ccd2; animation: sonic-blink 1.6s steps(2, jump-none) infinite; }
+/* The oscilloscope sits inside framed empty lines, one character in from each border. */
+.sonic-deck__scope { position: relative; }
+.sonic-deck__scope canvas { position: absolute; top: 2px; left: 1ch; height: calc(100% - 4px); pointer-events: none; }
+.sonic-deck .is-fader { color: #f2f2f0; cursor: ns-resize; touch-action: none; }
+.sonic-deck .is-fader.is-dim { color: #44474c; }
+.sonic-deck .is-platter { color: #c9ccd2; }
+.sonic-deck .is-platter.is-dim { color: #3c3f45; }
+.sonic-deck .is-track { color: #3c3f45; }
+.sonic-deck .is-track:hover { color: #8a8d94; }
+.sonic-deck .is-knob { color: #5af08a; }
 @media (max-width: 640px) {
-  .liquid-title { font-size: clamp(58px, 21vw, 120px); }
-  .liquid-title span { display: block; }
-  .liquid-film i { filter: blur(50px); }
+  .sonic-deck { font-size: 11px; }
+  .sonic-enter { font-size: 15px; padding: 11px 20px 10px; }
 }
+
+/* The way in from the portfolio header. */
+.header-lab { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .02em; }
 @media (prefers-reduced-motion: reduce) {
-  .liquid-intro { transition: none; }
-  .liquid-film i, .liquid-film b, .liquid-hint { animation: none; }
+  .sonic-lab.is-leaving { animation: none; opacity: 0; }
+  .sonic-deck .is-blink, .sonic-deck .is-pending { animation: none; }
 }
 
 /* ===== Workbench: a plate cut into the page, with each project's architecture etched into it ===== */
