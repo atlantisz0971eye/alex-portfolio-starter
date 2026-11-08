@@ -26,12 +26,25 @@ export const calendarDay = (ms: number) => dayFormat.format(new Date(ms));
 const timeFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false });
 export const londonTime = (ms: number) => timeFormat.format(new Date(ms));
 
+/**
+ * A missing file is the fallback; any other failure is retried and then thrown. Reading a month as empty because of a
+ * passing network error would drop days from the routine, and appending to it would overwrite the month.
+ */
 async function readJson<T>(path: string, fallback: T): Promise<T> {
-  try {
-    const result = await get(ROOT + path, { access: "private", useCache: false });
-    if (result && result.statusCode === 200) return JSON.parse(await new Response(result.stream).text()) as T;
-  } catch { /* first use */ }
-  return fallback;
+  let last: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const result = await get(ROOT + path, { access: "private", useCache: false });
+      if (!result) return fallback;
+      if (result.statusCode === 200) return JSON.parse(await new Response(result.stream).text()) as T;
+      last = new Error(`blob_${result.statusCode}`);
+    } catch (error) {
+      if (error instanceof Error && /not.?found/i.test(`${error.name} ${error.message}`)) return fallback;
+      last = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+  }
+  throw last instanceof Error ? last : new Error("ledger_read_failed");
 }
 const writeJson = (path: string, value: unknown) => put(ROOT + path, JSON.stringify(value), { access: "private", allowOverwrite: true, contentType: "application/json" });
 
