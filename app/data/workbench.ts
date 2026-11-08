@@ -11,19 +11,38 @@ export type WorkbenchEdge = { from: string; to: string; dashed?: boolean };
 export type WorkbenchDiagram = { nodes: WorkbenchNode[]; edges: WorkbenchEdge[] };
 
 type WorkbenchCopy = { status: string; summary: string };
+/** "bench": in development now. "studio": finished works from the RCA application portfolio, drawn from its system pages. */
+export type WorkbenchGroup = "bench" | "studio";
 export type WorkbenchProject = {
   slug: string;
   index: string;
   title: string;
-  /** Where the code lives, shown in small type. */
+  group: WorkbenchGroup;
+  /** Where the code lives, or what the work is, shown in small type. */
   repo: string;
   href?: string;
+  /** Whether the outside link is a site to visit or a video to watch. */
+  hrefKind?: "visit" | "watch";
+  /** The slug of the matching project card in the themes above, for works that have one. */
+  workSlug?: string;
   stack: string[];
   copy: Record<Language, WorkbenchCopy>;
   diagram: WorkbenchDiagram;
 };
 
-type WorkbenchContent = { kicker: string; title: string; intro: string; asOf: string; legend: Record<WorkbenchNodeKind, string>; open: string; close: string; visit: string; empty: string };
+type WorkbenchContent = {
+  kicker: string;
+  title: string;
+  intro: string;
+  asOf: string;
+  groups: Record<WorkbenchGroup, { title: string; note: string }>;
+  legend: Record<WorkbenchNodeKind, string>;
+  open: string;
+  close: string;
+  visit: string;
+  watch: string;
+  seeWork: string;
+};
 
 /** The day these diagrams were drawn from the code and the devlog. */
 export const WORKBENCH_AS_OF = "2026-11-08";
@@ -32,34 +51,46 @@ export const WORKBENCH_CONTENT: Record<Language, WorkbenchContent> = {
   en: {
     kicker: "On the bench",
     title: "Workbench",
-    intro: "What is being built right now, shown as its skeleton: each plate is the architecture of a project still in development.",
-    asOf: "Drawn from the code on",
+    intro: "The skeletons of the work: what is being built now, and how the earlier pieces were wired. Open a line to see its architecture.",
+    asOf: "Drawn on",
+    groups: {
+      bench: { title: "In development", note: "drawn from the code" },
+      studio: { title: "Studio works · 2025", note: "drawn from the RCA application portfolio" },
+    },
     legend: { actor: "Person / input", app: "Code", store: "Data", external: "Outside service" },
     open: "Open diagram",
     close: "Close diagram",
     visit: "Visit",
-    empty: "Bench space for the next project",
+    watch: "Watch",
+    seeWork: "See the work",
   },
   zh: {
     kicker: "工作台上",
     title: "Workbench",
-    intro: "正在做的东西，只露出骨架：每一块刻板是一个仍在开发的项目的架构。",
-    asOf: "依据代码绘制于",
+    intro: "作品的骨架：正在做的项目，以及之前的作品是怎么连起来的。点开一行，查看它的架构图。",
+    asOf: "绘制于",
+    groups: {
+      bench: { title: "开发中", note: "依据代码绘制" },
+      studio: { title: "工作室作品 · 2025", note: "依据 RCA 申请作品集绘制" },
+    },
     legend: { actor: "人 / 输入", app: "代码", store: "数据", external: "外部服务" },
     open: "展开架构图",
     close: "收起架构图",
     visit: "访问",
-    empty: "留给下一个项目的位置",
+    watch: "观看",
+    seeWork: "查看作品",
   },
 };
 
 export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
   {
     slug: "night-8looming-jasmine",
+    group: "bench",
     index: "01",
     title: "Night, 8looming Jasmine",
     repo: "night-8looming-jasmine",
     href: "https://night-8looming-jasmine.vercel.app/web/",
+    hrefKind: "visit",
     stack: ["MapLibre", "Vercel functions", "DeepSeek", "ElevenLabs", "React Three Fiber"],
     copy: {
       en: { status: "Running prototype", summary: "Yasmine walks the map naming the places she passes; a mind daemon learns from place facts, gets hungry and dreams, and Jasmine can only change her world." },
@@ -94,6 +125,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
   },
   {
     slug: "tryin",
+    group: "bench",
     index: "02",
     title: "Tryin'",
     repo: "tryin",
@@ -129,6 +161,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
   },
   {
     slug: "leaf-language-engine",
+    group: "bench",
     index: "03",
     title: "Leaf Language Engine",
     repo: "leaf-language-engine",
@@ -163,6 +196,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
   },
   {
     slug: "alex-workspace",
+    group: "bench",
     index: "04",
     title: "Alex Workspace",
     repo: "alex-portfolio-starter · /workspace",
@@ -201,6 +235,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
   },
   {
     slug: "alex-portfolio",
+    group: "bench",
     index: "05",
     title: "Alex Portfolio",
     repo: "alex-portfolio-starter",

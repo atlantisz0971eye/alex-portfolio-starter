@@ -7,6 +7,7 @@ import {
   WORKBENCH_CONTENT,
   WORKBENCH_PROJECTS,
   type WorkbenchDiagram,
+  type WorkbenchGroup,
   type WorkbenchNode,
   type WorkbenchNodeKind,
   type WorkbenchProject,
@@ -120,59 +121,64 @@ function Etching({ diagram, title }: { diagram: WorkbenchDiagram; title: string 
   );
 }
 
-type WellProps = { project: WorkbenchProject; lang: Language; isOpen: boolean; onToggle: () => void };
+type RowProps = { project: WorkbenchProject; lang: Language; isOpen: boolean; onToggle: () => void };
 
-/** One recess in the plate. Light follows the pointer across its floor; a click anywhere on it (or its toggle, which the click bubbles from) widens it across the plate. */
-function Well({ project, lang, isOpen, onToggle }: WellProps) {
+/** One line cut into the plate. Closed it is a single row; opened, the architecture and notes slide out beneath it. */
+function Row({ project, lang, isOpen, onToggle }: RowProps) {
   const content = WORKBENCH_CONTENT[lang];
   const copy = project.copy[lang];
+  const bodyId = `workbench-body-${project.slug}`;
   const moveLight = (event: ReactMouseEvent<HTMLElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--lx", `${((event.clientX - box.left) / box.width) * 100}%`);
-    event.currentTarget.style.setProperty("--ly", `${((event.clientY - box.top) / box.height) * 100}%`);
+  };
+  const seeWork = () => {
+    if (!project.workSlug) return;
+    window.dispatchEvent(new CustomEvent("portfolio:open", { detail: { slug: project.workSlug } }));
+    document.getElementById(`proj-${project.workSlug}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   return (
-    <article id={`workbench-${project.slug}`} className={`workbench-well ${isOpen ? "is-open" : ""}`} onMouseMove={moveLight} onClick={onToggle}>
-      <header className="workbench-well__head">
-        <span className="workbench-well__index">{project.index}</span>
-        <h3>{project.title}</h3>
-        <span className="workbench-well__status">{copy.status}</span>
-      </header>
+    <article id={`workbench-${project.slug}`} className={`workbench-row ${isOpen ? "is-open" : ""}`} onMouseMove={moveLight}>
+      <button type="button" className="workbench-row__bar" aria-expanded={isOpen} aria-controls={bodyId} onClick={onToggle}>
+        <span className="workbench-row__index">{project.index}</span>
+        <span className="workbench-row__title">{project.title}</span>
+        <span className="workbench-row__repo">{project.repo}</span>
+        <span className="workbench-row__status">{copy.status}</span>
+        <span className="workbench-row__mark" aria-hidden>{isOpen ? "−" : "+"}</span>
+        <span className="sr-only">{isOpen ? content.close : content.open}</span>
+      </button>
 
-      <div className="workbench-well__floor">
-        <Etching diagram={project.diagram} title={project.title} />
-      </div>
-
-      <div className="workbench-well__details" aria-hidden={!isOpen}>
-        <div className="workbench-well__details-inner">
-          <p>{copy.summary}</p>
-          <div className="workbench-well__stack">
+      <div id={bodyId} className="workbench-row__body" aria-hidden={!isOpen}>
+        <div className="workbench-row__body-inner">
+          <div className="workbench-row__floor">
+            <Etching diagram={project.diagram} title={project.title} />
+          </div>
+          <p className="workbench-row__summary">{copy.summary}</p>
+          <div className="workbench-row__stack">
             {project.stack.map((item) => <span key={item}>{item}</span>)}
           </div>
-          <div className="workbench-well__foot">
-            <code>{project.repo}</code>
+          <div className="workbench-row__foot">
+            {project.workSlug && (
+              <button type="button" onClick={seeWork} tabIndex={isOpen ? 0 : -1}>{content.seeWork}</button>
+            )}
             {project.href && (
-              <a href={project.href} target="_blank" rel="noopener noreferrer" tabIndex={isOpen ? 0 : -1} onClick={(event) => event.stopPropagation()}>
-                {content.visit}
+              <a href={project.href} target="_blank" rel="noopener noreferrer" tabIndex={isOpen ? 0 : -1}>
+                {project.hrefKind === "watch" ? content.watch : content.visit}
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </a>
             )}
           </div>
         </div>
       </div>
-
-      <button type="button" className="workbench-well__toggle" aria-expanded={isOpen}>
-        <span>{isOpen ? content.close : content.open}</span>
-        <span aria-hidden>{isOpen ? "−" : "+"}</span>
-      </button>
     </article>
   );
 }
 
 const LEGEND_KINDS: WorkbenchNodeKind[] = ["actor", "app", "store", "external"];
+const GROUPS: WorkbenchGroup[] = ["bench", "studio"];
 
-/** Projects still being built, shown as architecture etched into a plate pressed into the page rather than floating on it. */
+/** Projects as architecture etched into a plate pressed into the page. Every row starts closed; one opens at a time. */
 export function WorkbenchSection({ lang }: { lang: Language }) {
   const content = WORKBENCH_CONTENT[lang];
   const [openSlug, setOpenSlug] = useState<string | null>(null);
@@ -205,17 +211,17 @@ export function WorkbenchSection({ lang }: { lang: Language }) {
         <div className="cards-col">
           <div className="workbench-cut">
             <div className="workbench-plate">
-              <div className="workbench-grid">
-                {WORKBENCH_PROJECTS.map((project) => (
-                  <Well key={project.slug} project={project} lang={lang} isOpen={openSlug === project.slug} onToggle={() => toggle(project.slug)} />
-                ))}
-                {WORKBENCH_PROJECTS.length % 2 === 1 && (
-                  <div className="workbench-well workbench-well--empty" aria-hidden>
-                    <span>{String(WORKBENCH_PROJECTS.length + 1).padStart(2, "0")}</span>
-                    <p>{content.empty}</p>
-                  </div>
-                )}
-              </div>
+              {GROUPS.map((group) => (
+                <div key={group} className="workbench-group">
+                  <h2 className="workbench-group__head">
+                    <span>{content.groups[group].title}</span>
+                    <small>{content.groups[group].note}</small>
+                  </h2>
+                  {WORKBENCH_PROJECTS.filter((project) => project.group === group).map((project) => (
+                    <Row key={project.slug} project={project} lang={lang} isOpen={openSlug === project.slug} onToggle={() => toggle(project.slug)} />
+                  ))}
+                </div>
+              ))}
               <footer className="workbench-plate__foot">
                 <ul className="workbench-legend">
                   {LEGEND_KINDS.map((kind) => (
