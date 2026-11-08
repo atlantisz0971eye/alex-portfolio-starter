@@ -7,7 +7,7 @@ import { BioSection } from "./components/BioSection";
 import { DevelopmentSection } from "./components/DevelopmentSection";
 import { GallerySection } from "./components/GallerySection";
 import { HeaderBar } from "./components/HeaderBar";
-import { ScanIntro } from "./components/ScanIntro";
+import { SonicLab } from "./components/SonicLab";
 import { SiteFooter } from "./components/SiteFooter";
 import SidebarNav from "./components/SidebarNav";
 import { ThemeSection } from "./components/ThemeSection";
@@ -121,12 +121,13 @@ export default function Page() {
 
   return (
     <div className="min-h-screen text-white relative font-satoshi" onClick={() => search.setSearchOpen(false)}>
-      <ScanIntro open={intro.isOpen} onClose={intro.close} />
+      <SonicLab open={intro.isOpen} onClose={intro.close} />
       <SidebarNav lang={lang} />
 
       <HeaderBar
         lang={lang}
         onToggleLang={() => setLang((current) => (current === "en" ? "zh" : "en"))}
+        onOpenLab={intro.open}
         searchQuery={search.searchQuery}
         searchOpen={search.searchOpen}
         activeResultIndex={activeSearchIndex}

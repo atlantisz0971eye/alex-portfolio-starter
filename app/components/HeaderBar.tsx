@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import { Search } from "lucide-react";
+import { AudioWaveform, Search } from "lucide-react";
 import type { SearchResult } from "../types/project";
 import { glassButtonClass } from "../lib/ui";
 
 type HeaderBarProps = {
   lang: "en" | "zh";
   onToggleLang: () => void;
+  onOpenLab: () => void;
   searchQuery: string;
   searchOpen: boolean;
   activeResultIndex: number;
@@ -21,6 +22,7 @@ type HeaderBarProps = {
 export function HeaderBar({
   lang,
   onToggleLang,
+  onOpenLab,
   searchQuery,
   searchOpen,
   activeResultIndex,
@@ -93,6 +95,18 @@ export function HeaderBar({
               </div>
             )}
           </div>
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenLab();
+            }}
+            className={`header-lab ${glassButtonClass}`}
+            aria-label={lang === "en" ? "Open alexsonicLAb, a sound scanner of this site" : "打开 alexsonicLAb：把这个网站读成声音的扫描仪"}
+            title="alexsonicLAb"
+          >
+            <AudioWaveform className="w-4 h-4" aria-hidden />
+            <span>LAB</span>
+          </button>
           <button
             onClick={onToggleLang}
             className={`header-language ${glassButtonClass} text-sm`}

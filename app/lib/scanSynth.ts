@@ -23,6 +23,8 @@ export class ScanSynth {
   private bus: GainNode;
   private filter: BiquadFilterNode;
   private output: GainNode;
+  /** A tap on the final mix, for drawing the live waveform. */
+  readonly analyser: AnalyserNode;
   private noise: AudioBuffer;
   private timer = 0;
   private nextTime = 0;
@@ -46,6 +48,10 @@ export class ScanSynth {
     this.bus = ctx.createGain();
     this.bus.gain.value = 0.8;
     this.bus.connect(this.filter).connect(limiter).connect(this.output).connect(ctx.destination);
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0;
+    this.output.connect(this.analyser);
 
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = this.noise.getChannelData(0);

@@ -5,13 +5,13 @@ import { Ink, ROW_PX, readRow, snapshotPage, type ScanRow, type ScanSnapshot } f
 import { BPM, ScanSynth, type Step } from "../lib/scanSynth";
 import { prefersReducedMotion } from "../utils/environment";
 
-type ScanIntroProps = { open: boolean; onClose: () => void };
+type SonicLabProps = { open: boolean; onClose: () => void };
 
 /**
- * The welcome screen: an opaque scanner over the real portfolio. Scrolling moves a read head down the page under
- * it; each band of the page it crosses is drawn as a line of ASCII (edges as lines, text as its own letters) and
- * read as a step of techno. Entering drops the visitor into the page wherever the read head is.
- * Sound lives only here: it fades out and the audio shuts down on entering.
+ * alexsonicLAb: an opaque instrument over the real portfolio. The read head is a fixed axis across the middle of
+ * the screen; scrolling moves the page under it. Rows above the axis have been read, rows below are what comes next.
+ * On the axis: the row being read as a strip of pixels, the live waveform of the music it makes, and the readout.
+ * Sound lives only here: it fades out and the audio shuts down on entering the portfolio.
  */
 
 const ACCENT: Record<string, [number, number, number]> = {
@@ -71,29 +71,36 @@ function stepFor(bar: ScanRow[], s: number): Step {
 }
 
 const INK_ALPHA: Record<number, number> = { [Ink.Edge]: 0.5, [Ink.Text]: 0.72, [Ink.Heading]: 1, [Ink.Media]: 0.32, [Ink.Rule]: 0.9, [Ink.Link]: 0.6 };
+const inkColour = (ink: number, accent: [number, number, number], alpha: number) => {
+  const [r, g, b] = accent;
+  if (ink === Ink.Heading) return `rgba(255,255,255,${alpha})`;
+  if (ink === Ink.Edge || ink === Ink.Media) return `rgba(210,214,222,${alpha})`;
+  return `rgba(${r},${g},${b},${alpha})`;
+};
 
-export function ScanIntro({ open, onClose }: ScanIntroProps) {
+export function SonicLab({ open, onClose }: SonicLabProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [powered, setPowered] = useState(false); // sound on
-  const [started, setStarted] = useState(false); // the title screen is gone
+  const fieldRef = useRef<HTMLCanvasElement | null>(null);
+  const axisRef = useRef<HTMLCanvasElement | null>(null);
+  const [powered, setPowered] = useState(false);
+  const [started, setStarted] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [readout, setReadout] = useState({ y: 0, height: 1, section: "top", complete: false });
 
   const state = useRef({
     snapshot: null as ScanSnapshot | null,
+    cache: new Map<number, ScanRow>(),
     readY: 0,
-    lastRow: -1,
-    screen: [] as ScanRow[],
+    row: -1,
     bar: [] as ScanRow[],
     cols: 120,
-    rows: 40,
     cell: { w: 8, h: 16 },
-    dirty: true,
-    direction: 1,
+    size: { w: 0, h: 0 },
+    fieldDirty: true,
     speed: 0,
     moved: 0,
     synth: null as ScanSynth | null,
+    wave: new Uint8Array(2048),
     leaving: false,
   });
 
@@ -104,7 +111,7 @@ export function ScanIntro({ open, onClose }: ScanIntroProps) {
     setLeaving(true);
     s.synth?.stop(0.7);
     s.synth = null;
-    // Land with the read line a little above the middle of the screen.
+    // Land with the read line where it was on screen: 40% from the top.
     const target = Math.max(0, s.readY - window.innerHeight * 0.4);
     window.setTimeout(() => {
       onClose();
@@ -128,84 +135,163 @@ export function ScanIntro({ open, onClose }: ScanIntroProps) {
   useEffect(() => {
     if (!open) return;
     const root = rootRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
+    const field = fieldRef.current;
+    const axis = axisRef.current;
+    const fieldCtx = field?.getContext("2d");
+    const axisCtx = axis?.getContext("2d");
     const main = document.querySelector("main");
-    if (!root || !canvas || !context || !main) return;
+    if (!root || !field || !axis || !fieldCtx || !axisCtx || !main) return;
     const s = state.current;
+    s.leaving = false;
+    // Start reading where the visitor is: the line 40% down the screen they were looking at.
+    s.readY = window.scrollY + window.innerHeight * 0.4;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     root.focus({ preventScroll: true });
 
+    const rowAt = (index: number) => {
+      let row = s.cache.get(index);
+      if (!row && s.snapshot) {
+        row = readRow(s.snapshot, index, s.cols);
+        s.cache.set(index, row);
+      }
+      return row;
+    };
+    const maxRow = () => Math.floor(((s.snapshot?.height ?? 1) - 1) / ROW_PX);
+
     const takeSnapshot = () => {
       s.snapshot = snapshotPage(main);
-      setReadout((r) => ({ ...r, height: s.snapshot?.height ?? 1 }));
+      s.cache.clear();
+      s.fieldDirty = true;
+      s.row = Math.floor(s.readY / ROW_PX);
+      const section = s.snapshot.sections.find((x) => s.readY >= x.top && s.readY < x.bottom)?.id ?? "top";
+      setReadout((r) => ({ ...r, y: Math.round(s.readY), height: s.snapshot?.height ?? 1, section }));
     };
 
     const layout = () => {
       const box = root.getBoundingClientRect();
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = Math.round(box.width * dpr);
-      canvas.height = Math.round(box.height * dpr);
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      for (const [canvas, ctx] of [[field, fieldCtx], [axis, axisCtx]] as const) {
+        canvas.width = Math.round(box.width * dpr);
+        canvas.height = Math.round(box.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
       const size = box.width < 640 ? 10 : 13;
-      context.font = `${size}px ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace`;
-      context.textBaseline = "top";
-      s.cell = { w: context.measureText("M").width, h: Math.round(size * 1.3) };
+      fieldCtx.font = `${size}px ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace`;
+      fieldCtx.textBaseline = "top";
+      s.cell = { w: fieldCtx.measureText("M").width, h: Math.round(size * 1.3) };
       s.cols = Math.max(20, Math.floor(box.width / s.cell.w));
-      s.rows = Math.max(8, Math.floor(box.height / s.cell.h));
-      // Re-read what is on screen at the new width.
-      if (s.snapshot) s.screen = s.screen.map((row) => readRow(s.snapshot!, row.index, s.cols));
-      s.dirty = true;
+      s.size = { w: box.width, h: box.height };
+      s.cache.clear();
+      s.fieldDirty = true;
     };
 
-    const draw = () => {
-      const box = root.getBoundingClientRect();
-      context.clearRect(0, 0, box.width, box.height);
+    /** The ASCII field, centred on the read head. Redrawn only when the row under the head changes. */
+    const drawField = () => {
+      const { w: width, h: height } = s.size;
       const { w, h } = s.cell;
-      const top = box.height - s.screen.length * h;
-      s.screen.forEach((row, i) => {
-        const [r, g, b] = ACCENT[row.section] ?? ACCENT.top;
-        const y = top + i * h;
-        // Draw runs of the same ink in one call each.
+      fieldCtx.clearRect(0, 0, width, height);
+      const center = Math.floor(height / 2 / h);
+      const lines = Math.ceil(height / h);
+      const top = height / 2 - center * h - h / 2;
+      for (let k = 0; k < lines; k += 1) {
+        const offset = k - center;
+        if (offset === 0) continue; // the axis draws the row being read
+        const row = rowAt(s.row + offset);
+        if (!row || s.row + offset < 0 || s.row + offset > maxRow()) continue;
+        // Read rows above the axis at full strength, the rows still to come below it as ghosts; both fade with distance.
+        const distance = Math.abs(offset) / center;
+        const fade = (offset < 0 ? 1 : 0.22) * (1 - distance * distance * 0.75);
+        const accent = ACCENT[row.section] ?? ACCENT.top;
+        const y = top + k * h;
         let start = 0;
         for (let c = 1; c <= row.chars.length; c += 1) {
           if (c === row.chars.length || row.inks[c] !== row.inks[start]) {
             const ink = row.inks[start];
             if (ink !== Ink.Blank) {
-              const alpha = INK_ALPHA[ink] ?? 0.5;
-              context.fillStyle = ink === Ink.Heading ? `rgba(255,255,255,${alpha})` : ink === Ink.Edge || ink === Ink.Media ? `rgba(210,214,222,${alpha})` : `rgba(${r},${g},${b},${alpha})`;
-              context.fillText(row.chars.slice(start, c), start * w, y);
+              fieldCtx.fillStyle = inkColour(ink, accent, (INK_ALPHA[ink] ?? 0.5) * fade);
+              fieldCtx.fillText(row.chars.slice(start, c), start * w, y);
             }
             start = c;
           }
         }
-      });
-      // The read head: the newest line, lit.
-      if (s.screen.length) {
-        const y = s.direction > 0 ? box.height - h : top;
-        const [r, g, b] = ACCENT[s.screen[s.direction > 0 ? s.screen.length - 1 : 0].section] ?? ACCENT.top;
-        context.fillStyle = `rgba(${r},${g},${b},0.09)`;
-        context.fillRect(0, y, box.width, h);
-        context.fillStyle = `rgba(${r},${g},${b},0.9)`;
-        context.fillRect(0, s.direction > 0 ? y + h - 1 : y, box.width, 1);
       }
+    };
+
+    /** The axis: the pixels of the row being read, the live waveform along it, and the readout. Every frame. */
+    const drawAxis = () => {
+      const { w: width, h: height } = s.size;
+      axisCtx.clearRect(0, 0, width, height);
+      const mid = Math.round(height / 2);
+      const row = rowAt(s.row);
+      const accent = ACCENT[row?.section ?? "top"] ?? ACCENT.top;
+      const [r, g, b] = accent;
+
+      // A dark band so the axis reads as an instrument over the field.
+      axisCtx.fillStyle = "rgba(11,11,12,0.86)";
+      axisCtx.fillRect(0, mid - 34, width, 68);
+
+      // The traversed pixels: one block per column of the row under the head.
+      if (row) {
+        const cw = width / row.chars.length;
+        for (let c = 0; c < row.chars.length; c += 1) {
+          const ink = row.inks[c];
+          if (ink === Ink.Blank) continue;
+          axisCtx.fillStyle = inkColour(ink, accent, Math.min(1, (INK_ALPHA[ink] ?? 0.5) + 0.25));
+          axisCtx.fillRect(c * cw, mid - 30, Math.max(1, cw - 1), 6);
+        }
+      }
+
+      // The live waveform of the mix, drawn across the full width.
+      const analyser = s.synth?.analyser;
+      axisCtx.beginPath();
+      if (analyser) {
+        analyser.getByteTimeDomainData(s.wave);
+        const n = s.wave.length;
+        for (let i = 0; i < n; i += 2) {
+          const x = (i / (n - 1)) * width;
+          // Gain up so quiet passages still read, clamped inside the band.
+          const y = mid + Math.max(-28, Math.min(28, ((s.wave[i] - 128) / 128) * 60));
+          if (i === 0) axisCtx.moveTo(x, y);
+          else axisCtx.lineTo(x, y);
+        }
+      } else {
+        axisCtx.moveTo(0, mid);
+        axisCtx.lineTo(width, mid);
+      }
+      axisCtx.strokeStyle = `rgba(${r},${g},${b},0.25)`;
+      axisCtx.lineWidth = 4;
+      axisCtx.stroke();
+      axisCtx.strokeStyle = `rgba(${r},${g},${b},0.95)`;
+      axisCtx.lineWidth = 1.2;
+      axisCtx.stroke();
+
+      // The edges of the band.
+      axisCtx.fillStyle = `rgba(${r},${g},${b},0.5)`;
+      axisCtx.fillRect(0, mid - 34, width, 1);
+      axisCtx.fillRect(0, mid + 33, width, 1);
     };
 
     let frame = 0;
-    const render = () => {
+    let last = 0;
+    const tick = (now: number) => {
       frame = 0;
-      if (s.dirty) {
-        s.dirty = false;
-        draw();
+      if (document.hidden || s.leaving) return;
+      if (now - last >= 33) {
+        last = now;
+        if (s.fieldDirty) {
+          s.fieldDirty = false;
+          drawField();
+        }
+        drawAxis();
       }
+      frame = requestAnimationFrame(tick);
     };
-    const requestDraw = () => {
-      s.dirty = true;
-      if (!frame) frame = requestAnimationFrame(render);
+    const run = () => {
+      if (!frame && !document.hidden) frame = requestAnimationFrame(tick);
     };
 
-    /** Move the read head by some page pixels and scan every row it passes. */
+    /** Move the page under the read head and feed every row it passes to the music. */
     const move = (delta: number) => {
       if (!s.snapshot || s.leaving) return;
       setStarted(true);
@@ -213,34 +299,23 @@ export function ScanIntro({ open, onClose }: ScanIntroProps) {
       s.readY = Math.max(0, Math.min(max, s.readY + delta));
       s.moved += Math.abs(delta);
       const row = Math.floor(s.readY / ROW_PX);
-      if (row === s.lastRow) return;
-      const direction = row > s.lastRow ? 1 : -1;
-      s.direction = direction;
-      // Only the newest screenful matters when scrolling fast.
-      const from = s.lastRow < 0 ? Math.max(0, row - s.rows + 1) : s.lastRow + direction;
-      const first = Math.abs(row - from) + 1 > s.rows ? row - direction * (s.rows - 1) : from;
-      // The screen stays in page order, top to bottom: scanning down adds lines at the bottom, scanning up at the top.
-      for (let i = first; direction > 0 ? i <= row : i >= row; i += direction) {
-        const scanned = readRow(s.snapshot, i, s.cols);
-        if (direction > 0) s.screen.push(scanned);
-        else s.screen.unshift(scanned);
-        s.bar.push(scanned);
-      }
-      if (s.screen.length > s.rows) {
-        if (direction > 0) s.screen.splice(0, s.screen.length - s.rows);
-        else s.screen.length = s.rows;
+      if (row === s.row) return;
+      const direction = row > s.row ? 1 : -1;
+      const from = Math.abs(row - s.row) > 16 ? row - direction * 15 : s.row + direction;
+      for (let i = from; direction > 0 ? i <= row : i >= row; i += direction) {
+        const scanned = rowAt(i);
+        if (scanned) s.bar.push(scanned);
       }
       if (s.bar.length > 16) s.bar.splice(0, s.bar.length - 16);
-      s.lastRow = row;
-      const section = (direction > 0 ? s.screen[s.screen.length - 1] : s.screen[0])?.section ?? "top";
+      s.row = row;
+      s.fieldDirty = true;
       const complete = s.readY >= max - window.innerHeight * 0.2;
-      setReadout({ y: Math.round(s.readY), height: s.snapshot.height, section, complete });
-      requestDraw();
+      setReadout({ y: Math.round(s.readY), height: s.snapshot.height, section: rowAt(row)?.section ?? "top", complete });
     };
 
     // Speed of scanning drives the master filter; measured ten times a second.
     const meter = window.setInterval(() => {
-      s.speed = s.speed * 0.6 + (s.moved * 10) * 0.4;
+      s.speed = s.speed * 0.6 + s.moved * 10 * 0.4;
       s.moved = 0;
       s.synth?.setBrightness(s.speed / 2600);
     }, 100);
@@ -275,34 +350,24 @@ export function ScanIntro({ open, onClose }: ScanIntroProps) {
 
     const onVisibility = () => {
       const ctx = s.synth?.context;
-      if (!ctx) return;
-      if (document.hidden) void ctx.suspend();
-      else void ctx.resume();
+      if (ctx) void (document.hidden ? ctx.suspend() : ctx.resume());
+      run();
     };
     document.addEventListener("visibilitychange", onVisibility);
 
     let snapTimer = 0;
     const resized = new ResizeObserver(() => {
       window.clearTimeout(snapTimer);
-      snapTimer = window.setTimeout(() => {
-        takeSnapshot();
-        layout();
-        requestDraw();
-      }, 200);
+      snapTimer = window.setTimeout(takeSnapshot, 200);
     });
     resized.observe(main);
-    const onResize = () => {
-      layout();
-      requestDraw();
-    };
+    const onResize = () => layout();
     window.addEventListener("resize", onResize);
 
     layout();
     takeSnapshot();
-    void document.fonts?.ready.then(() => {
-      takeSnapshot();
-      requestDraw();
-    });
+    void document.fonts?.ready.then(takeSnapshot);
+    run();
 
     return () => {
       cancelAnimationFrame(frame);
@@ -318,15 +383,24 @@ export function ScanIntro({ open, onClose }: ScanIntroProps) {
       document.body.style.overflow = previousOverflow;
       s.synth?.stop(0.3);
       s.synth = null;
+      s.bar = [];
     };
   }, [open, enter, power]);
 
+  // Reset for the next time the Lab is opened from the header.
+  useEffect(() => {
+    if (open) return;
+    setLeaving(false);
+    setStarted(false);
+    setPowered(false);
+  }, [open]);
+
   // Scanned to the end: the scan completes and opens onto the page.
   useEffect(() => {
-    if (!readout.complete || leaving) return;
+    if (!open || !readout.complete || leaving) return;
     const timer = window.setTimeout(enter, 2200);
     return () => window.clearTimeout(timer);
-  }, [readout.complete, readout.y, leaving, enter]);
+  }, [open, readout.complete, readout.y, leaving, enter]);
 
   if (!open) return null;
   const percent = Math.min(100, Math.round((readout.y / Math.max(1, readout.height)) * 100));
@@ -334,33 +408,35 @@ export function ScanIntro({ open, onClose }: ScanIntroProps) {
   return (
     <div
       ref={rootRef}
-      className={`scan-intro${leaving ? " is-leaving" : ""}${started ? " is-started" : ""}`}
+      className={`sonic-lab${leaving ? " is-leaving" : ""}${started ? " is-started" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Alex Projects scanner. Scroll to read the site, click for sound, Enter to go in."
+      aria-label="alexsonicLAb. Scroll to read the site, click for sound, Enter to go to the portfolio."
       tabIndex={-1}
       onClick={power}
     >
-      <canvas ref={canvasRef} className="scan-intro__canvas" aria-hidden />
+      <canvas ref={fieldRef} className="sonic-lab__canvas" aria-hidden />
+      <canvas ref={axisRef} className="sonic-lab__canvas" aria-hidden />
 
-      <div className="scan-intro__hud" aria-hidden>
-        <b>ALEX PROJECTS</b>
+      <div className="sonic-lab__name">
+        <b>alexsonicLAb</b>
+        <span>an instrument that reads this site</span>
+      </div>
+
+      {/* The readout rides on the axis, above and below the band. */}
+      <div className="sonic-lab__readout sonic-lab__readout--top" aria-hidden>
         <span>{readout.complete ? "SCAN COMPLETE" : started ? "SCANNING" : "STANDBY"}</span>
         <span>y {readout.y.toString().padStart(5, "0")} / {readout.height}</span>
         <span>{percent}%</span>
         <span>§{readout.section.toUpperCase()}</span>
+      </div>
+      <div className="sonic-lab__readout sonic-lab__readout--bottom" aria-hidden>
         <span>{BPM} BPM</span>
         <span className={powered ? "is-on" : ""}>{powered ? "● SOUND" : "○ CLICK FOR SOUND"}</span>
+        <span>{started ? "SCROLL ↑↓ TO READ" : "SCROLL TO READ · CLICK FOR SOUND"}</span>
       </div>
 
-      {!started && (
-        <div className="scan-intro__title">
-          <h1>SCAN</h1>
-          <p>scroll to read this site line by line · click for sound · enter anywhere</p>
-        </div>
-      )}
-
-      <div className="scan-intro__exits">
+      <div className="sonic-lab__exits">
         <button type="button" onClick={(event) => { event.stopPropagation(); enter(); }}>
           {powered ? "ENTER HERE ↵" : "ENTER SILENTLY ↵"}
         </button>

@@ -10,7 +10,7 @@ export function useIntroOverlay() {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      // ?scan opens the scanner again on purpose, even after it has been seen.
+      // ?scan opens alexsonicLAb on purpose, even after it has been seen.
       setIsOpen(params.has("scan") || (!localStorage.getItem(INTRO_STORAGE_KEY) && !window.location.hash && !params.has("focus")));
     } catch {
       setIsOpen(false);
@@ -26,5 +26,8 @@ export function useIntroOverlay() {
     setIsOpen(false);
   }, []);
 
-  return { isOpen, close };
+  /** Open alexsonicLAb on purpose, from the header. */
+  const open = useCallback(() => setIsOpen(true), []);
+
+  return { isOpen, open, close };
 }
