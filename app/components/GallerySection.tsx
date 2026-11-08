@@ -11,6 +11,7 @@ import { ArrowUpRight, Headphones, Leaf, Play, Youtube } from "lucide-react";
 import { GALLERY_CONTENT, type GalleryItem } from "../data/gallery";
 import { cancelTiltAnimation, resetTilt, type TiltElement, updateTilt } from "../lib/tilt";
 import type { Language } from "../types/project";
+import { GalleryVeins } from "./GalleryVeins";
 import { isTouchDevice, prefersReducedMotion } from "../utils/environment";
 
 export function GallerySection({ lang }: { lang: Language }) {
@@ -52,6 +53,7 @@ export function GallerySection({ lang }: { lang: Language }) {
 
   return (
     <section id="gallery" className="gallery-section relative min-h-[100svh] snap-child overflow-hidden border-t border-white/10">
+      <GalleryVeins />
       <div className="gallery-orbit gallery-orbit-one" aria-hidden />
       <div className="gallery-orbit gallery-orbit-two" aria-hidden />
 

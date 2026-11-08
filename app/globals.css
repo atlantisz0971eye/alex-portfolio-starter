@@ -425,6 +425,18 @@ a {
   mask-image: linear-gradient(to bottom, transparent, black 22%, black 78%, transparent);
 }
 
+/* The leaf venation canvas sits under the grid, the orbits and the cards; it fades out at the top and bottom edges. */
+.gallery-veins {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 14%, black 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, black 14%, black 86%, transparent);
+}
+
 .gallery-orbit {
   position: absolute;
   border: 1px solid rgba(181, 203, 154, .13);
