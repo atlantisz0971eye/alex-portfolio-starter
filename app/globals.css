@@ -2406,50 +2406,7 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 .sonic-lab__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.sonic-lab__name {
-  position: absolute;
-  top: 14px;
-  left: 2.2vw;
-  z-index: 2;
-  display: flex;
-  gap: 3ch;
-  color: #6b6d72;
-  pointer-events: none;
-}
-.sonic-lab__name b { color: #f2f2f0; font-weight: 700; letter-spacing: .02em; }
-/* The readout rides on the axis: one line just above the band, one just below. */
-.sonic-lab__readout {
-  position: absolute;
-  left: 2.2vw;
-  right: 2.2vw;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 3ch;
-  font-size: 11px;
-  letter-spacing: .04em;
-  color: #8a8d94;
-  pointer-events: none;
-  text-shadow: 0 0 6px #0b0b0c, 0 0 2px #0b0b0c;
-}
-/* The axis sits 40% down the screen (AXIS in SonicLab.tsx). */
-.sonic-lab__readout--top { bottom: calc(60% + 40px); }
-.sonic-lab__readout--bottom { top: calc(40% + 40px); }
-.sonic-lab__readout span:first-child { color: #f2f2f0; }
-.sonic-lab__readout .is-on { color: #5af08a; }
-.sonic-lab:not(.is-started) .sonic-lab__readout--bottom span:last-child { animation: sonic-blink 1.6s steps(2, jump-none) infinite; }
 @keyframes sonic-blink { 50% { opacity: .35; } }
-.sonic-lab__exits { position: absolute; right: 2.2vw; top: 10px; z-index: 3; display: flex; gap: 3ch; }
-.sonic-lab__exits button {
-  padding: 6px 10px;
-  color: #0b0b0c;
-  background: #f2f2f0;
-  font: inherit;
-  font-weight: 700;
-  letter-spacing: .04em;
-  cursor: pointer;
-}
-.sonic-lab__exits button:hover { background: #5af08a; }
 /* Leaving: the instrument is wiped away band by band, like scan lines. */
 .sonic-lab.is-leaving { pointer-events: none; animation: sonic-wipe .7s steps(14, end) forwards; }
 @keyframes sonic-wipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
@@ -2481,18 +2438,21 @@ a {
 .sonic-deck .is-bar { color: #8a8d94; }
 .sonic-deck .is-bar:hover { color: #f2f2f0; }
 .sonic-deck .is-meter { color: #5af08a; }
+.sonic-deck .is-blink { color: #c9ccd2; animation: sonic-blink 1.6s steps(2, jump-none) infinite; }
+/* The oscilloscope sits inside framed empty lines, one character in from each border. */
+.sonic-deck__scope { position: relative; }
+.sonic-deck__scope canvas { position: absolute; top: 2px; left: 1ch; height: calc(100% - 4px); pointer-events: none; }
 .sonic-deck .is-fader { color: #f2f2f0; cursor: ns-resize; touch-action: none; }
 .sonic-deck .is-fader.is-dim { color: #44474c; }
 @media (max-width: 640px) {
   .sonic-deck { font-size: 11px; }
-  .sonic-lab__name span { display: none; }
 }
 
 /* The way in from the portfolio header. */
 .header-lab { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .02em; }
 @media (prefers-reduced-motion: reduce) {
   .sonic-lab.is-leaving { animation: none; opacity: 0; }
-  .sonic-lab__readout--bottom span:last-child { animation: none !important; }
+  .sonic-deck .is-blink, .sonic-deck .is-pending { animation: none; }
 }
 
 /* ===== Workbench: a plate cut into the page, with each project's architecture etched into it ===== */

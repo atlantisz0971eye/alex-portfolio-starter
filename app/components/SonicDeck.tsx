@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { PLAYERS, STYLES, type PlayerId, type StyleId } from "../data/sonicStyles";
 
 /**
@@ -30,6 +30,11 @@ type DeckProps = {
   onShare: () => Promise<boolean>;
   /** The Lab writes live readouts into these spans: "meter:<player>", "filter", "steps". */
   registerLive: (name: string, element: HTMLSpanElement | null) => void;
+  /** The canvas the Lab draws the live waveform into. */
+  scopeRef: RefObject<HTMLCanvasElement | null>;
+  status: { label: string; y: number; height: number; percent: number; section: string };
+  powered: boolean;
+  onEnter: () => void;
 };
 
 type Cell = { text: string; className?: string; title?: string; onClick?: () => void; fader?: { player: PlayerId; level: number }; live?: string };
@@ -37,7 +42,7 @@ type Cell = { text: string; className?: string; title?: string; onClick?: () => 
 const FADER_ROWS = 5;
 const pad = (text: string, width: number) => (text.length >= width ? text.slice(0, width) : text + " ".repeat(width - text.length));
 
-export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSends, onShare, registerLive }: DeckProps) {
+export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSends, onShare, registerLive, scopeRef, status, powered, onEnter }: DeckProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const probeRef = useRef<HTMLSpanElement | null>(null);
   const [cols, setCols] = useState(0);
@@ -71,7 +76,8 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
     window.setTimeout(() => setCopied(false), 1600);
   };
 
-  const lines: Cell[][] = [];
+  /** A line of cells, or a block of empty framed lines with the oscilloscope drawn over it. */
+  const lines: (Cell[] | { scope: number })[] = [];
   const text = (t: string, className?: string): Cell => ({ text: t, className });
   const styleKeys = (): Cell[] =>
     STYLES.flatMap((style) => [
@@ -90,6 +96,8 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
     return [text(border, "is-frame"), ...left, text(" ".repeat(gap)), ...right, text(border, "is-frame")];
   };
   const muted = (player: PlayerId) => state.mutes.includes(player) || (state.solos.length > 0 && !state.solos.includes(player));
+  const enterKey: Cell = { text: powered ? "[ENTER HERE ↵]" : "[ENTER SILENTLY ↵]", className: "is-key", title: "Go to the portfolio, where the read head is", onClick: onEnter };
+  const sound: Cell = { text: powered ? "● SOUND" : "○ CLICK FOR SOUND", className: powered ? "is-meter" : "is-blink" };
 
   if (cols >= 96) {
     // Six columns: five players and the master.
@@ -110,6 +118,18 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
 
     const title = " alexsonicLAb · DECK ";
     lines.push([text("┌─" + title + "─".repeat(Math.max(0, cols - 3 - title.length)) + "┐", "is-frame")]);
+    lines.push(row(
+      [
+        text(` ${status.label}`, "is-bright"),
+        text(`   y ${status.y.toString().padStart(5, "0")} / ${status.height}   ${status.percent}%   `, "is-dim"),
+        text(`§${status.section.toUpperCase()}`, "is-bright"),
+        text("   "),
+        sound,
+      ],
+      [enterKey, text(" ")],
+    ));
+    lines.push({ scope: 3 });
+    lines.push([text("├" + "─".repeat(Math.max(0, cols - 2)) + "┤", "is-frame")]);
     lines.push(row([text(" STYLE ", "is-dim"), ...styleKeys()], [text(`${bpm} BPM `, "is-bright")]));
     lines.push([rule("├", "┬", "┤")]);
     lines.push(columns((i) => (i < 5 ? [text(" " + PLAYERS[i].name, muted(PLAYERS[i].id) ? "is-dim" : "is-bright")] : [text(" MASTER", "is-bright")])));
@@ -149,6 +169,8 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
   } else if (cols > 0) {
     // Narrow screens: style keys, then one key per player that mutes it.
     lines.push([text("┌─ alexsonicLAb " + "─".repeat(Math.max(0, cols - 17)) + "┐", "is-frame")]);
+    lines.push(row([text(` ${status.percent}% §${status.section.toUpperCase()} `, "is-bright"), { ...sound, text: powered ? "●" : "○ SOUND" }], [{ ...enterKey, text: "[ENTER ↵]" }]));
+    lines.push({ scope: 2 });
     let current: Cell[] = [];
     for (const cell of styleKeys()) {
       if (width(current) + cell.text.length > cols - 3) {
@@ -208,9 +230,18 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
   return (
     <div ref={rootRef} className="sonic-deck">
       <span ref={probeRef} className="sonic-deck__probe" aria-hidden>0000000000</span>
-      {lines.map((line, index) => (
-        <div key={index} className="sonic-deck__line">{line.map(render)}</div>
-      ))}
+      {lines.map((line, index) =>
+        "scope" in line ? (
+          <div key={index} className="sonic-deck__scope">
+            {Array.from({ length: line.scope }, (_, k) => (
+              <div key={k} className="sonic-deck__line">{row([]).map(render)}</div>
+            ))}
+            <canvas ref={scopeRef} style={{ width: `${Math.max(0, cols - 2)}ch` }} aria-hidden />
+          </div>
+        ) : (
+          <div key={index} className="sonic-deck__line">{line.map(render)}</div>
+        ),
+      )}
     </div>
   );
 }

@@ -79,6 +79,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
   const deckRef = useRef<DeckState | null>(null);
   deckRef.current = deck;
   const live = useRef(new Map<string, HTMLSpanElement>());
+  const scope = useRef<HTMLCanvasElement | null>(null);
 
   const state = useRef({
     snapshot: null as ScanSnapshot | null,
@@ -283,7 +284,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       }
     };
 
-    /** The axis: the pixels of the row being read, the live waveform along it. Every frame. */
+    /** The axis: only the pixels of the row being read, one block per column. Every frame. */
     const drawAxis = () => {
       const { w: width, h: height } = s.size;
       axisCtx.clearRect(0, 0, width, height);
@@ -291,42 +292,62 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       const row = rowAt(s.row);
       const accent = ACCENT[row?.section ?? "top"] ?? ACCENT.top;
       const [r, g, b] = accent;
-      axisCtx.fillStyle = "rgba(11,11,12,0.86)";
-      axisCtx.fillRect(0, mid - 34, width, 68);
+      axisCtx.fillStyle = "rgba(11,11,12,0.9)";
+      axisCtx.fillRect(0, mid - 16, width, 32);
+      axisCtx.fillStyle = `rgba(${r},${g},${b},0.18)`;
+      axisCtx.fillRect(0, mid, width, 1);
       if (row) {
         const cw = width / row.chars.length;
         for (let c = 0; c < row.chars.length; c += 1) {
           const ink = row.inks[c];
           if (ink === Ink.Blank) continue;
-          axisCtx.fillStyle = inkColour(ink, accent, Math.min(1, (INK_ALPHA[ink] ?? 0.5) + 0.25));
-          axisCtx.fillRect(c * cw, mid - 30, Math.max(1, cw - 1), 6);
+          axisCtx.fillStyle = inkColour(ink, accent, Math.min(1, (INK_ALPHA[ink] ?? 0.5) + 0.3));
+          axisCtx.fillRect(c * cw, mid - 7, Math.max(1, cw - 1), 14);
         }
       }
+      axisCtx.fillStyle = `rgba(${r},${g},${b},0.55)`;
+      axisCtx.fillRect(0, mid - 16, width, 1);
+      axisCtx.fillRect(0, mid + 15, width, 1);
+    };
+
+    /** The deck's oscilloscope: the live waveform of the mix. */
+    const drawScope = () => {
+      const canvas = scope.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const [r, g, b] = ACCENT[rowAt(s.row)?.section ?? "top"] ?? ACCENT.top;
+      const mid = h / 2;
       const analyser = s.synth?.analyser;
-      axisCtx.beginPath();
+      ctx.beginPath();
       if (analyser) {
         analyser.getByteTimeDomainData(s.wave);
         const n = s.wave.length;
         for (let i = 0; i < n; i += 2) {
-          const x = (i / (n - 1)) * width;
-          // Gain up so quiet passages still read, clamped inside the band.
-          const y = mid + Math.max(-28, Math.min(28, ((s.wave[i] - 128) / 128) * 60));
-          if (i === 0) axisCtx.moveTo(x, y);
-          else axisCtx.lineTo(x, y);
+          const x = (i / (n - 1)) * w;
+          // Gain up so quiet passages still read, clamped inside the scope.
+          const y = mid + Math.max(-mid + 2, Math.min(mid - 2, ((s.wave[i] - 128) / 128) * h * 1.1));
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
       } else {
-        axisCtx.moveTo(0, mid);
-        axisCtx.lineTo(width, mid);
+        ctx.moveTo(0, mid);
+        ctx.lineTo(w, mid);
       }
-      axisCtx.strokeStyle = `rgba(${r},${g},${b},0.25)`;
-      axisCtx.lineWidth = 4;
-      axisCtx.stroke();
-      axisCtx.strokeStyle = `rgba(${r},${g},${b},0.95)`;
-      axisCtx.lineWidth = 1.2;
-      axisCtx.stroke();
-      axisCtx.fillStyle = `rgba(${r},${g},${b},0.5)`;
-      axisCtx.fillRect(0, mid - 34, width, 1);
-      axisCtx.fillRect(0, mid + 33, width, 1);
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.25)`;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.95)`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     };
 
     /** The deck's meters, filter readout and step lights, written straight into their spans. */
@@ -366,6 +387,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
           drawField();
         }
         drawAxis();
+        drawScope();
         drawLive();
       }
       frame = requestAnimationFrame(tick);
@@ -503,7 +525,6 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
 
   if (!open) return null;
   const percent = Math.min(100, Math.round((readout.y / Math.max(1, readout.height)) * 100));
-  const playing = styleById(deck?.style);
 
   return (
     <div
@@ -518,29 +539,6 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       <canvas ref={fieldRef} className="sonic-lab__canvas" aria-hidden />
       <canvas ref={axisRef} className="sonic-lab__canvas" aria-hidden />
 
-      <div className="sonic-lab__name">
-        <b>alexsonicLAb</b>
-        <span>an instrument that reads this site</span>
-      </div>
-
-      <div className="sonic-lab__readout sonic-lab__readout--top" aria-hidden>
-        <span>{readout.complete ? "SCAN COMPLETE" : started ? "SCANNING" : "STANDBY"}</span>
-        <span>y {readout.y.toString().padStart(5, "0")} / {readout.height}</span>
-        <span>{percent}%</span>
-        <span>§{readout.section.toUpperCase()}</span>
-      </div>
-      <div className="sonic-lab__readout sonic-lab__readout--bottom" aria-hidden>
-        <span>{playing.name}</span>
-        <span className={powered ? "is-on" : ""}>{powered ? "● SOUND" : "○ CLICK FOR SOUND"}</span>
-        <span>{started ? "SCROLL ↑↓ TO READ" : "SCROLL TO READ · CLICK FOR SOUND"}</span>
-      </div>
-
-      <div className="sonic-lab__exits">
-        <button type="button" onClick={(event) => { event.stopPropagation(); enter(); }}>
-          {powered ? "ENTER HERE ↵" : "ENTER SILENTLY ↵"}
-        </button>
-      </div>
-
       {deck && (
         <SonicDeck
           state={deck}
@@ -552,6 +550,10 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
           onSends={(delay, reverb) => updateDeck((d) => ({ ...d, delay, reverb }))}
           onShare={share}
           registerLive={registerLive}
+          scopeRef={scope}
+          status={{ label: readout.complete ? "SCAN COMPLETE" : started ? "SCANNING" : "STANDBY", y: readout.y, height: readout.height, percent, section: readout.section }}
+          powered={powered}
+          onEnter={enter}
         />
       )}
     </div>
