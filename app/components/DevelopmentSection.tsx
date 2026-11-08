@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { DEVELOPMENT_CONTENT, type DevelopmentItem } from "../data/development";
+import { DEVELOPMENT_CONTENT, DEVELOPMENT_GLOW, type DevelopmentItem } from "../data/development";
+import { DevelopmentSignal } from "./DevelopmentSignal";
 import { cancelTiltAnimation, resetTilt, type TiltElement, updateTilt } from "../lib/tilt";
 import type { Language } from "../types/project";
 import { isTouchDevice, prefersReducedMotion } from "../utils/environment";
@@ -85,6 +86,8 @@ function DevelopmentCard({ item, lang, isOpen, onToggle, liveLabel, visitLabel }
 export function DevelopmentSection({ lang }: { lang: Language }) {
   const content = DEVELOPMENT_CONTENT[lang];
   const [openSlug, setOpenSlug] = useState<string | null>(null);
+  const [hoverSlug, setHoverSlug] = useState<string | null>(null);
+  const tint = DEVELOPMENT_GLOW[hoverSlug ?? openSlug ?? "rest"] ?? DEVELOPMENT_GLOW.rest;
 
   // Opening a card elsewhere on the page closes this one, as it does for the project cards.
   useEffect(() => {
@@ -104,6 +107,7 @@ export function DevelopmentSection({ lang }: { lang: Language }) {
 
   return (
     <section id="development" className="section-wrap development-section relative overflow-hidden snap-child min-h-[100svh] w-full">
+      <DevelopmentSignal tint={tint} />
       <div className="dev-grid" aria-hidden />
       <div className="theme-noise section-noise" aria-hidden />
 
@@ -115,7 +119,7 @@ export function DevelopmentSection({ lang }: { lang: Language }) {
         </div>
         <div className="cards-col flex flex-col items-center gap-6">
           {content.items.map((item) => (
-            <div key={item.slug} className="w-full [&_.card]:px-5 [&_.card]:py-4 md:[&_.card]:px-6 md:[&_.card]:py-5">
+            <div key={item.slug} onMouseEnter={() => setHoverSlug(item.slug)} onMouseLeave={() => setHoverSlug(null)} className="w-full [&_.card]:px-5 [&_.card]:py-4 md:[&_.card]:px-6 md:[&_.card]:py-5">
               <DevelopmentCard item={item} lang={lang} isOpen={openSlug === item.slug} onToggle={() => toggle(item.slug)} liveLabel={content.liveLabel} visitLabel={content.visitLabel} />
             </div>
           ))}
