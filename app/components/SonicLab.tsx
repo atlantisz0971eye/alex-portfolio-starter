@@ -964,8 +964,16 @@ export function SonicLab({ open, onClose, snapshot: given = null, linkQuery = "s
   }, [open, settingsKey, applyDeck]);
 
   // A performance from the host plays at once if the sound is on, or waits for the click that turns it on.
+  const lastPlay = useRef<Performance | null>(null);
   useEffect(() => {
-    if (!open || !play) return;
+    // Taken away by the host: stop it (a replay link from the address is not the host's, and keeps playing).
+    if (!play) {
+      if (lastPlay.current) stopReplay();
+      lastPlay.current = null;
+      return;
+    }
+    if (!open) return;
+    lastPlay.current = play;
     stopReplay();
     const s = state.current;
     s.replay = play;

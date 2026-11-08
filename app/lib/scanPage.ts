@@ -126,7 +126,8 @@ export function snapshotPage(root: HTMLElement, options: SnapshotOptions = PORTF
     // A landmark is named by its first heading, its label, or a readable id (not a generated one), else its tag.
     const slug = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 16);
     const label = (element: Element) => {
-      const heading = (element.querySelector("h1, h2, h3")?.textContent ?? "").trim();
+      const shown = Array.from(element.querySelectorAll("h1, h2, h3")).find((h) => h.getClientRects().length > 0);
+      const heading = (shown?.textContent ?? "").trim();
       const id = /\d|^[a-z]{1,4}$/i.test(element.id) ? "" : element.id;
       for (const raw of [heading.length <= 40 ? heading : "", element.getAttribute("aria-label") ?? "", id, element.getAttribute("role") ?? "", element.tagName]) {
         const name = slug(raw);
