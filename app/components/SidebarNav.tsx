@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type NavId = "development" | "tian" | "ren" | "di" | "gallery" | "bio";
+type NavId = "development" | "tian" | "ren" | "di" | "gallery" | "workbench" | "bio";
 type SidebarNavItem = { id: NavId; icon: string };
 
 const NAV_ITEMS: SidebarNavItem[] = [
@@ -11,6 +11,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { id: "di", icon: "●" },
   { id: "development", icon: "●" },
   { id: "gallery", icon: "●" },
+  { id: "workbench", icon: "●" },
   { id: "bio", icon: "A" },
 ];
 
@@ -22,6 +23,7 @@ const LABELS: Record<NavId, { en: string; zh: string }> = {
   ren: { en: "Rumination", zh: "反刍" },
   di: { en: "Connection", zh: "连接" },
   gallery: { en: "Gallery", zh: "作品画廊" },
+  workbench: { en: "Workbench", zh: "工作台" },
   bio: { en: "Bio", zh: "简介" },
 };
 
