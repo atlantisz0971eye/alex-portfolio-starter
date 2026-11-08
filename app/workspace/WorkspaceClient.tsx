@@ -17,9 +17,9 @@ import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
 import { Members } from "./Members";
-import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme } from "./Shell";
+import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme, type ThemeMode } from "./Shell";
 import { Today } from "./Today";
-import { CarcosaProvider, CarcosaSpores } from "./Carcosa";
+import { CarcosaPet, CarcosaProvider } from "./Carcosa";
 import { CarcosaHead, CarcosaNow, type CarcosaSub } from "./CarcosaPage";
 
 type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
@@ -104,15 +104,20 @@ export default function WorkspaceClient({ authorized, configured, user }: Props)
       root.style.removeProperty("--ws-top");
     };
   }, []);
-  const [theme, setTheme] = useState<Theme>("dark");
+  // "auto" (the default) lets Carcosa's sky choose light or dark; until she reports, the system preference stands in
+  const [mode, setMode] = useState<ThemeMode>("auto");
+  const [autoTheme, setAutoTheme] = useState<Theme>("dark");
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("ws-theme");
-      if (saved === "dark" || saved === "light") setTheme(saved); else if (!window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("light");
+      const saved = localStorage.getItem("ws-theme-mode");
+      if (saved === "dark" || saved === "light" || saved === "auto") setMode(saved);
+      if (!window.matchMedia("(prefers-color-scheme: dark)").matches) setAutoTheme("light");
     } catch { /* storage unavailable */ }
   }, []);
-  const toggle = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; try { localStorage.setItem("ws-theme", next); } catch { /* storage unavailable */ } return next; });
-  return <ThemeContext.Provider value={{ theme, toggle }}><div className="ws-root" data-theme={theme} data-skin="byte">{authorized ? <UserContext.Provider value={{ user, openMembers: () => setMembersOpen(true) }}><App />{user?.role === "owner" && <Members open={membersOpen} onClose={() => setMembersOpen(false)} onError={setErrorText} />}{errorText && <div className="ws-toast" role="alert"><span>{errorText}</span><button type="button" onClick={() => setErrorText("")} aria-label="Dismiss"><X size={16} /></button></div>}</UserContext.Provider> : <Login configured={configured} />}</div></ThemeContext.Provider>;
+  const toggle = useCallback(() => setMode((current) => { const next: ThemeMode = current === "auto" ? "light" : current === "light" ? "dark" : "auto"; try { localStorage.setItem("ws-theme-mode", next); } catch { /* storage unavailable */ } return next; }), []);
+  const reportAuto = useCallback((next: Theme) => setAutoTheme(next), []);
+  const theme: Theme = mode === "auto" ? autoTheme : mode;
+  return <ThemeContext.Provider value={{ theme, mode, toggle, reportAuto }}><div className="ws-root" data-theme={theme} data-skin="byte">{authorized ? <UserContext.Provider value={{ user, openMembers: () => setMembersOpen(true) }}><App />{user?.role === "owner" && <Members open={membersOpen} onClose={() => setMembersOpen(false)} onError={setErrorText} />}{errorText && <div className="ws-toast" role="alert"><span>{errorText}</span><button type="button" onClick={() => setErrorText("")} aria-label="Dismiss"><X size={16} /></button></div>}</UserContext.Provider> : <Login configured={configured} />}</div></ThemeContext.Provider>;
 }
 
 function App() {
@@ -127,8 +132,8 @@ function App() {
   const [citation, setCitation] = useState<{ seq: number; page?: number; offset?: number } | null>(null);
   const [tab, setTab] = useState<Tab>("today");
   // which part of Carcosa is open: the ledger and the notebook are the former Devlog and Mindstreams tabs
-  const [carcosaSub, setCarcosaSub] = useState<CarcosaSub>("now");
-  useEffect(() => { try { const saved = localStorage.getItem("ws-carcosa-sub"); if (saved === "now" || saved === "ledger" || saved === "notebook") setCarcosaSub(saved); } catch { /* default */ } }, []);
+  const [carcosaSub, setCarcosaSub] = useState<CarcosaSub>("pet");
+  useEffect(() => { try { const saved = localStorage.getItem("ws-carcosa-sub"); if (saved === "pet" || saved === "now" || saved === "ledger" || saved === "notebook") setCarcosaSub(saved); } catch { /* default */ } }, []);
   const chooseSub = useCallback((next: CarcosaSub) => { setCarcosaSub(next); try { localStorage.setItem("ws-carcosa-sub", next); } catch { /* per-viewer */ } }, []);
   // the old tab names still arrive from a few places; they open the matching part of Carcosa
   useEffect(() => { if (tab === "mindstreams") { setTab("carcosa"); setCarcosaSub("notebook"); } else if (tab === "devlog") { setTab("carcosa"); setCarcosaSub("ledger"); } }, [tab]);
@@ -370,7 +375,6 @@ function App() {
   const updateDocument = (document: WorkspaceDocument) => setBook((current) => current && { ...current, document });
 
   return <CarcosaProvider>
-    <CarcosaSpores />
     <div className="shell">
       <Sidebar tab={tab} onTab={go} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
       <div className="shell__main">
@@ -380,7 +384,8 @@ function App() {
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
           : tab === "carcosa" || tab === "mindstreams" || tab === "devlog" ? <div className="page page--carcosa">
             <CarcosaHead sub={carcosaSub} onSub={chooseSub} />
-            {carcosaSub === "now" ? <CarcosaNow onError={setError} />
+            {carcosaSub === "pet" ? <CarcosaPet />
+              : carcosaSub === "now" ? <CarcosaNow onError={setError} />
               : carcosaSub === "ledger" ? <Devlog embedded onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); chooseSub("notebook"); }} />
               : <Mind embedded onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />}
           </div>

@@ -4,7 +4,6 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseResponse } from "./api";
 import { keepInNotebook } from "./keep";
-import { useCarcosa } from "./Carcosa";
 
 type Item = { id: string; title: string; zh: string; summary: string; note: string; source: string; url: string; published: string | null };
 type Section = { key: string; label: string; zh: string; items: Item[] };
@@ -60,23 +59,7 @@ export function Paper({ onError }: { onError: (message: string) => void }) {
     }
   }
 
-  const { eat } = useCarcosa();
-  // a story that has been on screen for three seconds has been seen
-  useEffect(() => {
-    if (!edition) return;
-    const timers = new Map<Element, number>();
-    const watch = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        const id = (entry.target as HTMLElement).dataset.carcosa;
-        if (!id) continue;
-        if (entry.isIntersecting) { if (!timers.has(entry.target)) timers.set(entry.target, window.setTimeout(() => eat([id]), 3000)); }
-        else { const timer = timers.get(entry.target); if (timer) { window.clearTimeout(timer); timers.delete(entry.target); } }
-      }
-    }, { threshold: 0.6 });
-    document.querySelectorAll(".paper__story[data-carcosa]").forEach((el) => watch.observe(el));
-    return () => { watch.disconnect(); timers.forEach((timer) => window.clearTimeout(timer)); };
-  }, [edition, eat]);
-  const keep = (item: Item) => { eat([`news:${item.url}`]); return void keepInNotebook(`${item.zh}\n${item.summary}\n${item.source} · ${item.url}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it.")); };
+  const keep = (item: Item) => void keepInNotebook(`${item.zh}\n${item.summary}\n${item.source} · ${item.url}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
 
   return <section className="paper" aria-label="Front page">
     <div className="paper__bar">
@@ -92,8 +75,8 @@ export function Paper({ onError }: { onError: (message: string) => void }) {
       <div className="paper__cols">
         {edition.sections.map((section) => <section key={section.key} className="paper__col" data-section={section.key}>
           <h2 className="paper__label">{section.label}<span>{section.zh}{section.key === "random" ? " · 抽签" : ""}</span></h2>
-          {section.items.length === 0 ? <p className="paper__none">Nothing fresh from these sources.</p> : section.items.map((item, index) => <article key={item.id} data-carcosa={`news:${item.url}`} className={index === 0 ? "paper__story is-lead" : "paper__story"}>
-            <h3><a href={item.url} target="_blank" rel="noopener noreferrer" onClick={() => eat([`news:${item.url}`])}>{item.zh}</a></h3>
+          {section.items.length === 0 ? <p className="paper__none">Nothing fresh from these sources.</p> : section.items.map((item, index) => <article key={item.id} className={index === 0 ? "paper__story is-lead" : "paper__story"}>
+            <h3><a href={item.url} target="_blank" rel="noopener noreferrer">{item.zh}</a></h3>
             <p>{item.summary}</p>
             <small>{item.source}{item.note ? ` · ${item.note}` : ""}{item.published ? ` · ${ago(item.published)}` : ""} <button type="button" className="paper__keep" onClick={() => keep(item)}>keep</button></small>
           </article>)}

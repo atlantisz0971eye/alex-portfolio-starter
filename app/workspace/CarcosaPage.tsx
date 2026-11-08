@@ -6,11 +6,11 @@ import { parseResponse } from "./api";
 import { PageTitle } from "./Shell";
 
 /**
- * The Carcosa tab: what really happened in development, the devlog written from it, and the notebook. "Now" puts
+ * The Carcosa tab: the creature (Yak), what really happened in development, the devlog written from it, and the notebook. "Now" puts
  * the three sources side by side (the working folders as Drive Sync sees them, GitHub, production), lists what does
  * not line up, the last days, and what the agents did. The ledger and the notebook are the former Devlog and Mindstreams.
  */
-export type CarcosaSub = "now" | "ledger" | "notebook";
+export type CarcosaSub = "pet" | "now" | "ledger" | "notebook";
 
 type Alignment = { repo: string; local?: { device: string; folder: string; branch: string; head: string; dirty: number; ahead: number; behind: number; seen: string }; main?: string; prod?: { sha: string; at: string }; lastDeploy?: { sha: string; state: string; at: string }; aligned: boolean };
 type Issue = { repo: string; kind: string; text: string; day?: string };
@@ -18,7 +18,7 @@ type Day = { day: string; key: string; label: string; repo?: string; syncs: numb
 type Audit = { at: string; actor: string; action: string; detail: string };
 type View = { polledAt: string | null; syncVersion: string | null; alignment: Alignment[]; issues: Issue[]; days: Day[]; audit: Audit[]; written?: string[] };
 
-const SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "now", label: "Now" }, { id: "ledger", label: "Ledger" }, { id: "notebook", label: "Notebook" }];
+const SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "pet", label: "Yak" }, { id: "now", label: "Now" }, { id: "ledger", label: "Ledger" }, { id: "notebook", label: "Notebook" }];
 const short = (sha?: string) => (sha ? sha.slice(0, 7) : "—");
 const when = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 

@@ -267,21 +267,24 @@
 /* The reader's own question bubble: the accent is pale here, so the text must be dark. */
 .ws-root[data-skin="byte"] .ws-message--user, .ws-root[data-skin="byte"] .ws-message--user * { color: var(--on-accent); }
 
-/* ---- Carcosa: a grey hairline under the corner strip; in the open index, the yak once everything is eaten ---- */
-/* inside the strip, along its bottom edge: hanging below it, the line would cross the giant page titles */
-.ws-root[data-skin="byte"] .carcosa-line { position: absolute; left: 2.2vw; right: 2.2vw; bottom: 0; width: calc(100% - 4.4vw); height: 12px; image-rendering: pixelated; pointer-events: none; }
-/* The count and the lump follow "index" on the left: the right end of the strip belongs to each page's own buttons. */
-.ws-root[data-skin="byte"] .carcosa-lump { position: static; align-self: center; width: 34px; height: 26px; margin: -6px 0 -6px -1ch; image-rendering: pixelated; pointer-events: none; display: none; }
-.ws-root[data-skin="byte"] .carcosa-lump[data-on] { display: block; }
-.ws-root[data-skin="byte"] .carcosa-count { position: static; order: 3; font-size: 11px; color: var(--text-2); white-space: nowrap; pointer-events: auto; }
-.ws-root[data-skin="byte"] .carcosa-lump { order: 4; }
-.ws-root[data-skin="byte"] .sidebar[data-open] .carcosa-line, .ws-root[data-skin="byte"] .sidebar[data-open] .carcosa-count { display: none; }
-@media (max-width: 640px) { .ws-root[data-skin="byte"] .carcosa-count { display: none; } }
-
-.ws-root[data-skin="byte"] .carcosa-hint { position: fixed; right: 2.2vw; bottom: 3vw; margin: 0; font-size: 13px; color: var(--text-2); }
-/* In the open index the scene sits in the free corner beside the short words at the top, scaled to the window; every
-   position below is a share of the 520 x 300 scene, so it can shrink without anything drifting. */
-.ws-root[data-skin="byte"] .carcosa-scene { position: absolute; z-index: 2; top: 9vh; right: 2.2vw; width: min(520px, 34vw); aspect-ratio: 520 / 300; pointer-events: none; }
+/* ---- Carcosa, the creature, on the Yak page of the Carcosa tab ---- */
+/* every position in the scene is a share of the 520 x 300 scene, so it can shrink without anything drifting */
+.ws-root[data-skin="byte"] .carcosa-pet__top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 3vw; }
+.ws-root[data-skin="byte"] .carcosa-scene { position: relative; flex: none; width: min(520px, 100%); aspect-ratio: 520 / 300; }
+.ws-root[data-skin="byte"] .carcosa-pet__state { flex: 1 1 260px; max-width: 420px; padding-top: 1vw; }
+.ws-root[data-skin="byte"] .carcosa-pet__phase { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: var(--text); }
+.ws-root[data-skin="byte"] .carcosa-meter { height: 6px; margin: 14px 0 6px; background: color-mix(in srgb, var(--text-2) 22%, transparent); }
+.ws-root[data-skin="byte"] .carcosa-meter span { display: block; height: 100%; background: var(--text-2); transition: width .6s; }
+.ws-root[data-skin="byte"] .carcosa-signals { margin: 12px 0; padding: 0; list-style: none; font-size: 13px; line-height: 21px; }
+.ws-root[data-skin="byte"] .carcosa-signals li::before { content: "◐ "; color: #c9a21e; }
+.ws-root[data-skin="byte"] .carcosa-signals li[data-level="star"]::before { content: "★ "; color: var(--text); }
+.ws-root[data-skin="byte"] .carcosa-pet .section-label { margin-top: 3vw; }
+.ws-root[data-skin="byte"] .carcosa-routine { max-width: 720px; }
+.ws-root[data-skin="byte"] .carcosa-routine__bars { display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; align-items: end; height: 72px; }
+.ws-root[data-skin="byte"] .carcosa-routine__bars span { background: color-mix(in srgb, var(--text-2) 35%, transparent); }
+.ws-root[data-skin="byte"] .carcosa-routine__bars span[data-in] { background: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-routine__bars span[data-now] { background: #c9a21e; }
+.ws-root[data-skin="byte"] .carcosa-routine__axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-2); }
 .ws-root[data-skin="byte"] .carcosa-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
 .ws-root[data-skin="byte"] .carcosa-ground { position: absolute; left: 0; right: 0; top: 82.7%; height: 2px; background: var(--text-2); opacity: .45; }
 .ws-root[data-skin="byte"] .carcosa-sun { position: absolute; left: 70%; top: 84%; width: 7.7%; aspect-ratio: 1; color: #ffe05a; opacity: .35; transition: top .9s, opacity .9s; }
@@ -289,20 +292,15 @@
 .ws-root[data-skin="byte"] .carcosa-sun--2 { left: 81%; width: 4.6%; color: #e6c229; }
 .ws-root[data-skin="byte"] .carcosa-sun.is-up { top: 8%; opacity: 1; filter: drop-shadow(0 0 8px rgba(255, 224, 90, .5)); }
 .ws-root[data-skin="byte"] .carcosa-sun--2.is-up { top: 13%; }
-.ws-root[data-skin="byte"] .carcosa-star { position: absolute; left: 14%; top: 85.5%; width: 5%; aspect-ratio: 1; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; opacity: .7; transition: top .9s, opacity .9s; }
+.ws-root[data-skin="byte"] .carcosa-star { position: absolute; left: 14%; top: 85.5%; width: 5%; aspect-ratio: 1; padding: 0; border: 0; background: none; cursor: pointer; opacity: .7; transition: top .9s, opacity .9s; }
 .ws-root[data-skin="byte"] .carcosa-star.is-up { top: 7.3%; opacity: 1; }
 .ws-root[data-skin="byte"] .carcosa-star svg { width: 100%; height: 100%; fill: #000; stroke: var(--text-2); stroke-width: 1.2; animation: carcosa-twinkle 3.2s steps(2) infinite; }
 @keyframes carcosa-twinkle { 0%, 90% { opacity: 1; } 95% { opacity: .3; } }
-.ws-root[data-skin="byte"] .carcosa-yak { position: absolute; left: 23.85%; top: 13.3%; width: 52.3%; height: 69.3%; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; }
+.ws-root[data-skin="byte"] .carcosa-yak { position: absolute; left: 23.85%; top: 13.3%; width: 52.3%; height: 69.3%; padding: 0; border: 0; background: none; cursor: pointer; }
 .ws-root[data-skin="byte"] .carcosa-say { position: absolute; left: 0; right: 0; top: 88%; margin: 0; text-align: center; font-size: 13px; letter-spacing: .06em; color: #c9a21e; }
-.ws-root[data-skin="byte"] .carcosa-dream { position: absolute; left: 0; right: 0; top: calc(100% + 18px); margin: 0; padding: 10px 0; font-size: 14px; line-height: 23px; color: var(--text); white-space: pre-wrap; background: var(--bg); }
-@media (max-width: 700px) {
-  .ws-root[data-skin="byte"] .carcosa-scene { position: relative; top: auto; right: auto; width: min(100%, 420px); margin: 5vh 0 12vh; flex: none; }
-  .ws-root[data-skin="byte"] .carcosa-dream { position: static; margin-top: 18px; }
-}
+.ws-root[data-skin="byte"] .carcosa-dream { position: absolute; left: 0; right: 0; top: calc(100% + 12px); margin: 0; font-size: 14px; line-height: 23px; color: var(--text); white-space: pre-wrap; }
+.ws-root[data-skin="byte"] .carcosa-scene:has(.carcosa-dream) { margin-bottom: 11em; }
 @media (prefers-reduced-motion: reduce) { .ws-root[data-skin="byte"] .carcosa-star svg { animation: none; } }
-/* Carcosa's spores: one still grey dot in the margin beside each hot thing on screen */
-.ws-root[data-skin="byte"] .carcosa-spores { position: fixed; inset: 0; z-index: 35; width: 100vw; height: 100vh; image-rendering: pixelated; pointer-events: none; }
 
 /* ---- the Carcosa tab: one title, three sections; the ledger and notebook pages sit under it without their own titles ---- */
 .ws-root[data-skin="byte"] .carcosa-head .pagetitle { margin-bottom: 1.6vw; }

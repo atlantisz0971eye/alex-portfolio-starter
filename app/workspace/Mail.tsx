@@ -3,7 +3,6 @@
 import { CalendarPlus, ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
 import { PageTitle, TopRow } from "./Shell";
 import { keepInNotebook } from "./keep";
-import { useCarcosa } from "./Carcosa";
 import { MailSchedule } from "./MailSchedule";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
@@ -159,7 +158,7 @@ export function Mail({ onError, onSignOut }: { onError: (message: string) => voi
         {failure.reason === "reauth" ? <>Access to {failure.email} expired. <a href={`/api/workspace/mail/connect?hint=${encodeURIComponent(failure.email)}`}>Reconnect</a></> : <>Could not load {failure.email}.</>}
       </p>)}
       {inbox === null ? <MailSkeleton /> : inbox.messages.length === 0 ? <p className="empty">{query ? "No messages match your search." : "Nothing in the inbox."}</p> : <ul className="mail-list">
-        {inbox.messages.map((message) => <li key={`${message.account}-${message.id}`} data-carcosa={`mail:${message.account}:${message.id}`}>
+        {inbox.messages.map((message) => <li key={`${message.account}-${message.id}`}>
           <button type="button" className={open?.id === message.id && open.account === message.account ? "is-open" : ""} onClick={() => setOpen(message)}>
             <span className={`mail-dot${message.unread ? " is-unread" : ""}`} aria-label={message.unread ? "Unread" : undefined} />
             <span className="mail-row">
@@ -206,8 +205,6 @@ export function MailMessage({ summary, onClose, onError, pane = false }: { summa
   const [live, setLive] = useState<Turn | null>(null);
   const [question, setQuestion] = useState("");
   const abort = useRef<AbortController | null>(null);
-  const { eat } = useCarcosa();
-  useEffect(() => { eat([`mail:${summary.account}:${summary.id}`]); }, [eat, summary.account, summary.id]);
 
   useEffect(() => {
     let cancelled = false;

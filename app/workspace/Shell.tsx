@@ -1,17 +1,20 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, Sun, Users, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, Sun, SunMoon, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
-import { CarcosaGauge, CarcosaIndex } from "./Carcosa";
 
 export type Theme = "light" | "dark";
-export const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({ theme: "light", toggle: () => undefined });
+export type ThemeMode = Theme | "auto";
+export const ThemeContext = createContext<{ theme: Theme; mode: ThemeMode; toggle: () => void; reportAuto: (theme: Theme) => void }>({ theme: "light", mode: "auto", toggle: () => undefined, reportAuto: () => undefined });
 
-/** Light by day, dark by night. */
+/** Auto (Carcosa's sky decides), then light, then dark. The button names what a click switches to. */
 export function ThemeToggle({ className = "" }: { className?: string }) {
-  const { theme, toggle } = useContext(ThemeContext);
-  return <button type="button" className={className} onClick={toggle} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}{className.includes("sidebar-theme") ? (theme === "dark" ? " Light mode" : " Dark mode") : ""}</button>;
+  const { mode, toggle } = useContext(ThemeContext);
+  const next = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
+  const label = { light: "Light mode", dark: "Dark mode", auto: "Auto (Carcosa)" }[next];
+  const Icon = next === "light" ? Sun : next === "dark" ? Moon : SunMoon;
+  return <button type="button" className={className} onClick={toggle} aria-label={`Switch to ${label}`} title={`Now: ${mode}`}><Icon size={15} />{className.includes("sidebar-theme") ? ` ${label}` : ""}</button>;
 }
 
 /** Who is signed in, as the browser may know it. */
@@ -63,7 +66,6 @@ export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { t
       {user?.role === "owner" && <SyncButton />}
       <button type="button" onClick={onSignOut}><LogOut size={15} /> Sign out</button>
     </div>
-    {open ? <CarcosaIndex /> : <CarcosaGauge />}
   </aside>;
 }
 
