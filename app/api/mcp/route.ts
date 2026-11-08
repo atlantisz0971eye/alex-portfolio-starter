@@ -28,8 +28,8 @@ async function authorized(request: Request): Promise<{ user: WorkspaceUser } | "
   // The owner's own access key is not accepted here: the owner uses the MCP token.
   if (member && member.role === "member") return { user: member };
   if (token.length < 32) return "not_configured";
-  // Lengths only, never the values: enough to tell an empty or truncated key from a different one.
-  console.error(`MCP auth failed: received ${given.length} characters, expected ${token.length}`);
+  // The received length only: enough to tell an empty or truncated key, without saying how long the real one is.
+  console.error(`MCP auth failed: received ${given.length} characters`);
   return "denied";
 }
 

@@ -58,7 +58,8 @@ export async function readNotesWithGemini(image: Uint8Array, mime: string): Prom
     }
     return { text, draft: items.length ? { title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim().slice(0, 60) : "Notes", items } : null };
   } catch {
-    console.error("Gemini returned unreadable output", raw.slice(0, 200));
+    // Only the size is logged, never the text: it is read from private handwriting.
+    console.error("Gemini returned unreadable output", { chars: raw.length });
     throw new GeminiError("gemini_failed");
   }
 }
