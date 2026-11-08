@@ -48,6 +48,10 @@ export type PerformActions = {
   onRoute: (player: PlayerId) => void;
 };
 
+/** The way out of the Lab: to the portfolio by default, or wherever the host page goes. */
+export type EnterLabels = { loud: string; silent: string; short: string; title: string };
+const PORTFOLIO_ENTER: EnterLabels = { loud: "[ENTER HERE ↵]", silent: "[ENTER SILENTLY ↵]", short: "[ENTER ↵]", title: "Go to the portfolio, where the read head is" };
+
 type DeckProps = {
   state: DeckState;
   bpm: number;
@@ -64,6 +68,7 @@ type DeckProps = {
   status: { label: string; y: number; height: number; percent: number; section: string };
   powered: boolean;
   onEnter: () => void;
+  enterLabels?: EnterLabels;
   perform: PerformState;
   actions: PerformActions;
   build: string;
@@ -83,7 +88,7 @@ type Cell = {
 const FADER_ROWS = 5;
 const pad = (text: string, width: number) => (text.length >= width ? text.slice(0, width) : text + " ".repeat(width - text.length));
 
-export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSends, onShare, registerLive, scopeRef, status, powered, onEnter, perform, actions, build }: DeckProps) {
+export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSends, onShare, registerLive, scopeRef, status, powered, onEnter, enterLabels = PORTFOLIO_ENTER, perform, actions, build }: DeckProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const probeRef = useRef<HTMLSpanElement | null>(null);
   const [cols, setCols] = useState(0);
@@ -144,7 +149,7 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
     return [text(border, "is-frame"), ...left, text(" ".repeat(gap)), ...right, text(border, "is-frame")];
   };
   const muted = (player: PlayerId) => state.mutes.includes(player) || (state.solos.length > 0 && !state.solos.includes(player));
-  const enterKey: Cell = { text: powered ? "[ENTER HERE ↵]" : "[ENTER SILENTLY ↵]", className: "is-key", title: "Go to the portfolio, where the read head is", onClick: onEnter };
+  const enterKey: Cell = { text: powered ? enterLabels.loud : enterLabels.silent, className: "is-key", title: enterLabels.title, onClick: onEnter };
   const sound: Cell = { text: powered ? "● SOUND" : "○ CLICK FOR SOUND", className: powered ? "is-meter" : "is-blink" };
   const press = (label: string, on: boolean, onClick: () => void, title?: string): Cell => ({ text: label, className: on ? "is-on" : "is-key", onClick, title });
   const loopCells: Cell[] = [
@@ -251,7 +256,7 @@ export function SonicDeck({ state, bpm, onStyle, onLevel, onMute, onSolo, onSend
   } else if (cols > 0) {
     // Narrow screens: style keys, then one key per player that mutes it.
     lines.push([text("┌─ alexsonicLAb " + "─".repeat(Math.max(0, cols - 17)) + "┐", "is-frame")]);
-    lines.push(row([text(` ${status.percent}% §${status.section.toUpperCase()} `, "is-bright"), { ...sound, text: powered ? "●" : "○ SOUND" }], [{ ...enterKey, text: "[ENTER ↵]" }]));
+    lines.push(row([text(` ${status.percent}% §${status.section.toUpperCase()} `, "is-bright"), { ...sound, text: powered ? "●" : "○ SOUND" }], [{ ...enterKey, text: enterLabels.short }]));
     lines.push({ scope: 2 });
     let current: Cell[] = [];
     for (const cell of styleKeys()) {

@@ -8,9 +8,23 @@ import { compose, DEFAULT_ROUTES, type Routes } from "../lib/sonicPlayers";
 import { SOURCES } from "../lib/sonicSignals";
 import { SonicSynth } from "../lib/sonicSynth";
 import { prefersReducedMotion } from "../utils/environment";
-import { SonicDeck, type DeckState, type PerformState } from "./SonicDeck";
+import { SonicDeck, type DeckState, type EnterLabels, type PerformState } from "./SonicDeck";
 
-type SonicLabProps = { open: boolean; onClose: () => void };
+type SonicLabProps = {
+  open: boolean;
+  onClose: () => void;
+  /**
+   * A page read elsewhere (by a server, from another site). Without it the Lab reads the page under it, the
+   * portfolio's `main`, and reads it again when its layout changes.
+   */
+  snapshot?: ScanSnapshot | null;
+  /** The query that opens this Lab again, for share and replay links. */
+  linkQuery?: string;
+  /** Leave on its own once the whole page has been read. */
+  autoEnter?: boolean;
+  /** What the way out is called on the deck. */
+  enterLabels?: EnterLabels;
+};
 
 /**
  * alexsonicLAb: an opaque instrument over the real portfolio. The read head is a fixed axis across the screen;
@@ -39,6 +53,15 @@ const ACCENT: Record<string, [number, number, number]> = {
 const INK_ALPHA: Record<number, number> = { [Ink.Edge]: 0.5, [Ink.Text]: 0.72, [Ink.Heading]: 1, [Ink.Media]: 0.32, [Ink.Rule]: 0.9, [Ink.Link]: 0.6 };
 /** How bright each kind of cell is, for pixel sorting. */
 const INK_WEIGHT: Record<number, number> = { [Ink.Blank]: 0, [Ink.Media]: 1, [Ink.Edge]: 2, [Ink.Link]: 3, [Ink.Rule]: 4, [Ink.Text]: 5, [Ink.Heading]: 6 };
+/** Sections of other sites have no colour of their own: each name gets one from this set, always the same. */
+const PALETTE: [number, number, number][] = [[126, 160, 255], [178, 150, 230], [110, 200, 196], [170, 206, 132], [232, 196, 140], [150, 158, 222], [236, 150, 160]];
+const accentOf = (section: string | undefined): [number, number, number] => {
+  const name = section ?? "top";
+  if (ACCENT[name]) return ACCENT[name];
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return PALETTE[Math.abs(hash) % PALETTE.length];
+};
 const inkColour = (ink: number, accent: [number, number, number], alpha: number) => {
   const [r, g, b] = accent;
   if (ink === Ink.Heading) return `rgba(255,255,255,${alpha})`;
@@ -111,7 +134,7 @@ const download = (blob: Blob, name: string) => {
 };
 const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
 
-export function SonicLab({ open, onClose }: SonicLabProps) {
+export function SonicLab({ open, onClose, snapshot: given = null, linkQuery = "scan", autoEnter = true, enterLabels }: SonicLabProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const fieldRef = useRef<HTMLCanvasElement | null>(null);
   const axisRef = useRef<HTMLCanvasElement | null>(null);
@@ -263,7 +286,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
   const share = useCallback(async () => {
     const d = deckRef.current;
     if (!d) return false;
-    const parts = ["scan", `style=${d.pending ?? d.style}`];
+    const parts = [linkQuery, `style=${d.pending ?? d.style}`];
     if (d.mutes.length) parts.push(`mute=${d.mutes.join(",")}`);
     if (d.solos.length) parts.push(`solo=${d.solos.join(",")}`);
     const rewired = PLAYERS.filter((p) => d.routes[p.id] !== DEFAULT_ROUTES[p.id]).map((p) => `${p.id}.${d.routes[p.id]}`);
@@ -274,7 +297,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     } catch {
       return false;
     }
-  }, []);
+  }, [linkQuery]);
 
   /** Start or stop recording: the sound into a file, the performance into a replayable link. */
   const record = useCallback(() => {
@@ -309,7 +332,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
   const copyLink = useCallback(async () => {
     const performanceTake = state.current.takePerformance;
     if (!performanceTake) return false;
-    const url = `${window.location.origin}${window.location.pathname}?scan#perf=${await encodePerformance(performanceTake)}`;
+    const url = `${window.location.origin}${window.location.pathname}?${linkQuery}#perf=${await encodePerformance(performanceTake)}`;
     try {
       await navigator.clipboard.writeText(url);
       return true;
@@ -317,7 +340,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       window.prompt("Copy this link to replay the performance:", url);
       return false;
     }
-  }, []);
+  }, [linkQuery]);
 
   /** The scan so far as a picture: every row read, pixel-sorted, one under the other. */
   const savePoster = useCallback(() => {
@@ -334,7 +357,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     ctx.fillStyle = "#0b0b0c";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     s.poster.forEach((line, y) => {
-      const accent = ACCENT[line.section] ?? ACCENT.top;
+      const accent = accentOf(line.section);
       for (let x = 0; x < line.inks.length; x += 1) {
         const ink = line.inks[x];
         if (ink === Ink.Blank) continue;
@@ -395,13 +418,13 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     stopReplay();
     s.synth?.stop(0.7);
     s.synth = null;
-    // Land with the read line where it was on screen.
+    // Land with the read line where it was on screen (only on the page that was read, under the Lab).
     const target = Math.max(0, s.readY - window.innerHeight * AXIS);
     window.setTimeout(() => {
       onClose();
-      window.setTimeout(() => window.scrollTo({ top: target, behavior: "instant" as ScrollBehavior }), 30);
+      if (!given) window.setTimeout(() => window.scrollTo({ top: target, behavior: "instant" as ScrollBehavior }), 30);
     }, prefersReducedMotion ? 0 : 720);
-  }, [onClose, stopReplay]);
+  }, [onClose, stopReplay, given]);
 
   const power = useCallback(() => {
     const s = state.current;
@@ -465,8 +488,8 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     const axis = axisRef.current;
     const fieldCtx = field?.getContext("2d");
     const axisCtx = axis?.getContext("2d");
-    const main = document.querySelector("main");
-    if (!root || !field || !axis || !fieldCtx || !axisCtx || !main) return;
+    const main = given ? null : document.querySelector("main");
+    if (!root || !field || !axis || !fieldCtx || !axisCtx || (!given && !main)) return;
     // The field is drawn once into a buffer; melting shifts slices of the buffer every frame.
     const buffer = document.createElement("canvas");
     const bufferCtx = buffer.getContext("2d");
@@ -499,7 +522,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     };
 
     const takeSnapshot = () => {
-      s.snapshot = snapshotPage(main);
+      s.snapshot = given ?? snapshotPage(main as HTMLElement);
       s.cache.clear();
       s.sorted.clear();
       s.fieldDirty = true;
@@ -549,7 +572,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
         // Read rows above the axis at full strength, rows still to come below it as ghosts; both fade with distance.
         const distance = Math.min(1, Math.abs(offset) / Math.max(center, lines - center));
         const fade = (offset < 0 ? 1 : 0.22) * (1 - distance * distance * 0.75);
-        const accent = ACCENT[row.section] ?? ACCENT.top;
+        const accent = accentOf(row.section);
         const y = top + k * h;
         let start = 0;
         for (let c = 1; c <= chars.length; c += 1) {
@@ -589,7 +612,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       axisCtx.clearRect(0, 0, width, height);
       const mid = Math.round(height * AXIS);
       const row = (s.hold && s.playing) || rowAt(s.row);
-      const accent = ACCENT[row?.section ?? "top"] ?? ACCENT.top;
+      const accent = accentOf(row?.section);
       const [r, g, b] = accent;
       axisCtx.fillStyle = "rgba(11,11,12,0.9)";
       axisCtx.fillRect(0, mid - 16, width, 32);
@@ -634,7 +657,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      const [r, g, b] = ACCENT[rowAt(s.row)?.section ?? "top"] ?? ACCENT.top;
+      const [r, g, b] = accentOf(rowAt(s.row)?.section);
       const mid = h / 2;
       ctx.beginPath();
       if (analyser) {
@@ -837,13 +860,13 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       window.clearTimeout(snapTimer);
       snapTimer = window.setTimeout(takeSnapshot, 200);
     });
-    resized.observe(main);
+    if (main) resized.observe(main);
     const onResize = () => layout();
     window.addEventListener("resize", onResize);
 
     layout();
     takeSnapshot();
-    void document.fonts?.ready.then(takeSnapshot);
+    if (!given) void document.fonts?.ready.then(takeSnapshot);
     run();
 
     return () => {
@@ -870,7 +893,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       s.roll = null;
       s.take = null;
     };
-  }, [open, enter, power, chooseStyle, toggle, toggleHold, setRoll, setPixel, setCarved, stopReplay]);
+  }, [open, given, enter, power, chooseStyle, toggle, toggleHold, setRoll, setPixel, setCarved, stopReplay]);
 
   // Reset for the next time the Lab is opened from the header.
   useEffect(() => {
@@ -883,10 +906,10 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
 
   // Scanned to the end: the scan completes and opens onto the page (not while a loop is held or a replay runs).
   useEffect(() => {
-    if (!open || !readout.complete || leaving || perform.hold || perform.replay) return;
+    if (!autoEnter || !open || !readout.complete || leaving || perform.hold || perform.replay) return;
     const timer = window.setTimeout(enter, 2200);
     return () => window.clearTimeout(timer);
-  }, [open, readout.complete, readout.y, leaving, perform.hold, perform.replay, enter]);
+  }, [autoEnter, open, readout.complete, readout.y, leaving, perform.hold, perform.replay, enter]);
 
   const registerLive = useCallback((name: string, element: HTMLSpanElement | null) => {
     if (element) live.current.set(name, element);
@@ -925,6 +948,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
           status={{ label, y: readout.y, height: readout.height, percent, section: readout.section }}
           powered={powered}
           onEnter={enter}
+          enterLabels={enterLabels}
           perform={perform}
           build={BUILD}
           actions={{
