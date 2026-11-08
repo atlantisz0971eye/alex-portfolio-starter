@@ -228,10 +228,16 @@ export function snapshotPage(root: HTMLElement, options: SnapshotOptions = PORTF
 
 const DENSITY = " .:-=+*#%@";
 
+/** How rows are cut from the page. Left out, a row is ROW_PX tall, read top down, with every kind of box. */
+export type RowOptions = { rowPx?: number; reverse?: boolean; kinds?: BoxKind[] | null };
+
 /** The ASCII and the features of one scan row of the page. */
-export function readRow(snapshot: ScanSnapshot, index: number, cols: number): ScanRow {
-  const y0 = index * ROW_PX;
-  const y1 = y0 + ROW_PX;
+export function readRow(snapshot: ScanSnapshot, index: number, cols: number, options: RowOptions = {}): ScanRow {
+  const rowPx = options.rowPx ?? ROW_PX;
+  // Read from the bottom up, row 0 is the last band of the page.
+  const y0 = options.reverse ? snapshot.height - (index + 1) * rowPx : index * rowPx;
+  const y1 = y0 + rowPx;
+  const kinds = options.kinds ?? null;
   const chars = new Array<string>(cols).fill(" ");
   const inks = new Uint8Array(cols);
   const edgeSet = new Set<number>();
@@ -252,7 +258,7 @@ export function readRow(snapshot: ScanSnapshot, index: number, cols: number): Sc
   const crossing: ScanBox[] = [];
   for (const box of snapshot.boxes) {
     if (box.top >= y1) break;
-    if (box.bottom > y0) crossing.push(box);
+    if (box.bottom > y0 && (!kinds || kinds.includes(box.kind))) crossing.push(box);
   }
 
   const order: BoxKind[] = ["media", "card", "link", "text", "heading", "section"];
