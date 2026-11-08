@@ -2432,13 +2432,14 @@ a {
   pointer-events: none;
   text-shadow: 0 0 6px #0b0b0c, 0 0 2px #0b0b0c;
 }
-.sonic-lab__readout--top { bottom: calc(50% + 40px); }
-.sonic-lab__readout--bottom { top: calc(50% + 40px); }
+/* The axis sits 40% down the screen (AXIS in SonicLab.tsx). */
+.sonic-lab__readout--top { bottom: calc(60% + 40px); }
+.sonic-lab__readout--bottom { top: calc(40% + 40px); }
 .sonic-lab__readout span:first-child { color: #f2f2f0; }
 .sonic-lab__readout .is-on { color: #5af08a; }
 .sonic-lab:not(.is-started) .sonic-lab__readout--bottom span:last-child { animation: sonic-blink 1.6s steps(2, jump-none) infinite; }
 @keyframes sonic-blink { 50% { opacity: .35; } }
-.sonic-lab__exits { position: absolute; right: 2.2vw; bottom: 14px; z-index: 2; display: flex; gap: 3ch; }
+.sonic-lab__exits { position: absolute; right: 2.2vw; top: 10px; z-index: 3; display: flex; gap: 3ch; }
 .sonic-lab__exits button {
   padding: 6px 10px;
   color: #0b0b0c;
@@ -2452,6 +2453,41 @@ a {
 /* Leaving: the instrument is wiped away band by band, like scan lines. */
 .sonic-lab.is-leaving { pointer-events: none; animation: sonic-wipe .7s steps(14, end) forwards; }
 @keyframes sonic-wipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
+/* The DJ deck: a grid of monospace characters. Its keys are characters too. */
+.sonic-deck {
+  position: absolute;
+  left: 2.2vw;
+  right: 2.2vw;
+  bottom: 14px;
+  z-index: 3;
+  padding: 6px 0 0;
+  background: #0b0b0c;
+  color: #8a8d94;
+  font: 12px/1.45 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace;
+  white-space: pre;
+  cursor: default;
+  user-select: none;
+}
+.sonic-deck__probe { position: absolute; visibility: hidden; pointer-events: none; }
+.sonic-deck__line { height: 1.45em; overflow: hidden; }
+.sonic-deck button { padding: 0; border: 0; background: none; color: inherit; font: inherit; line-height: inherit; cursor: pointer; white-space: pre; }
+.sonic-deck .is-frame { color: #3c3f45; }
+.sonic-deck .is-dim { color: #55585e; }
+.sonic-deck .is-bright { color: #f2f2f0; }
+.sonic-deck .is-key { color: #c9ccd2; }
+.sonic-deck .is-key:hover { color: #0b0b0c; background: #f2f2f0; }
+.sonic-deck .is-on { color: #0b0b0c; background: #5af08a; }
+.sonic-deck .is-pending { color: #5af08a; animation: sonic-blink .5s steps(2, jump-none) infinite; }
+.sonic-deck .is-bar { color: #8a8d94; }
+.sonic-deck .is-bar:hover { color: #f2f2f0; }
+.sonic-deck .is-meter { color: #5af08a; }
+.sonic-deck .is-fader { color: #f2f2f0; cursor: ns-resize; touch-action: none; }
+.sonic-deck .is-fader.is-dim { color: #44474c; }
+@media (max-width: 640px) {
+  .sonic-deck { font-size: 11px; }
+  .sonic-lab__name span { display: none; }
+}
+
 /* The way in from the portfolio header. */
 .header-lab { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .02em; }
 @media (prefers-reduced-motion: reduce) {

@@ -1,18 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PLAYERS, STYLES, styleById, type PlayerId, type StyleId } from "../data/sonicStyles";
 import { Ink, ROW_PX, readRow, snapshotPage, type ScanRow, type ScanSnapshot } from "../lib/scanPage";
-import { BPM, ScanSynth, type Step } from "../lib/scanSynth";
+import { compose } from "../lib/sonicPlayers";
+import { SonicSynth } from "../lib/sonicSynth";
 import { prefersReducedMotion } from "../utils/environment";
+import { SonicDeck, type DeckState } from "./SonicDeck";
 
 type SonicLabProps = { open: boolean; onClose: () => void };
 
 /**
- * alexsonicLAb: an opaque instrument over the real portfolio. The read head is a fixed axis across the middle of
- * the screen; scrolling moves the page under it. Rows above the axis have been read, rows below are what comes next.
- * On the axis: the row being read as a strip of pixels, the live waveform of the music it makes, and the readout.
- * Sound lives only here: it fades out and the audio shuts down on entering the portfolio.
+ * alexsonicLAb: an opaque instrument over the real portfolio. The read head is a fixed axis across the screen;
+ * scrolling moves the page under it. Rows above the axis have been read, rows below are what comes next. On the
+ * axis: the row being read as a strip of pixels, the live waveform, and the readout. Below, an ASCII DJ deck picks
+ * the style and mixes the five players. Sound lives only here and shuts down on entering the portfolio.
  */
+
+const AXIS = 0.4; // the read head sits 40% down the screen, so the deck fits underneath
+const STORAGE_KEY = "alexsonicLAb";
 
 const ACCENT: Record<string, [number, number, number]> = {
   top: [200, 204, 214],
@@ -25,51 +31,6 @@ const ACCENT: Record<string, [number, number, number]> = {
   bio: [232, 196, 140],
 };
 
-// Each section plays in its own mode over A: darkest for technology, a little light for the gallery.
-const PHRYGIAN = [0, 1, 3, 5, 7, 8, 10];
-const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
-const DORIAN = [0, 2, 3, 5, 7, 9, 10];
-const MODE: Record<string, number[]> = { top: PHRYGIAN, tian: PHRYGIAN, ren: AEOLIAN, di: DORIAN, development: PHRYGIAN, gallery: DORIAN, workbench: AEOLIAN, bio: DORIAN };
-const ROOT = 55; // A1
-
-const note = (scale: number[], degree: number, octave = 0) => {
-  const d = ((degree % scale.length) + scale.length) % scale.length;
-  const o = Math.floor(degree / scale.length) + octave;
-  return ROOT * Math.pow(2, (scale[d] + 12 * o) / 12);
-};
-
-/** How one scanned row sounds at one sixteenth of the bar. */
-function stepFor(bar: ScanRow[], s: number): Step {
-  const silent: Step = { kick: false, hat: false, openHat: false, clap: false, bass: null, stab: null };
-  if (!bar.length) return silent;
-  const row = bar[s % bar.length];
-  const previous = bar[(s + bar.length - 1) % bar.length];
-  // Gaps between sections read as empty rows: the kick drops out and the bar becomes a breakdown.
-  const breakdown = bar.filter((r) => r.empty).length > bar.length * 0.6;
-  const busy = bar.some((r) => r.textDensity > 0);
-  const scale = MODE[row.section] ?? AEOLIAN;
-  const step: Step = {
-    kick: s % 4 === 0 && !breakdown,
-    clap: (s === 4 || s === 12) && !breakdown && busy,
-    hat: s % 2 === 1 && row.textDensity > 0.03,
-    openHat: s % 4 === 2 && row.textDensity > 0.16,
-    bass: null,
-    stab: null,
-  };
-  // The bass reads the layout: how many edges cross the row and where the first one sits pick the note.
-  if (!row.empty && (s % 2 === 0 || row.edges.length > 1)) {
-    const degree = row.edges.length * 2 + ((row.edges[0] ?? 0) % 7) + Math.round(row.textDensity * 10);
-    const accent = row.heading || row.links > 0 || row.sectionStart;
-    const slide = previous.edges.some((edge) => row.edges.includes(edge)) && !previous.empty;
-    step.bass = { freq: note(scale, degree, row.heading ? 1 : 0), accent, slide };
-  }
-  if ((row.heading || row.sectionStart) && s % 2 === 0) {
-    const degree = row.edges.length + 2;
-    step.stab = [note(scale, degree, 3), note(scale, degree + 2, 3), note(scale, degree + 4, 3)];
-  }
-  return step;
-}
-
 const INK_ALPHA: Record<number, number> = { [Ink.Edge]: 0.5, [Ink.Text]: 0.72, [Ink.Heading]: 1, [Ink.Media]: 0.32, [Ink.Rule]: 0.9, [Ink.Link]: 0.6 };
 const inkColour = (ink: number, accent: [number, number, number], alpha: number) => {
   const [r, g, b] = accent;
@@ -77,6 +38,34 @@ const inkColour = (ink: number, accent: [number, number, number], alpha: number)
   if (ink === Ink.Edge || ink === Ink.Media) return `rgba(210,214,222,${alpha})`;
   return `rgba(${r},${g},${b},${alpha})`;
 };
+
+const isPlayer = (value: string): value is PlayerId => PLAYERS.some((player) => player.id === value);
+
+/** The visitor's last setup, then anything a shared link asks for. */
+function initialDeck(): DeckState {
+  let saved: Partial<DeckState> = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+  } catch {
+    // A fresh deck when storage is unavailable.
+  }
+  const params = new URLSearchParams(window.location.search);
+  const style = styleById(params.get("style") ?? saved.style);
+  const fromLink = params.has("style");
+  const list = (name: string, fallback?: PlayerId[]) => {
+    const raw = params.get(name);
+    return raw === null ? (fallback ?? []).filter(isPlayer) : raw.split(",").filter(isPlayer);
+  };
+  return {
+    style: style.id,
+    pending: null,
+    levels: !fromLink && saved.levels && saved.style === style.id ? { ...style.mix, ...saved.levels } : { ...style.mix },
+    mutes: list("mute", fromLink ? [] : saved.mutes),
+    solos: list("solo", fromLink ? [] : saved.solos),
+    delay: typeof saved.delay === "number" && !fromLink ? saved.delay : 0.5,
+    reverb: typeof saved.reverb === "number" && !fromLink ? saved.reverb : 0.5,
+  };
+}
 
 export function SonicLab({ open, onClose }: SonicLabProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -86,6 +75,10 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
   const [started, setStarted] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [readout, setReadout] = useState({ y: 0, height: 1, section: "top", complete: false });
+  const [deck, setDeck] = useState<DeckState | null>(null);
+  const deckRef = useRef<DeckState | null>(null);
+  deckRef.current = deck;
+  const live = useRef(new Map<string, HTMLSpanElement>());
 
   const state = useRef({
     snapshot: null as ScanSnapshot | null,
@@ -99,10 +92,60 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     fieldDirty: true,
     speed: 0,
     moved: 0,
-    synth: null as ScanSynth | null,
+    cutoff: 380,
+    synth: null as SonicSynth | null,
     wave: new Uint8Array(2048),
     leaving: false,
   });
+
+  /** Send the deck to the synth: style, the level of each player after mute and solo, and the effect sends. */
+  const applyDeck = useCallback((d: DeckState) => {
+    const synth = state.current.synth;
+    if (!synth) return;
+    synth.setStyle(styleById(d.pending ?? d.style));
+    for (const player of PLAYERS) {
+      const silenced = d.mutes.includes(player.id) || (d.solos.length > 0 && !d.solos.includes(player.id));
+      synth.setLevel(player.id, silenced ? 0 : d.levels[player.id]);
+    }
+    synth.setSends(d.delay, d.reverb);
+  }, []);
+
+  const updateDeck = useCallback((change: (d: DeckState) => DeckState) => {
+    const current = deckRef.current;
+    if (!current) return;
+    const next = change(current);
+    deckRef.current = next;
+    setDeck(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...next, pending: null, style: next.pending ?? next.style }));
+    } catch {
+      // The setup is simply not remembered.
+    }
+    applyDeck(next);
+  }, [applyDeck]);
+
+  const chooseStyle = useCallback((id: StyleId) => {
+    // A new style brings its own mix; with the sound on it starts at the next bar line.
+    const levels = { ...styleById(id).mix };
+    updateDeck((d) => (state.current.synth ? { ...d, pending: id === d.style ? null : id, levels } : { ...d, style: id, pending: null, levels }));
+  }, [updateDeck]);
+  const toggle = useCallback((list: "mutes" | "solos", player: PlayerId) => {
+    updateDeck((d) => ({ ...d, [list]: d[list].includes(player) ? d[list].filter((p) => p !== player) : [...d[list], player] }));
+  }, [updateDeck]);
+
+  const share = useCallback(async () => {
+    const d = deckRef.current;
+    if (!d) return false;
+    const parts = [`scan`, `style=${d.pending ?? d.style}`];
+    if (d.mutes.length) parts.push(`mute=${d.mutes.join(",")}`);
+    if (d.solos.length) parts.push(`solo=${d.solos.join(",")}`);
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?${parts.join("&")}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
 
   const enter = useCallback(() => {
     const s = state.current;
@@ -111,8 +154,8 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     setLeaving(true);
     s.synth?.stop(0.7);
     s.synth = null;
-    // Land with the read line where it was on screen: 40% from the top.
-    const target = Math.max(0, s.readY - window.innerHeight * 0.4);
+    // Land with the read line where it was on screen.
+    const target = Math.max(0, s.readY - window.innerHeight * AXIS);
     window.setTimeout(() => {
       onClose();
       window.setTimeout(() => window.scrollTo({ top: target, behavior: "instant" as ScrollBehavior }), 30);
@@ -122,15 +165,34 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
   const power = useCallback(() => {
     const s = state.current;
     setStarted(true);
-    if (s.synth || s.leaving) return;
+    const d = deckRef.current;
+    if (s.synth || s.leaving || !d) return;
     try {
-      s.synth = new ScanSynth((step) => stepFor(s.bar, step));
-      s.synth.start();
+      const synth = new SonicSynth(styleById(d.style), (style, step) => compose(style, s.bar, step));
+      // When a pending style starts on the bar line, the deck shows it as the one playing.
+      synth.onBar = (style) => {
+        const current = deckRef.current;
+        if (current?.pending === style.id) {
+          const next = { ...current, style: style.id, pending: null };
+          deckRef.current = next;
+          setDeck(next);
+        }
+      };
+      s.synth = synth;
+      applyDeck(d);
+      synth.start();
       setPowered(true);
     } catch {
       setPowered(false); // no Web Audio: the scan still works, silently
     }
-  }, []);
+  }, [applyDeck]);
+
+  useEffect(() => {
+    if (!open) return;
+    const initial = initialDeck();
+    deckRef.current = initial;
+    setDeck(initial);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -143,8 +205,8 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     if (!root || !field || !axis || !fieldCtx || !axisCtx || !main) return;
     const s = state.current;
     s.leaving = false;
-    // Start reading where the visitor is: the line 40% down the screen they were looking at.
-    s.readY = window.scrollY + window.innerHeight * 0.4;
+    // Start reading where the visitor is: the line at the axis height of the screen they were looking at.
+    s.readY = window.scrollY + window.innerHeight * AXIS;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     root.focus({ preventScroll: true });
@@ -186,21 +248,24 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       s.fieldDirty = true;
     };
 
-    /** The ASCII field, centred on the read head. Redrawn only when the row under the head changes. */
+    /** The ASCII field around the read head. Redrawn only when the row under the head changes. */
     const drawField = () => {
       const { w: width, h: height } = s.size;
       const { w, h } = s.cell;
       fieldCtx.clearRect(0, 0, width, height);
-      const center = Math.floor(height / 2 / h);
+      const axisY = height * AXIS;
+      const center = Math.floor(axisY / h);
       const lines = Math.ceil(height / h);
-      const top = height / 2 - center * h - h / 2;
+      const top = axisY - center * h - h / 2;
       for (let k = 0; k < lines; k += 1) {
         const offset = k - center;
         if (offset === 0) continue; // the axis draws the row being read
-        const row = rowAt(s.row + offset);
-        if (!row || s.row + offset < 0 || s.row + offset > maxRow()) continue;
-        // Read rows above the axis at full strength, the rows still to come below it as ghosts; both fade with distance.
-        const distance = Math.abs(offset) / center;
+        const index = s.row + offset;
+        if (index < 0 || index > maxRow()) continue;
+        const row = rowAt(index);
+        if (!row) continue;
+        // Read rows above the axis at full strength, rows still to come below it as ghosts; both fade with distance.
+        const distance = Math.min(1, Math.abs(offset) / Math.max(center, lines - center));
         const fade = (offset < 0 ? 1 : 0.22) * (1 - distance * distance * 0.75);
         const accent = ACCENT[row.section] ?? ACCENT.top;
         const y = top + k * h;
@@ -218,20 +283,16 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       }
     };
 
-    /** The axis: the pixels of the row being read, the live waveform along it, and the readout. Every frame. */
+    /** The axis: the pixels of the row being read, the live waveform along it. Every frame. */
     const drawAxis = () => {
       const { w: width, h: height } = s.size;
       axisCtx.clearRect(0, 0, width, height);
-      const mid = Math.round(height / 2);
+      const mid = Math.round(height * AXIS);
       const row = rowAt(s.row);
       const accent = ACCENT[row?.section ?? "top"] ?? ACCENT.top;
       const [r, g, b] = accent;
-
-      // A dark band so the axis reads as an instrument over the field.
       axisCtx.fillStyle = "rgba(11,11,12,0.86)";
       axisCtx.fillRect(0, mid - 34, width, 68);
-
-      // The traversed pixels: one block per column of the row under the head.
       if (row) {
         const cw = width / row.chars.length;
         for (let c = 0; c < row.chars.length; c += 1) {
@@ -241,8 +302,6 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
           axisCtx.fillRect(c * cw, mid - 30, Math.max(1, cw - 1), 6);
         }
       }
-
-      // The live waveform of the mix, drawn across the full width.
       const analyser = s.synth?.analyser;
       axisCtx.beginPath();
       if (analyser) {
@@ -265,11 +324,34 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       axisCtx.strokeStyle = `rgba(${r},${g},${b},0.95)`;
       axisCtx.lineWidth = 1.2;
       axisCtx.stroke();
-
-      // The edges of the band.
       axisCtx.fillStyle = `rgba(${r},${g},${b},0.5)`;
       axisCtx.fillRect(0, mid - 34, width, 1);
       axisCtx.fillRect(0, mid + 33, width, 1);
+    };
+
+    /** The deck's meters, filter readout and step lights, written straight into their spans. */
+    const drawLive = () => {
+      const synth = s.synth;
+      for (const [name, element] of live.current) {
+        const length = element.textContent?.length ?? 0;
+        if (!length) continue;
+        if (name.startsWith("meter:")) {
+          // A muted (or soloed-out) player's meter stays dark even though it keeps reading.
+          const player = name.slice(6) as PlayerId;
+          const d = deckRef.current;
+          const silenced = !d || d.mutes.includes(player) || (d.solos.length > 0 && !d.solos.includes(player));
+          const level = synth && !silenced ? synth.activity(player) : 0;
+          const lit = Math.round(level * length);
+          element.textContent = "▮".repeat(lit) + "·".repeat(length - lit);
+        } else if (name === "filter") {
+          const amount = Math.log(s.cutoff / 380) / Math.log(9580 / 380);
+          const lit = Math.round(Math.max(0, Math.min(1, amount)) * length);
+          element.textContent = "▇".repeat(lit) + "▁".repeat(length - lit);
+        } else if (name === "steps") {
+          const step = synth ? synth.playhead() : -1;
+          element.textContent = Array.from({ length }, (_, i) => (i === step ? "■" : i % 4 === 0 ? "▪" : "·")).join("");
+        }
+      }
     };
 
     let frame = 0;
@@ -284,6 +366,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
           drawField();
         }
         drawAxis();
+        drawLive();
       }
       frame = requestAnimationFrame(tick);
     };
@@ -291,7 +374,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       if (!frame && !document.hidden) frame = requestAnimationFrame(tick);
     };
 
-    /** Move the page under the read head and feed every row it passes to the music. */
+    /** Move the page under the read head and feed every row it passes to the players. */
     const move = (delta: number) => {
       if (!s.snapshot || s.leaving) return;
       setStarted(true);
@@ -317,7 +400,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     const meter = window.setInterval(() => {
       s.speed = s.speed * 0.6 + s.moved * 10 * 0.4;
       s.moved = 0;
-      s.synth?.setBrightness(s.speed / 2600);
+      if (s.synth) s.cutoff = s.synth.setBrightness(s.speed / 2600);
     }, 100);
 
     const onWheel = (event: WheelEvent) => {
@@ -333,11 +416,22 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       touchY = y;
     };
     const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       const steps: Record<string, number> = { ArrowDown: 80, ArrowUp: -80, PageDown: 600, PageUp: -600, " ": 600 };
+      const style = STYLES.find((x) => x.key === event.key);
+      const player = PLAYERS.find((x) => `Key${x.key.toUpperCase()}` === event.code);
       if (event.key in steps) {
         event.preventDefault();
         move(steps[event.key]);
         power();
+      } else if (style) {
+        event.preventDefault();
+        power();
+        chooseStyle(style.id);
+      } else if (player) {
+        event.preventDefault();
+        power();
+        toggle(event.shiftKey ? "solos" : "mutes", player.id);
       } else if (event.key === "Enter" || event.key === "Escape") {
         event.preventDefault();
         enter();
@@ -385,7 +479,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       s.synth = null;
       s.bar = [];
     };
-  }, [open, enter, power]);
+  }, [open, enter, power, chooseStyle, toggle]);
 
   // Reset for the next time the Lab is opened from the header.
   useEffect(() => {
@@ -402,8 +496,14 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
     return () => window.clearTimeout(timer);
   }, [open, readout.complete, readout.y, leaving, enter]);
 
+  const registerLive = useCallback((name: string, element: HTMLSpanElement | null) => {
+    if (element) live.current.set(name, element);
+    else live.current.delete(name);
+  }, []);
+
   if (!open) return null;
   const percent = Math.min(100, Math.round((readout.y / Math.max(1, readout.height)) * 100));
+  const playing = styleById(deck?.style);
 
   return (
     <div
@@ -411,7 +511,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
       className={`sonic-lab${leaving ? " is-leaving" : ""}${started ? " is-started" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label="alexsonicLAb. Scroll to read the site, click for sound, Enter to go to the portfolio."
+      aria-label="alexsonicLAb. Scroll to read the site, click for sound, keys 1 to 6 change style, Enter to go to the portfolio."
       tabIndex={-1}
       onClick={power}
     >
@@ -423,7 +523,6 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
         <span>an instrument that reads this site</span>
       </div>
 
-      {/* The readout rides on the axis, above and below the band. */}
       <div className="sonic-lab__readout sonic-lab__readout--top" aria-hidden>
         <span>{readout.complete ? "SCAN COMPLETE" : started ? "SCANNING" : "STANDBY"}</span>
         <span>y {readout.y.toString().padStart(5, "0")} / {readout.height}</span>
@@ -431,7 +530,7 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
         <span>§{readout.section.toUpperCase()}</span>
       </div>
       <div className="sonic-lab__readout sonic-lab__readout--bottom" aria-hidden>
-        <span>{BPM} BPM</span>
+        <span>{playing.name}</span>
         <span className={powered ? "is-on" : ""}>{powered ? "● SOUND" : "○ CLICK FOR SOUND"}</span>
         <span>{started ? "SCROLL ↑↓ TO READ" : "SCROLL TO READ · CLICK FOR SOUND"}</span>
       </div>
@@ -441,6 +540,20 @@ export function SonicLab({ open, onClose }: SonicLabProps) {
           {powered ? "ENTER HERE ↵" : "ENTER SILENTLY ↵"}
         </button>
       </div>
+
+      {deck && (
+        <SonicDeck
+          state={deck}
+          bpm={styleById(deck.pending ?? deck.style).bpm}
+          onStyle={chooseStyle}
+          onLevel={(player, level) => updateDeck((d) => ({ ...d, levels: { ...d.levels, [player]: level } }))}
+          onMute={(player) => toggle("mutes", player)}
+          onSolo={(player) => toggle("solos", player)}
+          onSends={(delay, reverb) => updateDeck((d) => ({ ...d, delay, reverb }))}
+          onShare={share}
+          registerLive={registerLive}
+        />
+      )}
     </div>
   );
 }
