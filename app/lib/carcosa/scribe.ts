@@ -44,7 +44,8 @@ export async function writeDevlog(maxCalls = 3, dry = false) {
     if (!owners.length) continue;
     const key = `${r.repo}|${r.day}`;
     const mine = book[key];
-    const others = entries.filter((e) => owners.some((p) => p.id === e.projectId) && e.date === r.day && !e.body.includes(MARK));
+    // someone may have dated it the work day or the calendar day of its last commit: either counts
+    const others = entries.filter((e) => owners.some((p) => p.id === e.projectId) && (e.date === r.day || e.date === r.date) && !e.body.includes(MARK));
     if (others.length) continue; // someone already wrote this day
     if (mine && sameSet(mine.shas, r.shas)) continue; // nothing new since the last time
     if (calls >= maxCalls) break;
@@ -73,8 +74,8 @@ export async function writeDevlog(maxCalls = 3, dry = false) {
     for (const [projectId, item] of byProject) {
       const project = owners.find((p) => p.id === projectId)!;
       const body = `${item.bullets.slice(0, 8).map((b) => `- ${b.slice(0, 200)}`).join("\n")}\n\n${evidence(r)}\n\n${MARK}`;
-      if (dry) { drafts.push({ project: project.name, day: r.day, title: String(item.title).slice(0, 60), body }); continue; }
-      const saved = await saveEntry({ id: ids[project.id], projectId: project.id, date: r.day, kind: "note", title: String(item.title).slice(0, 60), body });
+      if (dry) { drafts.push({ project: project.name, day: r.date, title: String(item.title).slice(0, 60), body }); continue; }
+      const saved = await saveEntry({ id: ids[project.id], projectId: project.id, date: r.date, kind: "note", title: String(item.title).slice(0, 60), body });
       ids[project.id] = saved.id;
       written.push(`${project.name} · ${r.day}`);
     }

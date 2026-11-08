@@ -21,6 +21,8 @@ const ROOT = "workspace/carcosa/";
 const DAY_START_HOURS = 5;
 const dayFormat = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" });
 export const workDay = (ms: number) => dayFormat.format(new Date(ms - DAY_START_HOURS * 3_600_000));
+/** The plain London calendar date, which is how people date devlog entries (a session ending at 02:00 is usually written up under that date). */
+export const calendarDay = (ms: number) => dayFormat.format(new Date(ms));
 const timeFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false });
 export const londonTime = (ms: number) => timeFormat.format(new Date(ms));
 
@@ -111,6 +113,11 @@ export async function pollRepos(force = false) {
         events.push({ kind: "commit", at, repo, sha: c.sha, message: c.commit.message.split("\n")[0].slice(0, 200), claude: /Co-Authored-By:\s*Claude/i.test(c.commit.message) });
       }
       if (commits[0]) { rs.mainSha = commits[0].sha; rs.mainAt = commits[0].commit.committer?.date; rs.since = rs.mainAt ?? rs.since; }
+      else if (!rs.mainSha) {
+        // nothing new in the window: still learn where the default branch stands
+        const head = await gh(`/repos/${repo}/commits?per_page=1`) as { sha: string; commit: { committer?: { date?: string } } }[];
+        if (head[0]) { rs.mainSha = head[0].sha; rs.mainAt = head[0].commit.committer?.date; }
+      }
       const deployments = await gh(`/repos/${repo}/deployments?per_page=15`) as { id: number; sha: string; environment: string; created_at: string }[];
       for (const d of deployments) {
         const known = rs.deploys[d.id];
@@ -138,9 +145,9 @@ export async function pollRepos(force = false) {
 
 // ---- the view: three sources side by side --------------------------------------------------------------------------
 
-export type DayRow = { day: string; key: string; label: string; repo?: string; syncs: number; changed: number; ticks: number; commits: number; withClaude: number; deploysOk: number; deploysFailed: number; shas: string[]; messages: { at: string; sha: string; message: string; claude: boolean }[]; lastAt: string; devlog: boolean };
-export type Alignment = { repo: string; local?: { device: string; folder: string; head: string; dirty: number; ahead: number; behind: number; seen: string }; main?: string; prod?: { sha: string; at: string }; lastDeploy?: { sha: string; state: string; at: string }; aligned: boolean };
-export type Issue = { repo: string; kind: "unreadable" | "unpushed" | "uncommitted" | "deploy_failed" | "deploying" | "prod_behind" | "devlog_missing"; text: string; day?: string };
+export type DayRow = { day: string; /** London calendar date of the last commit (or activity), the date an entry about this work would carry. */ date: string; key: string; label: string; repo?: string; syncs: number; changed: number; ticks: number; commits: number; withClaude: number; deploysOk: number; deploysFailed: number; shas: string[]; messages: { at: string; sha: string; message: string; claude: boolean }[]; lastAt: string; devlog: boolean };
+export type Alignment = { repo: string; local?: { device: string; folder: string; branch: string; head: string; dirty: number; ahead: number; behind: number; seen: string }; main?: string; prod?: { sha: string; at: string }; lastDeploy?: { sha: string; state: string; at: string }; aligned: boolean };
+export type Issue = { repo: string; kind: "unreadable" | "unpushed" | "behind" | "uncommitted" | "deploy_failed" | "deploying" | "prod_behind" | "devlog_missing"; text: string; day?: string };
 
 const short = (sha?: string) => (sha ?? "").slice(0, 7);
 const isProd = (env: string) => /prod/i.test(env);
@@ -157,7 +164,7 @@ export async function ledgerView(days = 14) {
     const key = repo ?? `folder:${source}`;
     const id = `${day}|${key}`;
     let r = rows.get(id);
-    if (!r) { r = { day, key, label: repo ? repo.split("/")[1] : source ?? "?", repo, syncs: 0, changed: 0, ticks: 0, commits: 0, withClaude: 0, deploysOk: 0, deploysFailed: 0, shas: [], messages: [], lastAt: "", devlog: false }; rows.set(id, r); }
+    if (!r) { r = { day, date: day, key, label: repo ? repo.split("/")[1] : source ?? "?", repo, syncs: 0, changed: 0, ticks: 0, commits: 0, withClaude: 0, deploysOk: 0, deploysFailed: 0, shas: [], messages: [], lastAt: "", devlog: false }; rows.set(id, r); }
     return r;
   };
   for (const e of events) {
@@ -177,26 +184,33 @@ export async function ledgerView(days = 14) {
     }
   }
   for (const r of rows.values()) {
+    const last = r.messages.length ? r.messages.reduce((a, b) => (a.at > b.at ? a : b)).at : r.lastAt;
+    if (last) r.date = calendarDay(Date.parse(last));
     if (!r.repo) continue;
     const ids = new Set(projects.filter((p) => p.repo === r.repo).map((p) => p.id));
-    r.devlog = entries.some((e) => ids.has(e.projectId) && e.date === r.day);
+    // an entry dated either the work day or the calendar date of its last commit covers it
+    r.devlog = entries.some((e) => ids.has(e.projectId) && (e.date === r.day || e.date === r.date));
   }
 
   const repos = new Set<string>([...Object.keys(poll.repos), ...folderRepo.values()]);
   const alignment: Alignment[] = [];
   const issues: Issue[] = [];
   for (const repo of repos) {
-    const local = devices.flatMap((d) => d.folders.filter((f) => f.git?.repo === repo).map((f) => ({ device: d.name, folder: f.name, head: f.git!.head, dirty: f.git!.dirty, ahead: f.git!.ahead, behind: f.git!.behind, seen: d.lastSeen })))[0];
+    const found = devices.flatMap((d) => d.folders.filter((f) => f.git?.repo === repo).map((f) => ({ device: d.name, folder: f.name, branch: f.git!.branch, head: f.git!.head, dirty: f.git!.dirty, ahead: f.git!.ahead, behind: f.git!.behind, seen: d.lastSeen })))[0];
+    const main = poll.repos[repo]?.mainSha;
+    // "ahead" is counted against whatever branch the checkout tracks; if GitHub's default branch already has this commit, nothing is unpushed
+    const local = found ? { ...found, ahead: main && found.head === main ? 0 : found.ahead } : undefined;
     const deploys = events.filter((e): e is Extract<LedgerEvent, { kind: "deploy" }> => e.kind === "deploy" && e.repo === repo && isProd(e.env)).sort((a, b) => a.at.localeCompare(b.at));
     const last = deploys[deploys.length - 1];
     const ok = [...deploys].reverse().find((e) => e.state === "success");
-    const main = poll.repos[repo]?.mainSha;
     const aligned = !!local && !!main && !!ok && local.head === main && ok.sha === main && local.dirty === 0;
     alignment.push({ repo, local, main, prod: ok ? { sha: ok.sha, at: ok.at } : undefined, lastDeploy: last ? { sha: last.sha, state: last.state, at: last.at } : undefined, aligned });
     const name = repo.split("/")[1];
     const err = poll.repos[repo]?.error;
     if (err) issues.push({ repo, kind: "unreadable", text: err === "no_access" ? `${name}：GitHub 令牌读不到这个仓库，提交和部署都看不到` : err === "rate_limited" ? `${name}：GitHub 请求次数暂时用完，稍后会再读` : `${name}：上次读取 GitHub 失败` });
     if (local?.ahead) issues.push({ repo, kind: "unpushed", text: `${name}：本地有 ${local.ahead} 个提交还没推送` });
+    // the checkout is on a commit GitHub's default branch has moved past (pulled nothing since), and has nothing of its own to push
+    else if (local && main && ["main", "master"].includes(local.branch) && local.head !== main && !local.ahead) issues.push({ repo, kind: "behind", text: `${name}：本地停在 ${short(local.head)}，GitHub 已到 ${short(main)}，需要 pull` });
     if (local?.dirty) issues.push({ repo, kind: "uncommitted", text: `${name}：${local.dirty} 个文件改了还没提交` });
     if (last && (last.state === "failure" || last.state === "error")) issues.push({ repo, kind: "deploy_failed", text: `${name}：最近一次生产部署失败（${short(last.sha)}）` });
     else if (last && !FINAL.has(last.state)) issues.push({ repo, kind: "deploying", text: `${name}：${short(last.sha)} 正在部署` });
@@ -205,8 +219,10 @@ export async function ledgerView(days = 14) {
   const recent = [...rows.values()].filter((r) => r.repo && r.commits > 0 && !r.devlog && Date.now() - Date.parse(`${r.day}T12:00:00Z`) < 7 * 86_400_000);
   for (const r of recent) issues.push({ repo: r.repo!, kind: "devlog_missing", text: `${r.label} · ${r.day}：${r.commits} 个提交，devlog 里还没有记录`, day: r.day });
 
+  const syncVersion = devices.map((d) => d.version ?? "0").sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] ?? null;
   return {
     polledAt: poll.polledAt ? new Date(poll.polledAt).toISOString() : null,
+    syncVersion,
     alignment: alignment.sort((a, b) => a.repo.localeCompare(b.repo)),
     issues,
     days: [...rows.values()].sort((a, b) => (b.day + b.lastAt).localeCompare(a.day + a.lastAt)),

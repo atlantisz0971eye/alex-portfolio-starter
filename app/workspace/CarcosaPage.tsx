@@ -12,11 +12,11 @@ import { PageTitle } from "./Shell";
  */
 export type CarcosaSub = "now" | "ledger" | "notebook";
 
-type Alignment = { repo: string; local?: { device: string; folder: string; head: string; dirty: number; ahead: number; behind: number; seen: string }; main?: string; prod?: { sha: string; at: string }; lastDeploy?: { sha: string; state: string; at: string }; aligned: boolean };
+type Alignment = { repo: string; local?: { device: string; folder: string; branch: string; head: string; dirty: number; ahead: number; behind: number; seen: string }; main?: string; prod?: { sha: string; at: string }; lastDeploy?: { sha: string; state: string; at: string }; aligned: boolean };
 type Issue = { repo: string; kind: string; text: string; day?: string };
 type Day = { day: string; key: string; label: string; repo?: string; syncs: number; changed: number; ticks: number; commits: number; withClaude: number; deploysOk: number; deploysFailed: number; devlog: boolean };
 type Audit = { at: string; actor: string; action: string; detail: string };
-type View = { polledAt: string | null; alignment: Alignment[]; issues: Issue[]; days: Day[]; audit: Audit[]; written?: string[] };
+type View = { polledAt: string | null; syncVersion: string | null; alignment: Alignment[]; issues: Issue[]; days: Day[]; audit: Audit[]; written?: string[] };
 
 const SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "now", label: "Now" }, { id: "ledger", label: "Ledger" }, { id: "notebook", label: "Notebook" }];
 const short = (sha?: string) => (sha ? sha.slice(0, 7) : "—");
@@ -66,9 +66,9 @@ export function CarcosaNow({ onError }: { onError: (message: string) => void }) 
       <div className="carcosa-align__head"><span>repository</span><span>local</span><span>GitHub</span><span>production</span></div>
       {view.alignment.map((a) => <div key={a.repo} className="carcosa-align__row" data-aligned={a.aligned || undefined}>
         <span>{a.aligned ? "■" : "□"} {a.repo.split("/")[1]}</span>
-        <span>{a.local ? <>{short(a.local.head)}{a.local.dirty ? ` · ${a.local.dirty} uncommitted` : ""}{a.local.ahead ? ` · ${a.local.ahead} unpushed` : ""}</> : <em>needs drivesync 1.3</em>}</span>
+        <span>{a.local ? <>{short(a.local.head)}{a.local.branch && !["main", "master"].includes(a.local.branch) ? ` (${a.local.branch})` : ""}{a.local.dirty ? ` · ${a.local.dirty} uncommitted` : ""}{a.local.ahead ? ` · ${a.local.ahead} unpushed` : ""}</> : <em>{view.syncVersion && view.syncVersion.localeCompare("1.3.0", undefined, { numeric: true }) >= 0 ? "no synced folder" : "needs drivesync 1.3"}</em>}</span>
         <span>{short(a.main)}</span>
-        <span>{short(a.prod?.sha)}{a.lastDeploy && a.lastDeploy.state !== "success" ? ` · last ${a.lastDeploy.state}` : ""}</span>
+        <span>{a.prod || a.lastDeploy ? <>{short(a.prod?.sha)}{a.lastDeploy && a.lastDeploy.state !== "success" ? ` · last ${a.lastDeploy.state}` : ""}</> : a.main ? <em>no deploy records</em> : "—"}</span>
       </div>)}
     </div>
 
