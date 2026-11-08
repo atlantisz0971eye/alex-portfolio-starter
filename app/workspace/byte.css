@@ -303,3 +303,34 @@
 @media (prefers-reduced-motion: reduce) { .ws-root[data-skin="byte"] .carcosa-star svg { animation: none; } }
 /* Carcosa's spores: one still grey dot in the margin beside each hot thing on screen */
 .ws-root[data-skin="byte"] .carcosa-spores { position: fixed; inset: 0; z-index: 35; width: 100vw; height: 100vh; image-rendering: pixelated; pointer-events: none; }
+
+/* ---- the Carcosa tab: one title, three sections; the ledger and notebook pages sit under it without their own titles ---- */
+.ws-root[data-skin="byte"] .carcosa-head .pagetitle { margin-bottom: 1.6vw; }
+.ws-root[data-skin="byte"] .carcosa-tabs { display: flex; gap: 3ch; font-size: 15px; }
+.ws-root[data-skin="byte"] .carcosa-tabs button { padding: 0; background: none; border: 0; color: var(--text-2); cursor: pointer; font: inherit; }
+.ws-root[data-skin="byte"] .carcosa-tabs button::before { content: "□ "; }
+.ws-root[data-skin="byte"] .carcosa-tabs button.is-on { color: var(--text); font-weight: 700; }
+.ws-root[data-skin="byte"] .carcosa-tabs button.is-on::before { content: "■ "; color: var(--blue); }
+/* one page holds the whole tab; the sections inside it are plain blocks, not pages of their own */
+.ws-root[data-skin="byte"] .is-embedded { display: block; padding: 2vw 0 0; }
+.ws-root[data-skin="byte"] .pagetitle--quiet { min-height: 0; margin: 0 0 1vw; }
+.ws-root[data-skin="byte"] .pagetitle--quiet .pagetitle__actions { position: static; justify-content: flex-end; }
+.ws-root[data-skin="byte"] .carcosa-row { display: flex; align-items: baseline; justify-content: space-between; gap: 2ch; }
+.ws-root[data-skin="byte"] .carcosa-now .section-label { margin-top: 3vw; }
+.ws-root[data-skin="byte"] .carcosa-row .section-label { margin-top: 0; }
+.ws-root[data-skin="byte"] .carcosa-muted { margin: 0 0 12px; font-size: 13px; color: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-align, .ws-root[data-skin="byte"] .carcosa-days { font-size: 13px; line-height: 20px; max-width: 1100px; }
+.ws-root[data-skin="byte"] .carcosa-align__head, .ws-root[data-skin="byte"] .carcosa-align__row { display: grid; grid-template-columns: minmax(150px, 1.3fr) 2fr 1fr 1.5fr; gap: 2ch; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ws-root[data-skin="byte"] .carcosa-days__head, .ws-root[data-skin="byte"] .carcosa-days__row { display: grid; grid-template-columns: 6ch minmax(140px, 1.4fr) 1.4fr 1.4fr 1fr 1fr; gap: 2ch; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.ws-root[data-skin="byte"] .carcosa-align__head, .ws-root[data-skin="byte"] .carcosa-days__head { color: var(--text-2); font-size: 11px; letter-spacing: .04em; }
+.ws-root[data-skin="byte"] .carcosa-align__row[data-aligned] span:first-child { color: var(--text); }
+.ws-root[data-skin="byte"] .carcosa-align__row em { font-style: normal; color: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-issues, .ws-root[data-skin="byte"] .carcosa-audit { margin: 0; padding: 0; list-style: none; font-size: 14px; line-height: 24px; max-width: 900px; }
+.ws-root[data-skin="byte"] .carcosa-issues li::before { content: "□ "; color: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-issues li[data-kind="deploy_failed"]::before, .ws-root[data-skin="byte"] .carcosa-issues li[data-kind="unreadable"]::before { content: "■ "; color: #c9a21e; }
+.ws-root[data-skin="byte"] .carcosa-audit { font-size: 13px; color: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-audit b { color: var(--text); font-weight: 600; }
+@media (max-width: 700px) {
+  .ws-root[data-skin="byte"] .carcosa-align__head, .ws-root[data-skin="byte"] .carcosa-days__head { display: none; }
+  .ws-root[data-skin="byte"] .carcosa-align__row, .ws-root[data-skin="byte"] .carcosa-days__row { grid-template-columns: 1fr 1fr; row-gap: 2px; }
+}

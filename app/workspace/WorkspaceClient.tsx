@@ -20,6 +20,7 @@ import { Members } from "./Members";
 import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme } from "./Shell";
 import { Today } from "./Today";
 import { CarcosaProvider, CarcosaSpores } from "./Carcosa";
+import { CarcosaHead, CarcosaNow, type CarcosaSub } from "./CarcosaPage";
 
 type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
 
@@ -125,10 +126,16 @@ function App() {
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page?: number; offset?: number } | null>(null);
   const [tab, setTab] = useState<Tab>("today");
+  // which part of Carcosa is open: the ledger and the notebook are the former Devlog and Mindstreams tabs
+  const [carcosaSub, setCarcosaSub] = useState<CarcosaSub>("now");
+  useEffect(() => { try { const saved = localStorage.getItem("ws-carcosa-sub"); if (saved === "now" || saved === "ledger" || saved === "notebook") setCarcosaSub(saved); } catch { /* default */ } }, []);
+  const chooseSub = useCallback((next: CarcosaSub) => { setCarcosaSub(next); try { localStorage.setItem("ws-carcosa-sub", next); } catch { /* per-viewer */ } }, []);
+  // the old tab names still arrive from a few places; they open the matching part of Carcosa
+  useEffect(() => { if (tab === "mindstreams") { setTab("carcosa"); setCarcosaSub("notebook"); } else if (tab === "devlog") { setTab("carcosa"); setCarcosaSub("ledger"); } }, [tab]);
   const [mindstreamRefresh, setMindstreamRefresh] = useState(0);
   const [streamOpenId, setStreamOpenId] = useState<string | null>(null);
   // A link from the devlog only applies to that visit.
-  useEffect(() => { if (tab !== "mindstreams") setStreamOpenId(null); }, [tab]);
+  useEffect(() => { if (!(tab === "carcosa" && carcosaSub === "notebook")) setStreamOpenId(null); }, [tab, carcosaSub]);
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [notesRefresh, setNotesRefresh] = useState(0);
@@ -371,15 +378,19 @@ function App() {
           ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
           : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
-          : tab === "mindstreams" ? <Mind onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />
-          : tab === "devlog" ? <Devlog onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); setTab("mindstreams"); }} />
+          : tab === "carcosa" || tab === "mindstreams" || tab === "devlog" ? <div className="page page--carcosa">
+            <CarcosaHead sub={carcosaSub} onSub={chooseSub} />
+            {carcosaSub === "now" ? <CarcosaNow onError={setError} />
+              : carcosaSub === "ledger" ? <Devlog embedded onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); chooseSub("notebook"); }} />
+              : <Mind embedded onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />}
+          </div>
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
       </div>
       <TabBar tab={tab} onTab={go} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
-    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "carcosa" ? (carcosaSub === "ledger" ? "devlog" : "mindstreams") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />

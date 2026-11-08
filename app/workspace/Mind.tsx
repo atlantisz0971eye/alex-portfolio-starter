@@ -12,7 +12,7 @@ import { useRemembered } from "./useSplit";
 type Derived = { title: string; topic: string; project: string; kind: string };
 type Item = { id: string; at: string; text: string; source: "notebook" | "devlog"; derived: Derived | null };
 type Data = { items: Item[]; topics: { name: string; project: string; summary: string }[]; projects: { name: string; summary: string }[]; overview: string; updatedAt: string };
-type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId: string | null };
+type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId: string | null; embedded?: boolean };
 
 const day = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const UNSORTED = "Unsorted";
@@ -22,7 +22,7 @@ const UNSORTED = "Unsorted";
  * projects and topics with a short summary at each level. Nothing here is filed by hand. The earlier pages and boards
  * stay reachable as the archive.
  */
-export function Mind({ onError, onSignOut, refresh, openId }: Props) {
+export function Mind({ onError, onSignOut, refresh, openId, embedded = false }: Props) {
   const [data, setData] = useState<Data | null>(null);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -140,10 +140,10 @@ export function Mind({ onError, onSignOut, refresh, openId }: Props) {
   const unfiled = data?.items.filter((item) => !item.derived) ?? [];
   const projectNames = [...new Set(data?.projects.map((project) => project.name) ?? [])];
   const topicNames = [...new Set(data?.topics.map((topic) => topic.name) ?? [])];
-  return <main className="page page--mind">
+  return <main className={embedded ? "page--mind is-embedded" : "page page--mind"}>
     <TopRow onSignOut={onSignOut} />
     <div className="page__inner">
-      <PageTitle actions={<><button type="button" className="ws-text-button" onClick={() => setArchive(true)}>archive</button><button type="button" className="ws-round" aria-label="Rebuild the map" title="Have the model file everything again" onClick={() => void rebuild()} disabled={rebuilding}>{rebuilding ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button></>}>Mindstreams</PageTitle>
+      <PageTitle quiet={embedded} actions={<><button type="button" className="ws-text-button" onClick={() => setArchive(true)}>archive</button><button type="button" className="ws-round" aria-label="Rebuild the map" title="Have the model file everything again" onClick={() => void rebuild()} disabled={rebuilding}>{rebuilding ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button></>}>Mindstreams</PageTitle>
       <textarea ref={box} className="mind__input" rows={3} value={text} placeholder="Write anything. It gets filed for you." aria-label="Write in the notebook" maxLength={4000}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void save(); } }} />

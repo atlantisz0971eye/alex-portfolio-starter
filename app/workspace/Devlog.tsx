@@ -11,7 +11,7 @@ import { shrink } from "./BoardCanvas";
 import { Sheet } from "./Sheet";
 import { PageTitle, TopRow } from "./Shell";
 
-type Props = { onError: (message: string) => void; onSignOut: () => void; onOpenStream: (noteId: string) => void };
+type Props = { onError: (message: string) => void; onSignOut: () => void; onOpenStream: (noteId: string) => void ; embedded?: boolean };
 type Data = { projects: DevProject[]; entries: DevEntry[]; github: boolean };
 
 const json = { "Content-Type": "application/json" };
@@ -42,7 +42,7 @@ function Strip({ entries }: { entries: DevEntry[] }) {
   return <div className="dl-strip" role="img" aria-label="Activity over the last 18 weeks">{cells.map((cell) => <i key={cell.key} title={`${cell.key}: ${cell.count}`} data-level={cell.future ? "x" : Math.min(3, cell.count)} />)}</div>;
 }
 
-export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
+export function Devlog({ onError, onSignOut, onOpenStream, embedded = false }: Props) {
   // opening the devlog reads the new entries
   const { eatKind, items: hot } = useCarcosa();
   const hotDevlog = hot.some((item) => item.kind === "devlog" && !item.eaten);
@@ -96,9 +96,9 @@ export function Devlog({ onError, onSignOut, onOpenStream }: Props) {
   const toggle = (id: string) => setOpen((currentSet) => { const next = new Set(currentSet); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   return <>
-    <main className="page page--devlog">
+    <main className={embedded ? "page--devlog is-embedded" : "page page--devlog"}>
       <TopRow onSignOut={onSignOut} />
-      <PageTitle actions={<>
+      <PageTitle quiet={embedded} actions={<>
         <button type="button" className="ws-round" aria-label="New entry" onClick={() => setEditing({ projectId: filter ?? projects[0]?.id, date: today(), kind: "note" })} disabled={!projects.length}><Plus size={20} /></button>
       </>}>Devlog</PageTitle>
 

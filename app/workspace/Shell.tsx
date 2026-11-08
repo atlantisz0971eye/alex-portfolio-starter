@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, ScrollText, Sun, Users, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, Sun, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
 import { CarcosaGauge, CarcosaIndex } from "./Carcosa";
@@ -18,15 +18,15 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 export type PublicUser = { id: string; name: string; role: "owner" | "member"; features: { mail: boolean; github: boolean; today: boolean }; root: string };
 export const UserContext = createContext<{ user: PublicUser | null; openMembers: () => void }>({ user: null, openMembers: () => undefined });
 
-export type Tab = "today" | "library" | "mail" | "calendar" | "mindstreams" | "devlog";
+export type Tab = "today" | "library" | "mail" | "calendar" | "carcosa" | "mindstreams" | "devlog";
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "today", label: "Today", icon: Sun },
   { id: "library", label: "Library", icon: BookOpen },
   { id: "mail", label: "Mail", icon: MailIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
-  { id: "mindstreams", label: "Mindstreams", icon: Waypoints },
-  { id: "devlog", label: "Devlog", icon: ScrollText },
+  // the notebook (Mindstreams) and the devlog live inside Carcosa now
+  { id: "carcosa", label: "Carcosa", icon: Waypoints },
 ];
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */
@@ -87,7 +87,9 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
   </div>;
 }
 
-export function PageTitle({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+export function PageTitle({ children, actions, quiet = false }: { children: ReactNode; actions?: ReactNode; quiet?: boolean }) {
+  // inside another page (Carcosa) a section keeps its buttons but not its own giant title
+  if (quiet) return actions ? <div className="pagetitle pagetitle--quiet"><div className="pagetitle__actions">{actions}</div></div> : null;
   // The byte look sizes a title by its length so every word fills the width; other looks ignore this.
   const text = typeof children === "string" ? children : "";
   const wide = /[\u2e80-\u9fff\uff00-\uffef]/.test(text);
