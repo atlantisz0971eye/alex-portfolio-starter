@@ -301,6 +301,25 @@
 .ws-root[data-skin="byte"] .carcosa-dream { position: absolute; left: 0; right: 0; top: calc(100% + 12px); margin: 0; font-size: 14px; line-height: 23px; color: var(--text); white-space: pre-wrap; }
 .ws-root[data-skin="byte"] .carcosa-scene:has(.carcosa-dream) { margin-bottom: 11em; }
 @media (prefers-reduced-motion: reduce) { .ws-root[data-skin="byte"] .carcosa-star svg { animation: none; } }
+.ws-root[data-skin="byte"] .carcosa-checkin, .ws-root[data-skin="byte"] .carcosa-reading { max-width: 720px; font-size: 14px; }
+.ws-root[data-skin="byte"] .carcosa-scale { display: flex; align-items: center; gap: 1.2ch; margin-bottom: 10px; }
+.ws-root[data-skin="byte"] .carcosa-scale span { width: 5ch; color: var(--text-2); font-size: 13px; }
+.ws-root[data-skin="byte"] .carcosa-scale button { width: 34px; height: 30px; padding: 0; border: 1px solid color-mix(in srgb, var(--text-2) 45%, transparent); background: none; color: var(--text-2); font: inherit; cursor: pointer; }
+.ws-root[data-skin="byte"] .carcosa-scale button.is-on { border-color: var(--text); background: var(--text); color: var(--bg); font-weight: 700; }
+.ws-root[data-skin="byte"] .carcosa-fields { display: flex; flex-wrap: wrap; gap: 1ch 3ch; margin: 4px 0 12px; font-size: 13px; color: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-fields input { margin-left: .5ch; padding: 4px 6px; border: 0; border-bottom: 1px solid var(--text-2); background: none; color: var(--text); font: inherit; }
+.ws-root[data-skin="byte"] .carcosa-fields input[type="number"] { width: 6ch; }
+.ws-root[data-skin="byte"] .carcosa-fields input[type="text"] { width: 16ch; }
+.ws-root[data-skin="byte"] .carcosa-rest { display: flex; gap: 3ch; margin-top: 10px; }
+.ws-root[data-skin="byte"] .carcosa-poem { margin: 0 0 16px; padding-left: 2ch; border-left: 2px solid #c9a21e; font-size: 16px; line-height: 28px; letter-spacing: .08em; }
+.ws-root[data-skin="byte"] .carcosa-poem p { margin: 0; }
+.ws-root[data-skin="byte"] .carcosa-poem b { color: #c9a21e; }
+.ws-root[data-skin="byte"] .carcosa-plain { margin: 0 0 10px; line-height: 25px; color: var(--text); }
+.ws-root[data-skin="byte"] .carcosa-action { margin: 0 0 10px; font-weight: 700; }
+.ws-root[data-skin="byte"] .carcosa-reading--safety { padding: 14px 16px; border: 1px solid var(--text); line-height: 25px; }
+.ws-root[data-skin="byte"] .carcosa-reading--safety ul { display: flex; flex-wrap: wrap; gap: 1ch 3ch; margin: 10px 0 0; padding: 0; list-style: none; font-weight: 700; }
+.ws-root[data-skin="byte"] .carcosa-reading--safety a { color: var(--text); }
+.ws-root[data-skin="byte"] .carcosa-privacy { margin-top: 3vw; max-width: 720px; }
 
 /* ---- the Carcosa tab: one title, three sections; the ledger and notebook pages sit under it without their own titles ---- */
 .ws-root[data-skin="byte"] .carcosa-head .pagetitle { margin-bottom: 1.6vw; }
