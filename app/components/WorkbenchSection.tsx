@@ -14,6 +14,7 @@ import {
   type WorkbenchProject,
 } from "../data/workbench";
 import type { Language } from "../types/project";
+import { WorkbenchMill } from "./WorkbenchMill";
 
 const CELL_W = 156;
 const CELL_H = 68;
@@ -221,7 +222,8 @@ export function WorkbenchSection({ lang }: { lang: Language }) {
   };
 
   return (
-    <section id="workbench" className="section-wrap workbench-section relative snap-child min-h-[100svh] w-full">
+    <section id="workbench" className="section-wrap workbench-section relative overflow-hidden snap-child min-h-[100svh] w-full">
+      <WorkbenchMill />
       <div className="theme-noise section-noise" aria-hidden />
       <div className="section-content content-grid py-16 md:py-24">
         <div className="section-head mb-8">

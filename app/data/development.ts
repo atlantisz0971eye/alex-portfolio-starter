@@ -33,6 +33,14 @@ const LEAF_FIELD = "radial-gradient(circle at 72% 24%, rgba(181,203,154,.5), tra
 // A dark photographic print with a trace of ember, the colour of the burnt shadow the piece leaves behind the foreground.
 const TRYIN_FIELD = "radial-gradient(circle at 74% 38%, rgba(192,100,58,.4), transparent 34%), radial-gradient(circle at 24% 80%, rgba(230,225,214,.1), transparent 44%), linear-gradient(145deg, #0b0a09, #1b1a18 55%, #070605)";
 
+/** The colour each work lends the background signal while it is looked at, and the field's own resting colour. */
+export const DEVELOPMENT_GLOW: Record<string, [number, number, number]> = {
+  rest: [150, 158, 222],
+  "night-8looming-jasmine": [228, 52, 52],
+  "ga1a-poetry-leaf-archive": [170, 206, 132],
+  tryin: [214, 118, 66],
+};
+
 export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
   en: {
     title: "Project Development",
