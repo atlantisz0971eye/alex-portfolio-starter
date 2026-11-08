@@ -6,6 +6,7 @@ import {
   WORKBENCH_AS_OF,
   WORKBENCH_CONTENT,
   WORKBENCH_PROJECTS,
+  projectViews,
   type WorkbenchDiagram,
   type WorkbenchGroup,
   type WorkbenchNode,
@@ -23,8 +24,9 @@ const PAD = 10;
 // Every plate shares one frame, so all diagrams are drawn at the same scale; narrower ones sit centred in it.
 const spanW = (cols: number) => cols * CELL_W + NODE_W;
 const spanH = (rows: number) => rows * CELL_H + NODE_H;
-const FRAME_W = PAD * 2 + spanW(Math.max(...WORKBENCH_PROJECTS.flatMap((project) => project.diagram.nodes.map((node) => node.col))));
-const FRAME_H = PAD * 2 + spanH(Math.max(...WORKBENCH_PROJECTS.flatMap((project) => project.diagram.nodes.map((node) => node.row))));
+const ALL_NODES = WORKBENCH_PROJECTS.flatMap((project) => projectViews(project).flatMap((view) => view.diagram.nodes));
+const FRAME_W = PAD * 2 + spanW(Math.max(...ALL_NODES.map((node) => node.col)));
+const FRAME_H = PAD * 2 + spanH(Math.max(...ALL_NODES.map((node) => node.row)));
 
 const nodeX = (node: WorkbenchNode) => PAD + node.col * CELL_W;
 const nodeY = (node: WorkbenchNode) => PAD + node.row * CELL_H;
@@ -127,6 +129,9 @@ type RowProps = { project: WorkbenchProject; lang: Language; isOpen: boolean; on
 function Row({ project, lang, isOpen, onToggle }: RowProps) {
   const content = WORKBENCH_CONTENT[lang];
   const copy = project.copy[lang];
+  const views = projectViews(project);
+  const [viewIndex, setViewIndex] = useState(0);
+  const view = views[Math.min(viewIndex, views.length - 1)];
   const bodyId = `workbench-body-${project.slug}`;
   const moveLight = (event: ReactMouseEvent<HTMLElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
@@ -151,8 +156,25 @@ function Row({ project, lang, isOpen, onToggle }: RowProps) {
 
       <div id={bodyId} className="workbench-row__body" aria-hidden={!isOpen}>
         <div className="workbench-row__body-inner">
+          {views.length > 1 && (
+            <div className="workbench-row__views" role="tablist" aria-label={project.title}>
+              {views.map((item, index) => (
+                <button
+                  key={item.label.en}
+                  type="button"
+                  role="tab"
+                  aria-selected={item === view}
+                  tabIndex={isOpen ? 0 : -1}
+                  className={item === view ? "is-active" : undefined}
+                  onClick={() => setViewIndex(index)}
+                >
+                  {item.label[lang]}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="workbench-row__floor">
-            <Etching diagram={project.diagram} title={project.title} />
+            <Etching key={view.label.en} diagram={view.diagram} title={`${project.title} · ${view.label.en}`} />
           </div>
           <p className="workbench-row__summary">{copy.summary}</p>
           <div className="workbench-row__stack">
