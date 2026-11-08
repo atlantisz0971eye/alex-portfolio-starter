@@ -253,7 +253,7 @@ function Checkin({ creature }: { creature: Creature }) {
 
 const HELP = [["Samaritans", "116 123", "tel:116123"], ["SHOUT（短信）", "85258", "sms:85258&body=SHOUT"], ["NHS", "111", "tel:111"], ["紧急", "999", "tel:999"]];
 
-/** Today's reading: the acrostic (its first characters lit), then plainly, then one small thing. */
+/** Today's reading: her whisper, then the same said plainly, then one small thing. */
 function ReadingCard({ creature }: { creature: Creature }) {
   const { act } = useCarcosa();
   const [busy, setBusy] = useState(false);
@@ -270,7 +270,7 @@ function ReadingCard({ creature }: { creature: Creature }) {
     <ul>{HELP.map(([name, num, href]) => <li key={name}><a href={href}>{name} {num}</a></li>)}</ul>
   </div>;
   return <div className="carcosa-reading">
-    {r.poem.length > 0 && <div className="carcosa-poem" aria-label={`藏头：${r.head}`}>{r.poem.map((line, i) => <p key={i}><b>{[...line][0]}</b>{[...line].slice(1).join("")}</p>)}</div>}
+    {r.poem.length > 0 && <div className="carcosa-whisper" aria-label="Carcosa 的低语">{r.poem.map((line, i) => <p key={i}>{line}</p>)}</div>}
     <p className="carcosa-plain">{r.plain}</p>
     {r.action && <p className="carcosa-action">□ {r.action}</p>}
     <button type="button" className="ws-text-button" disabled={busy} onClick={() => void read()}>{busy ? "她在读…" : "read again"}</button>

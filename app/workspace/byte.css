@@ -311,9 +311,9 @@
 .ws-root[data-skin="byte"] .carcosa-fields input[type="number"] { width: 6ch; }
 .ws-root[data-skin="byte"] .carcosa-fields input[type="text"] { width: 16ch; }
 .ws-root[data-skin="byte"] .carcosa-rest { display: flex; gap: 3ch; margin-top: 10px; }
-.ws-root[data-skin="byte"] .carcosa-poem { margin: 0 0 16px; padding-left: 2ch; border-left: 2px solid #c9a21e; font-size: 16px; line-height: 28px; letter-spacing: .08em; }
-.ws-root[data-skin="byte"] .carcosa-poem p { margin: 0; }
-.ws-root[data-skin="byte"] .carcosa-poem b { color: #c9a21e; }
+.ws-root[data-skin="byte"] .carcosa-whisper { margin: 0 0 18px; padding-left: 2ch; border-left: 1px solid color-mix(in srgb, #c9a21e 60%, transparent); font-size: 15px; line-height: 30px; letter-spacing: .06em; color: var(--text-2); }
+.ws-root[data-skin="byte"] .carcosa-whisper p { margin: 0; }
+.ws-root[data-skin="byte"] .carcosa-whisper p:last-child { color: #c9a21e; }
 .ws-root[data-skin="byte"] .carcosa-plain { margin: 0 0 10px; line-height: 25px; color: var(--text); }
 .ws-root[data-skin="byte"] .carcosa-action { margin: 0 0 10px; font-weight: 700; }
 .ws-root[data-skin="byte"] .carcosa-reading--safety { padding: 14px 16px; border: 1px solid var(--text); line-height: 25px; }
