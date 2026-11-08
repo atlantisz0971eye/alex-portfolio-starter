@@ -274,10 +274,10 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     group: "studio",
     index: "06",
     title: "Dys/Utopia",
-    repo: "Interactive model · Kinect",
+    repo: "Interactive model · TouchDesigner",
     href: "https://vimeo.com/1151628483",
     hrefKind: "watch",
-    stack: ["Kinect skeleton", "Real-time 3-D", "Vertex displacement"],
+    stack: ["TouchDesigner", "Kinect skeleton", "Real-time 3-D", "Vertex displacement"],
     copy: {
       en: { status: "Interactive model", summary: "An algorithmic self-portrait of rumination. Rings drift into disorder on their own; raising a hand above the head breaks the threshold and the feedback loop melts the head." },
       zh: { status: "互动模型", summary: "关于反刍的算法自画像。圆环会自行滑向混乱；右手举过头顶越过阈值，反馈回路让头部液化坍塌。" },
@@ -290,7 +290,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
         { id: "entropy", label: "Passive entropy", sub: "noise over time", kind: "app", col: 2, row: 0 },
         { id: "gate", label: "Threshold gate", sub: "hand above head", kind: "app", col: 2, row: 1 },
         { id: "feedback", label: "Active feedback", sub: "the head liquefies", kind: "app", col: 3, row: 1 },
-        { id: "mind", label: "Head · Bed · Rings", sub: "the mindscape", kind: "app", col: 4, row: 1 },
+        { id: "mind", label: "Head · Bed · Rings", sub: "TouchDesigner scene", kind: "app", col: 4, row: 1 },
         { id: "grid", label: "YOU ME US", sub: "mirrored infinite grid", kind: "app", col: 4, row: 2 },
       ],
       edges: [
