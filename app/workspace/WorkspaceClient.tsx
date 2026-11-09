@@ -12,7 +12,7 @@ import { DocumentSheet, type DocumentActions } from "./DocumentSheet";
 import { Library } from "./Library";
 import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
-import { GlobalAssistant } from "./GlobalAssistant";
+import { CHAT_KEY, GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
@@ -390,6 +390,8 @@ function App() {
 
   async function signOut() {
     await fetch("/api/workspace/session", { method: "DELETE" });
+    // The kept conversation may quote mail and calendar entries; it does not outlive the session.
+    try { Object.keys(localStorage).filter((key) => key.startsWith(CHAT_KEY)).forEach((key) => localStorage.removeItem(key)); } catch { /* storage unavailable */ }
     window.location.reload();
   }
 

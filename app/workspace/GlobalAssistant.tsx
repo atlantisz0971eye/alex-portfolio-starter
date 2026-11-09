@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Loader2, Send, Sparkles, Square } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { AssistantScreen } from "../lib/assistantScreens";
 import { streamNdjson } from "./api";
@@ -10,6 +10,7 @@ import { currentMindstream } from "./mindstreamBus";
 import { zone } from "./calendarFormat";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { Sheet } from "./Sheet";
+import { UserContext } from "./Shell";
 
 type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
 
@@ -25,6 +26,10 @@ const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
 };
 
 const HISTORY_CHARS = 1500;
+/** The conversation is kept in this browser so a reload does not erase it; an old one is not brought back. */
+export const CHAT_KEY = "ws-assistant-chat";
+const CHAT_HOURS = 12;
+const CHAT_TURNS = 30;
 
 const OUTCOME: Record<Status, string> = { pending: "用户还没处理", applying: "用户还没处理", done: "用户已确认，已生效", failed: "确认时出错，没有生效", dismissed: "用户已忽略" };
 
@@ -50,6 +55,26 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
   const [failure, setFailure] = useState<{ message: string; retry: () => void } | null>(null);
   const abort = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const { user } = useContext(UserContext);
+  const chatKey = `${CHAT_KEY}:${user?.id ?? "owner"}`;
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(chatKey) ?? "null") as { at?: number; messages?: Message[] } | null;
+      // A card caught mid-confirmation comes back as waiting: whether it went through is not known here.
+      if (saved?.at && Date.now() - saved.at < CHAT_HOURS * 3_600_000 && Array.isArray(saved.messages)) setMessages(saved.messages.map((item) => ({ ...item, status: item.status?.map((value) => value === "applying" ? "pending" : value) })));
+    } catch { /* nothing kept, or storage is unavailable */ }
+    setRestored(true);
+  }, [chatKey]);
+  useEffect(() => {
+    if (!restored || busy) return;
+    try {
+      if (messages.length) localStorage.setItem(chatKey, JSON.stringify({ at: Date.now(), messages: messages.slice(-CHAT_TURNS) }));
+      else localStorage.removeItem(chatKey);
+    } catch { /* the chat still works without being kept */ }
+  }, [messages, busy, restored, chatKey]);
+  const reset = () => { abort.current?.abort(); setMessages([]); setFailure(null); setInput(""); };
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages, failure, open]);
   useEffect(() => () => abort.current?.abort(), []);
@@ -114,6 +139,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
           <div className="ca-suggest">{SUGGESTIONS[screen ?? "home"].map((text) => <button key={text} type="button" className="ws-pill" onClick={() => void send(text)}>{text}</button>)}</div>
           <small className="ws-note">When you ask, the calendar entries, emails or book passages I look up are sent to DeepSeek. Mail and the library stay read-only.</small>
         </div>}
+        {messages.length > 0 && <button type="button" className="ws-text-button ca-new" onClick={reset}>New chat</button>}
         {messages.map((message, messageIndex) => <div key={messageIndex} className={`ca-turn ca-turn--${message.role}`}>
           {message.role === "assistant" && message.tools && message.tools.length > 0 && <ul className="ca-tools">{message.tools.map((label, index) => <li key={index}>{busy && messageIndex === messages.length - 1 && index === message.tools!.length - 1 && !message.text ? <Loader2 className="ws-spin" size={12} /> : <Check size={12} />} {label}</li>)}</ul>}
           {message.role === "user" ? <div className="ws-message ws-message--user"><div className="ws-markdown"><p>{message.text}</p></div></div> : <>
