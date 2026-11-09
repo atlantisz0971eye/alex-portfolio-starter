@@ -96,6 +96,17 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
       onError(cause instanceof Error ? cause.message : "Could not apply the change.");
     }
   }
+  async function reply(index: number, message: string) {
+    try {
+      const result = await parseResponse<{ answer: string; added: number }>(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discuss", index, message, zone: zone() }) }));
+      setLocal({});
+      await load();
+      if (result.added) onChanged();
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Could not send your reply.");
+      throw cause;
+    }
+  }
   const dismiss = (index: number) => { setLocal((current) => ({ ...current, [index]: "dismissed" })); record(index, "dismissed"); };
 
   const now = Date.now();
@@ -140,7 +151,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
 
             {plan && plan.proposals.length > 0 && <section className="today__proposals" aria-label="Suggested calendar changes" {...place("proposals")}>
               <h2 className="section-label">From your mail</h2>
-              {plan.proposals.map((proposal, index) => <ProposalCard key={index} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(index)} onDismiss={() => dismiss(index)} />)}
+              {plan.proposals.map((proposal, index) => <ProposalCard key={index} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(index)} onDismiss={() => dismiss(index)} onReply={(text) => reply(index, text)} />)}
             </section>}
           </div>
 

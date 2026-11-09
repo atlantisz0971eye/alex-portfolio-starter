@@ -2,7 +2,7 @@ import { calendarGuard } from "../../../lib/calendarGuard";
 import { validZone } from "../../../lib/calendarTime";
 import { MailAuthError } from "../../../lib/gmail";
 import { DeepSeekError, deepSeekErrorCode } from "../../../lib/workspaceDeepSeek";
-import { checkToday, resolveProposal, todayView } from "../../../lib/today";
+import { checkToday, discussProposal, resolveProposal, todayView } from "../../../lib/today";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -18,13 +18,13 @@ export async function GET(request: Request) {
   }
 }
 
-/** "check" looks for new mail (and plans if there is some); "refresh" always plans; "proposal" records a decision. */
+/** "check" looks for new mail (and plans if there is some); "refresh" always plans; "proposal" records a decision; "discuss" answers a card in words. */
 export async function POST(request: Request) {
   const denied = await calendarGuard();
   if (denied) return denied;
-  let body: { action?: unknown; zone?: unknown; index?: unknown; status?: unknown };
+  let body: { action?: unknown; zone?: unknown; index?: unknown; status?: unknown; message?: unknown };
   try {
-    if (Number(request.headers.get("content-length")) > 2000) throw new Error("too large");
+    if (Number(request.headers.get("content-length")) > 4000) throw new Error("too large");
     body = await request.json();
   } catch {
     return Response.json({ error: "invalid_request" }, { status: 400 });
@@ -33,6 +33,9 @@ export async function POST(request: Request) {
     if (body.action === "proposal" && Number.isInteger(body.index) && (body.status === "applied" || body.status === "dismissed")) {
       await resolveProposal(body.index as number, body.status);
       return Response.json({ ok: true });
+    }
+    if (body.action === "discuss" && Number.isInteger(body.index) && typeof body.message === "string" && body.message.trim()) {
+      return Response.json(await discussProposal(body.index as number, body.message, typeof body.zone === "string" ? validZone(body.zone) : undefined));
     }
     if (body.action === "check" || body.action === "refresh") {
       const result = await checkToday({ zone: typeof body.zone === "string" ? validZone(body.zone) : undefined, force: body.action === "refresh" });

@@ -528,6 +528,12 @@
 .ca-card__why { margin: 0; font-size: 13px; color: var(--text-2); }
 .ca-card__warn { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--warn); }
 .ca-card__actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.ca-card__reply { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--f2); font-size: 13px; line-height: 1.5; }
+.ca-card__reply b { font-weight: 600; }
+.ca-card__reply-toggle { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; }
+.ca-card__compose { display: flex; flex-direction: column; gap: 8px; }
+.ca-card__compose textarea { width: 100%; resize: vertical; min-height: 56px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--f2); background: transparent; color: var(--text); font: inherit; font-size: 14px; line-height: 1.5; }
+.ca-card__compose-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ca-card__done { display: inline-flex; align-items: center; gap: 6px; color: #4f8a5b; font-size: 14px; }
 .ca-all { align-self: flex-start; }
 @media (hover: hover) { .ef__cats button:hover, .ef__days button:not(.is-on):hover { background: #48484a; } }
