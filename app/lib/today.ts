@@ -286,6 +286,21 @@ export async function discussProposal(pid: string, message: string, zoneInput?: 
   return { answer, added: proposals.length };
 }
 
+/** The plan, its cards and what the person has said about earlier ones, as text for Claude over MCP. */
+export async function todaySummary() {
+  const state = await readState();
+  const plan = state.plan;
+  if (!plan) return "No plan has been made yet. It is written in the web app from the calendar and new mail.";
+  const outcome = { applied: "confirmed", dismissed: "set aside" };
+  const cards = plan.proposals.map((item) => `- [${item.status ? outcome[item.status] : "waiting for an answer"}] ${cardLine(item).replace(/\n/g, "；")}${item.reply ? `；他的回复：${item.reply.you}；助手：${item.reply.answer}` : ""}`);
+  return [
+    `Plan for ${plan.date}, written ${plan.generatedAt}${plan.basedOn.length ? `, from mail: ${plan.basedOn.map((item) => item.subject).join(" · ")}` : ""}`,
+    plan.text,
+    `Cards (${cards.length}):\n${cards.join("\n") || "(none)"}`,
+    remarksBlock(state.remarks).trim() || "(He has said nothing about earlier suggestions.)",
+  ].join("\n\n").slice(0, 9000);
+}
+
 /** Marks one proposal on the plan as applied or dismissed so it does not come back. */
 export async function resolveProposal(pid: string, status: "applied" | "dismissed") {
   const state = await readState();

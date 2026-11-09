@@ -1,7 +1,7 @@
 import { createEvent, CalendarInputError, deleteEvent, updateEvent } from "./calendarStore";
 import { validZone } from "./calendarTime";
 import { conflictsFor, eventProps, runTool } from "./agentTools";
-import { savedZone } from "./today";
+import { savedZone, todaySummary } from "./today";
 import { DevlogError, deleteEntry, deleteProject, readEntries, readProjects, saveEntry, saveProject, validDate, validId } from "./devlogStore";
 import { applyBoardOps, applyNoteEdit, ensureNote, resolveBoardId, type BoardOp } from "./mindstreamOps";
 import { BoardError, readBoard, updateBoard } from "./boardStore";
@@ -230,6 +230,8 @@ const TOOLS: Tool[] = [
 const MAIL: Tool[] = [
   { name: "mail_search", readOnly: true, description: "Search the user's Gmail (read-only). Supports Gmail syntax such as from:, newer_than:7d, is:unread.", inputSchema: obj({ query: { type: "string" }, max: { type: "number" } }, ["query"]), run: read("mail_search") },
   { name: "mail_read", readOnly: true, description: "Read one email (text only, read-only). Use ids from mail_search.", inputSchema: obj({ account: { type: "string" }, id: { type: "string" } }, ["account", "id"]), run: read("mail_read") },
+  // The plan is written from mail, so it is offered under the same switch.
+  { name: "today_read", readOnly: true, description: "Read the Today screen's plan, which the web assistant writes from the calendar and new mail: its text, the calendar changes and questions on it with whether each was confirmed, set aside or is still waiting, and what he has said about earlier suggestions. Read this before changing the calendar so you do not repeat or contradict a card. Read-only: cards are answered in the web app.", inputSchema: obj({}), run: async () => todaySummary() },
 ];
 
 /** Mail tools are offered only when the owner switched them on, and never to members' connections. */
