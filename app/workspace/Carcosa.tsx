@@ -7,13 +7,13 @@ import { ThemeContext } from "./Shell";
 
 /**
  * Carcosa, the creature that lives in the Carcosa tab. She eats what the development ledger records (synced changes,
- * commits, deploys), learns the owner's routine from when that happens, and shows it back: eating, a well-fed yak, a
+ * commits, deploys) in meals, learns the owner's routine from when that happens, and shows it back: eating, a well-fed yak, a
  * hungry dried lump, or asleep outside the usual hours; and a sky of twin suns while work keeps its usual shape, the
  * black star when it has clearly left it, both while it drifts. The sky also drives the "auto" theme.
  */
 export type Phase = "eating" | "heavy" | "resting" | "sleeping" | "yak" | "lump";
 export type Sky = "suns" | "both" | "star";
-type Bite = { at: string; kind: "sync" | "commit" | "deploy" | "tick" | "rest"; label: string; value: number };
+type Bite = { at: string; kind: "meal" | "rest" | "breakfast"; label: string; value: number };
 type Finding = { key: string; text: string; diff: number; n: [number, number] };
 type DayNote = { mood?: number; energy?: number; sleep?: number; word?: string; rest?: boolean; at: string };
 type Reading = { day: string; at: string; head: string; poem: string[]; plain: string; action: string; safety: boolean };
