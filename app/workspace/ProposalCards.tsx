@@ -8,6 +8,7 @@ import { flushMindstream, notifyMindstreamChanged } from "./mindstreamBus";
 
 export type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat?: unknown };
 export type Proposal = {
+  pid?: string;
   op: "create" | "update" | "delete" | "note_create" | "note_append" | "ms_note" | "ms_board";
   ms?: { boardId: string; title: string; mode?: "replace" | "append"; markdown?: string; ops?: unknown[]; lines?: string[]; why?: string };
   note?: { id?: string; title: string; markdown: string; parentId?: string | null };

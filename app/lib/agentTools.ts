@@ -50,6 +50,8 @@ export const TOOLS: ToolSpec[] = [
 
 export type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat?: unknown };
 export type Proposal = {
+  /** Names this proposal for as long as it is shown, so a decision is recorded against the right card even after the list around it changes. */
+  pid?: string;
   op: "create" | "update" | "delete" | "note_create" | "note_append" | "ms_note" | "ms_board";
   id?: string;
   scope?: "this" | "all";
@@ -117,6 +119,8 @@ export const calendarLines = (occurrences: Occurrence[], zone: string) => {
 
 export type ToolContext = { zone: string; proposals: Proposal[] };
 
+const propose = (ctx: ToolContext, proposal: Proposal) => { ctx.proposals.push({ pid: crypto.randomUUID(), ...proposal }); };
+
 /** Only these tools run; mindstream edits and new notes are left to the person and to Claude over MCP. */
 const ALLOWED = new Set(TOOLS.map((tool) => tool.function.name));
 
@@ -139,7 +143,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         const doc = await readCalendar();
         const fields = buildFields(event, zone, doc.categories);
         const conflicts = await conflictsFor(fields);
-        ctx.proposals.push({ op: "create", event, after: summary(fields), conflicts, ...whyOf(args) });
+        propose(ctx, { op: "create", event, after: summary(fields), conflicts, ...whyOf(args) });
         return `Proposed creating "${fields.title}". Awaiting the user's confirmation.${conflicts.length ? ` It overlaps with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "calendar_update":
@@ -156,13 +160,13 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         }
         const before = summary(fieldsOf(shown ?? series));
         if (name === "calendar_delete") {
-          ctx.proposals.push({ op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [], ...whyOf(args) });
+          propose(ctx, { op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [], ...whyOf(args) });
           return `Proposed deleting "${before.title}". Awaiting the user's confirmation.`;
         }
         const patch = args.event && typeof args.event === "object" ? args.event as Record<string, unknown> : {};
         const fields = buildFields(patch, zone, doc.categories, fieldsOf(shown && scope === "this" ? shown : series));
         const conflicts = await conflictsFor(fields, series.id);
-        ctx.proposals.push({ op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts, ...whyOf(args) });
+        propose(ctx, { op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts, ...whyOf(args) });
         return `Proposed changing "${before.title}". Awaiting the user's confirmation.${conflicts.length ? ` It would overlap with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "mail_search": {
@@ -204,7 +208,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (!found || found.note.deletedAt) return "Error: no note has that id.";
         const markdown = String(args.markdown ?? "").slice(0, 20_000);
         if (!markdown.trim()) return "Error: there is nothing to add.";
-        ctx.proposals.push({ op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
+        propose(ctx, { op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
         return `Proposed adding text to "${found.note.title || "Untitled"}". Awaiting the user's confirmation.`;
       }
       case "mindstream_list": {

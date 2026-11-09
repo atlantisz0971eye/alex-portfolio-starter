@@ -36,7 +36,8 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   const [view, setView] = useState<View | null>(null);
   const [planning, setPlanning] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [local, setLocal] = useState<Record<number, Status>>({});
+  // Keyed by the proposal's own id, so a plan that is replaced underneath never hands a status to a different card.
+  const [local, setLocal] = useState<Record<string, Status>>({});
   const [open, setOpen] = useState<MailItem | null>(null);
   // The front page is off until the viewer turns it on, and a hidden one is never fetched, so it costs nothing.
 
@@ -67,7 +68,6 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   async function regenerate() {
     if (planning) return;
     setPlanning(true);
-    setLocal({});
     try {
       await parseResponse(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "refresh", zone: zone() }) }));
       await load();
@@ -78,28 +78,28 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
     }
   }
 
-  const statusOf = (proposal: Plan["proposals"][number], index: number): Status => local[index] ?? (proposal.status === "applied" ? "done" : proposal.status === "dismissed" ? "dismissed" : "pending");
-  const record = (index: number, status: "applied" | "dismissed") => void fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "proposal", index, status }) }).catch(() => undefined);
+  const pidOf = (proposal: Plan["proposals"][number], index: number) => proposal.pid ?? `${plan?.generatedAt}-${index}`;
+  const statusOf = (proposal: Plan["proposals"][number], index: number): Status => local[pidOf(proposal, index)] ?? (proposal.status === "applied" ? "done" : proposal.status === "dismissed" ? "dismissed" : "pending");
+  const record = (pid: string, status: "applied" | "dismissed") => void fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "proposal", pid, status }) }).catch(() => undefined);
 
-  async function apply(index: number) {
-    const proposal = plan?.proposals[index];
+  async function apply(pid: string) {
+    const proposal = plan?.proposals.find((item, index) => pidOf(item, index) === pid);
     if (!proposal) return;
-    setLocal((current) => ({ ...current, [index]: "applying" }));
+    setLocal((current) => ({ ...current, [pid]: "applying" }));
     try {
       await applyProposal(proposal);
-      setLocal((current) => ({ ...current, [index]: "done" }));
-      record(index, "applied");
+      setLocal((current) => ({ ...current, [pid]: "done" }));
+      record(pid, "applied");
       onChanged();
       void load();
     } catch (cause) {
-      setLocal((current) => ({ ...current, [index]: "failed" }));
+      setLocal((current) => ({ ...current, [pid]: "failed" }));
       onError(cause instanceof Error ? cause.message : "Could not apply the change.");
     }
   }
-  async function reply(index: number, message: string) {
+  async function reply(pid: string, message: string) {
     try {
-      const result = await parseResponse<{ answer: string; added: number }>(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discuss", index, message, zone: zone() }) }));
-      setLocal({});
+      const result = await parseResponse<{ answer: string; added: number }>(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discuss", pid, message, zone: zone() }) }));
       await load();
       if (result.added) onChanged();
     } catch (cause) {
@@ -107,7 +107,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
       throw cause;
     }
   }
-  const dismiss = (index: number) => { setLocal((current) => ({ ...current, [index]: "dismissed" })); record(index, "dismissed"); };
+  const dismiss = (pid: string) => { setLocal((current) => ({ ...current, [pid]: "dismissed" })); record(pid, "dismissed"); };
 
   const now = Date.now();
   const mail = useMemo(() => {
@@ -152,7 +152,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
 
             {plan && plan.proposals.length > 0 && <section className="today__proposals" aria-label="Suggested calendar changes" {...place("proposals")}>
               <h2 className="section-label">From your mail</h2>
-              {plan.proposals.map((proposal, index) => <ProposalCard key={index} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(index)} onDismiss={() => dismiss(index)} onReply={(text) => reply(index, text)} />)}
+              {plan.proposals.map((proposal, index) => { const pid = pidOf(proposal, index); return <ProposalCard key={pid} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(pid)} onDismiss={() => dismiss(pid)} onReply={(text) => reply(pid, text)} />; })}
             </section>}
           </div>
 

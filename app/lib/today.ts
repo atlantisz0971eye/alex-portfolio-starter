@@ -45,8 +45,17 @@ const MAX_SEEN = 800;
 async function readState(): Promise<TodayState> {
   const result = await get(await statePath(), { access: "private", useCache: false });
   if (!result || result.statusCode !== 200) return { seen: [] };
-  return JSON.parse(await new Response(result.stream).text()) as TodayState;
+  const state = JSON.parse(await new Response(result.stream).text()) as TodayState;
+  // Plans saved before proposals had ids get one that is the same on every read.
+  state.plan?.proposals.forEach((item, index) => { item.pid ??= `${state.plan!.generatedAt}-${index}`; });
+  return state;
 }
+
+/** Two proposals for the same change: the same event to alter, or a new event with the same title and start. */
+const sameChange = (proposal: Proposal) => proposal.op === "create" ? `create|${(proposal.after?.title ?? "").trim().toLowerCase()}|${proposal.after?.start ?? ""}` : `${proposal.op}|${proposal.id ?? proposal.note?.id ?? ""}|${proposal.occurrenceDate ?? ""}`;
+
+/** Cards from the plan being replaced that the person has not answered yet. They stay until answered or the day ends. */
+const waiting = (plan: TodayPlan | undefined, date: string): PlanProposal[] => plan?.date === date ? plan.proposals.filter((item) => !item.status) : [];
 
 async function writeState(state: TodayState) {
   await put(await statePath(), JSON.stringify(state), { access: "private", allowOverwrite: true, contentType: "application/json" });
@@ -89,12 +98,14 @@ const PLAN_TASK = `你现在要为用户制定“今天的日程建议”，不�
 
 const CLAIMS_PROPOSAL = /已提议|请确认|提议(加入|修改|删除|如下)/;
 
-async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = []): Promise<TodayPlan> {
+async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = [], previous?: TodayPlan): Promise<TodayPlan> {
   const proposals: Proposal[] = [];
+  const kept = waiting(previous, wallDate(Date.now(), zone));
+  const keptBlock = kept.length ? `\n\n下面这些提议已经在等用户确认，卡片会继续显示，不要再提议同样的事：\n${kept.map((item) => `- ${cardLine(item).replace(/\n/g, "；")}`).join("\n")}` : "";
   const list = emails.slice(0, 12).map((message) => `- [account ${message.account} | id ${message.id}] ${new Date(message.date).toISOString().slice(0, 16)} | ${message.from} <${message.fromEmail}> | ${message.subject} | ${message.snippet.slice(0, 160)}`).join("\n");
   const messages: ChatMessage[] = [
     { role: "system", content: await agentSystem(zone, "today", PLAN_TASK + remarksBlock(remarks)) },
-    { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。${expired.length ? `\n\n注意：${expired.join("、")} 的 Gmail 授权已过期，读不到这个邮箱的邮件。不要说“没有新邮件”；在“今天重点”第一条写明这个邮箱需要在 Mail 页重新连接。` : ""}\n\n新邮件：\n${list || (expired.length ? "（读不到）" : "（没有新邮件，请根据已有日程和最近的邮件给出建议）")}` },
+    { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。${expired.length ? `\n\n注意：${expired.join("、")} 的 Gmail 授权已过期，读不到这个邮箱的邮件。不要说“没有新邮件”；在“今天重点”第一条写明这个邮箱需要在 Mail 页重新连接。` : ""}\n\n新邮件：\n${list || (expired.length ? "（读不到）" : "（没有新邮件，请根据已有日程和最近的邮件给出建议）")}${keptBlock}` },
   ];
   let text = await runAgentLoop(messages, { zone, proposals }, {}, 6, true);
   // The model sometimes writes that it proposed events without calling a tool, which leaves the person nothing to confirm.
@@ -111,7 +122,7 @@ async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["
     generatedAt: new Date().toISOString(),
     date: wallDate(Date.now(), zone),
     text: text.trim(),
-    proposals: proposals.slice(0, 8),
+    proposals: [...proposals.slice(0, 8), ...kept.filter((item) => !proposals.some((fresh) => sameChange(fresh) === sameChange(item)))].slice(0, 12),
     reason,
     basedOn: emails.slice(0, 6).map((message) => ({ from: message.from, subject: message.subject })),
   };
@@ -184,7 +195,7 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
   let updated = false;
   if (shouldGenerate) {
     const base = options.force ? inbox.filter((message) => message.unread && relevant(message)) : worth.length ? worth : inbox.filter((message) => message.unread && relevant(message));
-    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired);
+    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired, state.plan);
     updated = true;
   }
   // Mail held back by the cool-down stays "new" so the next check handles it.
@@ -211,20 +222,20 @@ const DISCUSS_TASK = `用户在 Today 页对一条日程建议卡片回复了一
 提议必须调用 calendar_create / calendar_update / calendar_delete，并填 why（以“按你的回复：”开头）。
 最后只用一两句中文说明你做了什么或理解了什么（不超过 80 字），不要写“请确认”。`;
 
-const cardLine = (proposal: Proposal) => {
+function cardLine(proposal: Proposal) {
   const show = (item?: { title: string; start: string; end: string; allDay: boolean; location: string }) => item ? `${item.title} | ${item.start} → ${item.end}${item.allDay ? " (all-day)" : ""}${item.location ? ` | ${item.location}` : ""}` : "";
   const op = proposal.op === "create" ? "新建日程" : proposal.op === "update" ? "修改已有日程" : proposal.op === "delete" ? "删除已有日程" : proposal.op;
   return [`卡片：${op}`, proposal.id ? `已有日程 id：${proposal.id}` : "", proposal.before ? `原来：${show(proposal.before)}` : "", proposal.after ? `建议：${show(proposal.after)}` : "", proposal.why ? `理由：${proposal.why}` : ""].filter(Boolean).join("\n");
-};
+}
 
 /**
  * The person answers one suggestion in their own words ("I already signed up", "that is the tutorial I added").
  * The assistant reads the card and the answer, may propose corrected changes in its place, and the answer is kept
  * so later plans take it into account. The original card is set aside; new cards follow it.
  */
-export async function discussProposal(index: number, message: string, zoneInput?: string) {
+export async function discussProposal(pid: string, message: string, zoneInput?: string) {
   const state = await readState();
-  const original = state.plan?.proposals[index];
+  const original = state.plan?.proposals.find((item) => item.pid === pid);
   if (!state.plan || !original) throw new Error("no such proposal");
   const zone = validZone(zoneInput ?? state.zone ?? "Europe/London");
   const text = message.replace(/\s+/g, " ").trim().slice(0, 500);
@@ -239,20 +250,21 @@ export async function discussProposal(index: number, message: string, zoneInput?
   // read again so a plan written meanwhile is not overwritten with an old copy
   const fresh = await readState();
   const plan = fresh.plan ?? state.plan;
-  const at = plan.proposals.findIndex((item) => JSON.stringify({ ...item, status: undefined, reply: undefined }) === JSON.stringify({ ...original, status: undefined, reply: undefined }));
-  const slot = at >= 0 ? at : Math.min(index, plan.proposals.length);
-  const updated: PlanProposal = { ...(plan.proposals[slot] ?? original), status: "dismissed", reply: { you: text, answer } };
-  plan.proposals = [...plan.proposals.slice(0, slot), updated, ...proposals, ...plan.proposals.slice(slot + 1)].slice(0, 16);
+  const at = plan.proposals.findIndex((item) => item.pid === pid);
+  const updated: PlanProposal = { ...(at >= 0 ? plan.proposals[at] : original), status: "dismissed", reply: { you: text, answer } };
+  // If the card is no longer on the plan, it goes back at the end with the answer, so what was said is not lost.
+  plan.proposals = at >= 0 ? [...plan.proposals.slice(0, at), updated, ...proposals, ...plan.proposals.slice(at + 1)].slice(0, 16) : [...plan.proposals, updated, ...proposals].slice(-16);
   const remarks = [...(fresh.remarks ?? []), { at: new Date().toISOString(), about: about.slice(0, 80), text }].slice(-MAX_REMARKS);
   await writeState({ ...fresh, plan, remarks });
   return { answer, added: proposals.length };
 }
 
 /** Marks one proposal on the plan as applied or dismissed so it does not come back. */
-export async function resolveProposal(index: number, status: "applied" | "dismissed") {
+export async function resolveProposal(pid: string, status: "applied" | "dismissed") {
   const state = await readState();
-  if (!state.plan?.proposals[index]) return;
-  state.plan.proposals[index] = { ...state.plan.proposals[index], status };
+  const found = state.plan?.proposals.find((item) => item.pid === pid);
+  if (!found) return;
+  found.status = status;
   await writeState(state);
 }
 
