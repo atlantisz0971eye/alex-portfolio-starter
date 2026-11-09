@@ -18,7 +18,7 @@ const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   mail: ["Summarize my unread mail", "Which emails need a reply?", "Add events from this week’s emails to my calendar"],
   library: ["What am I reading, and how far along?", "What should I read next?"],
   devlog: ["Find a free 2-hour slot this week to write up my project", "Summarize my week and unread mail"],
-  mindstreams: ["Review this mindstream for gaps and contradictions", "Which cards are missing from the note?", "Tidy the board: merge duplicates and vague cards"],
+  mindstreams: ["Review this mindstream for gaps and contradictions", "Which cards are missing from the note?", "Which cards are duplicates or too vague?"],
   carcosa: ["Summarize my week and unread mail", "Summarize my recent notes", "Find a free 2-hour slot this week"],
   today: ["Re-plan my day around my new mail", "Which emails need a reply today?", "Add events from my recent emails"],
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
