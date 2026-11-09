@@ -23,6 +23,8 @@ const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
 };
 
+const HISTORY_CHARS = 1500;
+
 type Props = { open: boolean; onClose: () => void; screen: AssistantScreen | null; onChanged: () => void; onError: (message: string) => void };
 
 /** Chat with DeepSeek across the library, mail and calendar. It proposes calendar changes; nothing is written until you confirm each one. */
@@ -43,7 +45,8 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
-    const history = messages.filter((item) => item.text).slice(-6).map((item) => ({ role: item.role, content: item.text }));
+    // Long answers are cut for the model's memory only; the screen keeps them whole.
+    const history = messages.filter((item) => item.text).slice(-6).map((item) => ({ role: item.role, content: item.text.length > HISTORY_CHARS ? `${item.text.slice(0, HISTORY_CHARS)}…` : item.text }));
     setFailure(null);
     setInput("");
     setBusy(true);

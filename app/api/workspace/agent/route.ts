@@ -28,8 +28,9 @@ export async function POST(request: Request) {
   calls.set(key, { count: count + 1, until: now + 60_000 });
 
   let body: { message?: unknown; history?: unknown; zone?: unknown; context?: unknown; mindstreamId?: unknown };
+  // Room for the message and the six earlier turns the client sends, in Chinese (three bytes a character).
+  if (Number(request.headers.get("content-length")) > 48_000) return Response.json({ error: "too_large" }, { status: 413 });
   try {
-    if (Number(request.headers.get("content-length")) > 14_000) throw new Error("too large");
     body = await request.json();
   } catch {
     return Response.json({ error: "invalid_request" }, { status: 400 });
