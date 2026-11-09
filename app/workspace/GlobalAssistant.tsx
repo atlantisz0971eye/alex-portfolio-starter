@@ -3,14 +3,15 @@
 import { Check, Loader2, Send, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import type { AssistantScreen } from "../lib/assistantScreens";
 import { streamNdjson } from "./api";
+import { openMail } from "./assistantFocus";
 import { currentMindstream } from "./mindstreamBus";
 import { zone } from "./calendarFormat";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { Sheet } from "./Sheet";
 
 type Message = { role: "user" | "assistant"; text: string; tools?: string[]; proposals?: Proposal[]; status?: Status[] };
-export type AssistantScreen = "today" | "library" | "mail" | "calendar" | "mindstreams" | "devlog" | "notes";
 
 const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   calendar: ["Summarize my week", "Find a free 2-hour slot this week", "Add events from my recent emails"],
@@ -18,7 +19,7 @@ const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   library: ["What am I reading, and how far along?", "What should I read next?"],
   devlog: ["Find a free 2-hour slot this week to write up my project", "Summarize my week and unread mail"],
   mindstreams: ["Review this mindstream for gaps and contradictions", "Which cards are missing from the note?", "Tidy the board: merge duplicates and vague cards"],
-  notes: ["Summarize my recent notes", "Find my notes about…"],
+  carcosa: ["Summarize my week and unread mail", "Summarize my recent notes", "Find a free 2-hour slot this week"],
   today: ["Re-plan my day around my new mail", "Which emails need a reply today?", "Add events from my recent emails"],
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
 };
@@ -53,7 +54,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     setMessages((current) => [...current, { role: "user", text: message }, { role: "assistant", text: "" }]);
     const patchLast = (change: (item: Message) => Message) => setMessages((current) => current.map((item, index) => index === current.length - 1 ? change(item) : item));
     try {
-      await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen, mindstreamId: screen === "mindstreams" ? currentMindstream() : null }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
+      await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen, mindstreamId: screen === "mindstreams" ? currentMindstream() : null, mail: screen === "mail" || screen === "today" ? openMail() : null }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
         if (event.t === "tool" && typeof event.label === "string") patchLast((item) => ({ ...item, tools: [...(item.tools ?? []), event.label as string] }));
         else if (event.t === "action" && event.action && typeof event.action === "object") patchLast((item) => ({ ...item, proposals: [...(item.proposals ?? []), event.action as Proposal], status: [...(item.status ?? []), "pending" as Status] }));
         // The closing list only matters when the cards did not already arrive one by one.

@@ -408,7 +408,7 @@ function App() {
       <TabBar tab={tab} onTab={go} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
-    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "carcosa" ? (carcosaSub === "ledger" ? "devlog" : "mindstreams") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "carcosa" ? (carcosaSub === "ledger" ? "devlog" : carcosaSub === "notebook" ? "mindstreams" : "carcosa") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />
