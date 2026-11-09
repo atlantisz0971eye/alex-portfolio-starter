@@ -199,7 +199,7 @@ export function Calendar({ onError, onSignOut, onAssistant, refresh }: { onError
           : <Agenda days={days} events={visible} today={today} color={color} onSelect={setSelected} onCreate={() => startNew()} />}
     </div>
     <EventSheet event={selected} color={selected ? color(selected) : "#8e8e93"} categoryName={categories.find((category) => category.id === selected?.category)?.name ?? ""} onClose={() => setSelected(null)} onEdit={edit} onDelete={remove} />
-    <EventEditor value={editor} categories={categories} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); changed(); }} onError={onError} />
+    <EventEditor value={editor} categories={categories.filter((category) => !category.readOnly)} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); changed(); }} onError={onError} />
   </main>;
 }
 
@@ -261,10 +261,10 @@ function EventSheet({ event, color, categoryName, onClose, onEdit, onDelete }: {
     {shown && <div className="ev">
       <h2 style={{ "--c": color } as CSSProperties}><i />{shown.title}</h2>
       <p className="ev__when">{shown.allDay ? `${dayFormat.format(parse(shown.start, true))} · All day` : `${dayFormat.format(new Date(shown.start))} · ${eventTime(shown)}`}</p>
-      <p className="ev__cal">{categoryName}{shown.recurring ? " · Repeats" : ""}{shown.createdBy === "agent" ? " · Added by assistant" : ""}</p>
+      <p className="ev__cal">{categoryName}{shown.recurring ? " · Repeats" : ""}{shown.source ? " · Subscribed timetable, read-only" : shown.createdBy === "agent" ? " · Added by assistant" : ""}</p>
       {shown.location && <p className="ev__row"><MapPin size={16} /><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shown.location)}`} target="_blank" rel="noopener noreferrer">{shown.location}</a></p>}
       {shown.notes && <p className="ev__desc">{shown.notes}</p>}
-      <div className="ev__actions">
+      {!shown.source && <div className="ev__actions">
         {confirming ? <>
           <span>Delete {shown.recurring ? "which?" : "this event?"}</span>
           {shown.recurring ? <>
@@ -276,7 +276,7 @@ function EventSheet({ event, color, categoryName, onClose, onEdit, onDelete }: {
           <button type="button" className="ws-pill" onClick={() => onEdit(shown)}>Edit</button>
           <button type="button" className="ws-pill ws-pill--danger" onClick={() => setConfirming(true)}><Trash2 size={15} /> Delete</button>
         </>}
-      </div>
+      </div>}
     </div>}
   </Sheet>;
 }

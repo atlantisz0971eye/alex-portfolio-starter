@@ -1,4 +1,4 @@
-export type Category = { id: string; name: string; color: string };
+export type Category = { id: string; name: string; color: string; readOnly?: boolean };
 export type Repeat = { freq: "daily" | "weekly" | "monthly" | "yearly"; interval: number; until?: string; count?: number; byDay?: number[] };
 /** One occurrence of a stored event as the API returns it. */
 export type Occ = {
@@ -15,4 +15,6 @@ export type Occ = {
   occurrenceDate: string;
   recurring: boolean;
   createdBy: "user" | "agent";
+  /** Set on events from a subscribed calendar, which are read-only. */
+  source?: string;
 };
