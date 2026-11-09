@@ -1,7 +1,7 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { ArrowLeft, Loader2, X } from "lucide-react";
+import { ArrowLeft, Check, Loader2, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ENRICH_VERSION } from "../lib/bookTitle";
 import type { WorkspaceDocument, WorkspaceLibraryItem } from "../lib/workspaceStore";
@@ -17,6 +17,7 @@ import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
 import { Members } from "./Members";
+import { NOTICE } from "./notice";
 import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme, type ThemeMode } from "./Shell";
 import { Today } from "./Today";
 import { CarcosaPet, CarcosaProvider } from "./Carcosa";
@@ -225,6 +226,18 @@ function App() {
     const timer = window.setTimeout(() => setError(""), 6000);
     return () => window.clearTimeout(timer);
   }, [error]);
+  // Confirmations are not errors: they are announced politely and leave sooner.
+  const [info, setInfo] = useState("");
+  useEffect(() => {
+    const show = (event: Event) => setInfo((event as CustomEvent<string>).detail);
+    window.addEventListener(NOTICE, show);
+    return () => window.removeEventListener(NOTICE, show);
+  }, []);
+  useEffect(() => {
+    if (!info) return;
+    const timer = window.setTimeout(() => setInfo(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [info]);
 
   // Recognizes scanned pages a few at a time; the server is authoritative about what is still pending.
   async function runOcr(documentId: string, pages: number[]) {
@@ -402,5 +415,6 @@ function App() {
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} document={book.document} intent={intent} onDocument={updateDocument} stream={streamAssistant} onError={setError} onCite={(target) => { setAssistantOpen(false); setCitation((current) => ({ seq: (current?.seq ?? 0) + 1, ...target })); }} />
     </>}
     {error && <div className="ws-toast" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={16} /></button></div>}
+    {info && !error && <div className="ws-toast ws-toast--info" role="status"><Check size={16} /><span>{info}</span></div>}
   </CarcosaProvider>;
 }
