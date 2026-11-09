@@ -27,15 +27,30 @@ export type TodayPlan = {
   basedOn: { from: string; subject: string }[];
 };
 /** What the person has told the assistant about its suggestions, kept so later plans do not suggest the same thing again. */
-type Remark = { at: string; about: string; text: string };
+/** `dismissed` marks a card the person set aside without a word: weaker than something they said, and kept for less time. */
+type Remark = { at: string; about: string; text: string; dismissed?: true };
 type TodayState = { seen: string[]; zone?: string; plan?: TodayPlan; lastGenerated?: string; lastCheck?: string; remarks?: Remark[] };
 const MAX_REMARKS = 40;
 const REMARK_DAYS = 60;
+const MAX_DISMISSED = 15;
+const DISMISSED_DAYS = 14;
+
+/** Adds a remark and trims the list, counting dismissals apart so they never push out what the person actually said. */
+function withRemark(remarks: Remark[] | undefined, remark: Remark) {
+  const all = [...(remarks ?? []), remark];
+  const said = all.filter((item) => !item.dismissed).slice(-MAX_REMARKS);
+  const dismissed = all.filter((item) => item.dismissed).slice(-MAX_DISMISSED);
+  return [...said, ...dismissed].sort((a, b) => a.at.localeCompare(b.at));
+}
 
 function remarksBlock(remarks: Remark[] | undefined) {
-  const recent = (remarks ?? []).filter((item) => Date.now() - Date.parse(item.at) < REMARK_DAYS * 86_400_000);
-  if (!recent.length) return "";
-  return `\n用户之前对日程建议说过的话（按这些处理，不要再提已经处理过的事，也不要把它们和别的日程搞混）：\n${recent.slice(-20).map((item) => `- ${item.at.slice(0, 10)} 关于「${item.about}」：${item.text}`).join("\n")}`;
+  const within = (item: Remark, days: number) => Date.now() - Date.parse(item.at) < days * 86_400_000;
+  const said = (remarks ?? []).filter((item) => !item.dismissed && within(item, REMARK_DAYS));
+  const dismissed = (remarks ?? []).filter((item) => item.dismissed && within(item, DISMISSED_DAYS));
+  return [
+    said.length ? `\n用户之前对日程建议说过的话（按这些处理，不要再提已经处理过的事，也不要把它们和别的日程搞混）：\n${said.slice(-20).map((item) => `- ${item.at.slice(0, 10)} 关于「${item.about}」：${item.text}`).join("\n")}` : "",
+    dismissed.length ? `\n用户最近没有采纳、直接忽略的建议（没说原因；同一件事不要再提议或再问，除非新邮件里它有了变化）：\n${dismissed.slice(-10).map((item) => `- ${item.at.slice(0, 10)}「${item.about}」：${item.text}`).join("\n")}` : "",
+  ].join("");
 }
 
 const statePath = async () => `${await scopeRoot()}today/state.json`;
@@ -201,13 +216,15 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
   }
   // Mail held back by the cool-down stays "new" so the next check handles it.
   const handled = shouldGenerate ? inbox : inbox.filter((message) => !relevant(message) || seen.has(message.id));
+  // Writing a plan takes a while; what the person said or dismissed meanwhile is read again rather than overwritten.
+  const remarks = updated ? (await readState()).remarks : state.remarks;
   await writeState({
     seen: [...new Set([...handled.map((message) => message.id), ...state.seen])].slice(0, MAX_SEEN),
     zone,
     plan,
     lastGenerated: updated ? new Date().toISOString() : state.lastGenerated,
     lastCheck: new Date().toISOString(),
-    remarks: state.remarks,
+    remarks,
   });
   // A new plan is the event that changes what matters today, so the arrangement is remade with it.
   if (updated) { try { await refreshLayout(zone); } catch { /* the plan is saved either way */ } }
@@ -256,7 +273,7 @@ export async function discussProposal(pid: string, message: string, zoneInput?: 
   const updated: PlanProposal = { ...(at >= 0 ? plan.proposals[at] : original), status: "dismissed", reply: { you: text, answer } };
   // If the card is no longer on the plan, it goes back at the end with the answer, so what was said is not lost.
   plan.proposals = at >= 0 ? [...plan.proposals.slice(0, at), updated, ...proposals, ...plan.proposals.slice(at + 1)].slice(0, 16) : [...plan.proposals, updated, ...proposals].slice(-16);
-  const remarks = [...(fresh.remarks ?? []), { at: new Date().toISOString(), about: about.slice(0, 80), text }].slice(-MAX_REMARKS);
+  const remarks = withRemark(fresh.remarks, { at: new Date().toISOString(), about: about.slice(0, 80), text });
   await writeState({ ...fresh, plan, remarks });
   return { answer, added: proposals.length };
 }
@@ -266,6 +283,12 @@ export async function resolveProposal(pid: string, status: "applied" | "dismisse
   const state = await readState();
   const found = state.plan?.proposals.find((item) => item.pid === pid);
   if (!found) return;
+  // A card set aside without a reply is remembered too, or the next plan proposes the same thing again.
+  if (status === "dismissed" && !found.status) {
+    const shown = found.after ?? found.before;
+    const what = found.op === "ask" ? "跳过了这个问题" : `${found.op === "create" ? "新建日程" : found.op === "update" ? "修改日程" : found.op === "delete" ? "删除日程" : found.op}${shown ? `（${shown.start}）` : ""}`;
+    state.remarks = withRemark(state.remarks, { at: new Date().toISOString(), about: (found.ask?.about ?? shown?.title ?? found.op).slice(0, 80), text: what, dismissed: true });
+  }
   found.status = status;
   await writeState(state);
 }
