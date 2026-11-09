@@ -525,6 +525,7 @@
 .ca-card__after, .ca-card__gone { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
 .ca-card__gone strong { text-decoration: line-through; }
 .ca-card__after span, .ca-card__gone span { color: var(--text-2); font-size: 14px; }
+.ca-card__why { margin: 0; font-size: 13px; color: var(--text-2); }
 .ca-card__warn { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--warn); }
 .ca-card__actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .ca-card__done { display: inline-flex; align-items: center; gap: 6px; color: #4f8a5b; font-size: 14px; }

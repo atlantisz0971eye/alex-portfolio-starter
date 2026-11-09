@@ -17,6 +17,7 @@ export type Proposal = {
   before?: Summary;
   after?: Summary;
   conflicts: string[];
+  why?: string;
 };
 export type Status = "pending" | "applying" | "done" | "failed" | "dismissed";
 
@@ -59,6 +60,7 @@ export function ProposalCard({ proposal, status, onApply, onDismiss }: CardProps
     {proposal.note && <p className="ca-card__after"><strong>{proposal.note.title}</strong><span className="ca-card__note">{proposal.note.markdown.slice(0, 320)}{proposal.note.markdown.length > 320 ? "…" : ""}</span></p>}
     {proposal.op === "update" && proposal.before && <p className="ca-card__before">{proposal.before.title} · {when(proposal.before)}{proposal.before.location ? ` · ${proposal.before.location}` : ""}</p>}
     {shown && <p className={proposal.op === "delete" ? "ca-card__gone" : "ca-card__after"}><strong>{shown.title}</strong><span>{when(shown)}{shown.location ? ` · ${shown.location}` : ""}</span></p>}
+    {proposal.why && <p className="ca-card__why">{proposal.why}</p>}
     {proposal.conflicts.length > 0 && <p className="ca-card__warn"><TriangleAlert size={14} /> Overlaps with {proposal.conflicts.join(", ")}</p>}
     <div className="ca-card__actions">
       {status === "done" ? <span className="ca-card__done"><Check size={15} /> Done</span> : status === "dismissed" ? <span className="ws-muted">Dismissed</span> : <>
