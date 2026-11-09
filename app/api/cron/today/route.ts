@@ -1,3 +1,4 @@
+import { syncDueFeeds } from "../../../lib/calendarFeed";
 import { pollRepos } from "../../../lib/carcosa/ledger";
 import { writeDevlog } from "../../../lib/carcosa/scribe";
 import { checkToday } from "../../../lib/today";
@@ -9,7 +10,7 @@ export const maxDuration = 120;
 
 /**
  * Scheduled by Vercel Cron (see vercel.json). It checks for new mail and refreshes the plan for today
- * even when the app is closed. Vercel sends `Authorization: Bearer $CRON_SECRET`; anything else is refused.
+ * even when the app is closed, and refreshes subscribed calendars hourly. Vercel sends `Authorization: Bearer $CRON_SECRET`; anything else is refused.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
   try {
     // The owner first, then members who have asked for the daily plan; each in their own folder.
     const started = Date.now();
+    // Subscribed calendars (the school timetable) first, at most once an hour, so the day's plan sees them.
+    const feeds = await runAs(ownerUser(), () => syncDueFeeds()).catch((error) => { console.error("Calendar feeds failed", error instanceof Error ? error.message : error); return "failed"; });
     const result = await runAs(ownerUser(), () => checkToday({}));
     // Carcosa's ledger: new commits and deployment results every ten minutes, and the devlog written from them once a session goes quiet
     let carcosa: string[] | string = [];
@@ -26,7 +29,7 @@ export async function GET(request: Request) {
       if (member.disabled || !member.features.today || !member.features.mail || Date.now() - started > 90_000) continue;
       await runAs(member, () => checkToday({})).then(() => { members += 1; }).catch((error) => console.error("Today check failed for a member", error instanceof Error ? error.message : error));
     }
-    return Response.json({ ...result, members, carcosa });
+    return Response.json({ ...result, members, carcosa, feeds });
   } catch (error) {
     console.error("Today check failed", error instanceof Error ? error.message : error);
     return Response.json({ error: "failed" }, { status: 500 });
