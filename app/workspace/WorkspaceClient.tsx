@@ -205,9 +205,15 @@ function App() {
     return () => { stopped = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   useEffect(() => { if (tab === "today") setTodayBadge(false); }, [tab]);
+  // ⌘K opens the assistant that fits what is on screen: the reading assistant inside a book, the global one elsewhere.
+  const readingRef = useRef(false);
+  readingRef.current = !!book;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setGlobalOpen((value) => !value); }
+      if (!((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")) return;
+      event.preventDefault();
+      if (readingRef.current) setAssistantOpen((value) => !value);
+      else setGlobalOpen((value) => !value);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -379,6 +385,8 @@ function App() {
   // Going to another part of the workspace from inside a book closes the book: the reader keeps its own progress, and the
   // page underneath is what was asked for. Without this the book stayed on top and every destination showed the same page.
   const go = useCallback((next: Tab) => { setAssistantOpen(false); setBook(null); setTab(next); }, []);
+  // The global assistant cannot show over a book; left "open" underneath, it would appear by itself when the book closes.
+  useEffect(() => { if (book) setGlobalOpen(false); }, [book]);
 
   async function signOut() {
     await fetch("/api/workspace/session", { method: "DELETE" });
