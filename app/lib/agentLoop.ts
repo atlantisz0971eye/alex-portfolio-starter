@@ -1,4 +1,4 @@
-import { describeCall, runTool, TOOLS, type ToolContext } from "./agentTools";
+import { ASK_TOOL, describeCall, runTool, TOOLS, type ToolContext } from "./agentTools";
 import { DeepSeekError, streamChat, type ChatMessage } from "./workspaceDeepSeek";
 
 type Events = {
@@ -17,7 +17,7 @@ export async function runAgentLoop(messages: ChatMessage[], ctx: ToolContext, ev
   for (let step = 0; step < maxSteps; step += 1) {
     let text = "";
     let pending: { id: string; name: string; args: string }[] = [];
-    for await (const part of streamChat(messages, TOOLS, 1800, events.signal)) {
+    for await (const part of streamChat(messages, ctx.ask ? [...TOOLS, ASK_TOOL] : TOOLS, 1800, events.signal)) {
       if (part.kind === "text") {
         if (!text && full) { full += "\n\n"; events.onText?.("\n\n"); }
         text += part.text;
