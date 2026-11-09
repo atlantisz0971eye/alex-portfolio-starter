@@ -26,6 +26,20 @@ const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
 
 const HISTORY_CHARS = 1500;
 
+const OUTCOME: Record<Status, string> = { pending: "用户还没处理", applying: "用户还没处理", done: "用户已确认，已生效", failed: "确认时出错，没有生效", dismissed: "用户已忽略" };
+
+/** What the model is told about an earlier turn's cards: one line each, with what the person did. Without it "the second one" points at nothing. */
+function recall(message: Message) {
+  if (!message.proposals?.length) return "";
+  const lines = message.proposals.map((proposal, index) => {
+    const shown = proposal.after ?? proposal.before;
+    const what = proposal.op === "create" ? "新建日程" : proposal.op === "update" ? "修改日程" : proposal.op === "delete" ? "删除日程" : "追加到笔记";
+    const detail = shown ? `「${shown.title.slice(0, 60)}」${shown.start}${proposal.id ? `（日程 id ${proposal.id}）` : ""}` : proposal.note ? `「${proposal.note.title.slice(0, 60)}」` : "";
+    return `${index + 1}. ${what}${detail}：${OUTCOME[message.status?.[index] ?? "pending"]}`;
+  });
+  return `\n\n[系统记录：这一轮提议的卡片和用户的处理]\n${lines.join("\n")}`;
+}
+
 type Props = { open: boolean; onClose: () => void; screen: AssistantScreen | null; onChanged: () => void; onError: (message: string) => void };
 
 /** Chat with DeepSeek across the library, mail and calendar. It proposes calendar changes; nothing is written until you confirm each one. */
@@ -47,7 +61,7 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     const controller = new AbortController();
     abort.current = controller;
     // Long answers are cut for the model's memory only; the screen keeps them whole.
-    const history = messages.filter((item) => item.text).slice(-6).map((item) => ({ role: item.role, content: item.text.length > HISTORY_CHARS ? `${item.text.slice(0, HISTORY_CHARS)}…` : item.text }));
+    const history = messages.filter((item) => item.text || item.proposals?.length).slice(-6).map((item) => ({ role: item.role, content: `${item.text.length > HISTORY_CHARS ? `${item.text.slice(0, HISTORY_CHARS)}…` : item.text}${recall(item)}`.trim() }));
     setFailure(null);
     setInput("");
     setBusy(true);
