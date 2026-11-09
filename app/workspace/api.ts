@@ -52,6 +52,7 @@ export const errors: Record<string, string> = {
   no_text_found: "No text was found in that image.",
   invalid_question: "Ask a slightly longer question.",
   ai_failed: "DeepSeek could not read your mail just now. Try again.",
+  today_failed: "Today could not be updated. Try again.",
   no_mail_accounts: "Connect a Gmail account first.",
 };
 

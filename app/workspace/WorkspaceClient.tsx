@@ -12,7 +12,7 @@ import { DocumentSheet, type DocumentActions } from "./DocumentSheet";
 import { Library } from "./Library";
 import { OcrSheet, type OcrState } from "./OcrSheet";
 import { Calendar } from "./Calendar";
-import { GlobalAssistant } from "./GlobalAssistant";
+import { CHAT_KEY, GlobalAssistant } from "./GlobalAssistant";
 import { Mail } from "./Mail";
 import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
@@ -205,9 +205,15 @@ function App() {
     return () => { stopped = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   useEffect(() => { if (tab === "today") setTodayBadge(false); }, [tab]);
+  // ⌘K opens the assistant that fits what is on screen: the reading assistant inside a book, the global one elsewhere.
+  const readingRef = useRef(false);
+  readingRef.current = !!book;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setGlobalOpen((value) => !value); }
+      if (!((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")) return;
+      event.preventDefault();
+      if (readingRef.current) setAssistantOpen((value) => !value);
+      else setGlobalOpen((value) => !value);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -379,9 +385,13 @@ function App() {
   // Going to another part of the workspace from inside a book closes the book: the reader keeps its own progress, and the
   // page underneath is what was asked for. Without this the book stayed on top and every destination showed the same page.
   const go = useCallback((next: Tab) => { setAssistantOpen(false); setBook(null); setTab(next); }, []);
+  // The global assistant cannot show over a book; left "open" underneath, it would appear by itself when the book closes.
+  useEffect(() => { if (book) setGlobalOpen(false); }, [book]);
 
   async function signOut() {
     await fetch("/api/workspace/session", { method: "DELETE" });
+    // The kept conversation may quote mail and calendar entries; it does not outlive the session.
+    try { Object.keys(localStorage).filter((key) => key.startsWith(CHAT_KEY)).forEach((key) => localStorage.removeItem(key)); } catch { /* storage unavailable */ }
     window.location.reload();
   }
 
@@ -408,7 +418,7 @@ function App() {
       <TabBar tab={tab} onTab={go} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
-    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "carcosa" ? (carcosaSub === "ledger" ? "devlog" : "mindstreams") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "carcosa" ? (carcosaSub === "ledger" ? "devlog" : carcosaSub === "notebook" ? "mindstreams" : "carcosa") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />

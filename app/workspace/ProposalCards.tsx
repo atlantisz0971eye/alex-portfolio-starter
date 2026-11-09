@@ -55,10 +55,10 @@ export async function applyProposal(proposal: Proposal) {
   }
 }
 
-type CardProps = { proposal: Proposal; status: Status; onApply: () => void; onDismiss: () => void; onReply?: (text: string) => Promise<void> };
+type CardProps = { proposal: Proposal; status: Status; onApply: () => void; onDismiss: () => void; onReply?: (text: string) => Promise<void>; /** What the assistant is looking up while it answers a reply. */ progress?: string };
 
 /** One proposed change, with the buttons that confirm or dismiss it. */
-export function ProposalCard({ proposal, status, onApply, onDismiss, onReply }: CardProps) {
+export function ProposalCard({ proposal, status, onApply, onDismiss, onReply, progress }: CardProps) {
   const shown = proposal.after ?? proposal.before;
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState("");
@@ -83,7 +83,6 @@ export function ProposalCard({ proposal, status, onApply, onDismiss, onReply }: 
     <div className="ca-card__actions">
       {status === "done" ? <span className="ca-card__done"><Check size={15} /> Done</span> : status === "dismissed" ? <span className="ws-muted">{proposal.reply ? "Answered" : "Dismissed"}</span> : asking ? <>
         {onReply && proposal.ask!.options.map((option) => <button key={option} type="button" className="ws-pill ca-card__option" disabled={sending} onClick={() => void send(option)}>{option}</button>)}
-        {sending && <Loader2 className="ws-spin" size={14} />}
         <button type="button" className="ws-text-button" disabled={sending} onClick={onDismiss}>Skip</button>
         {onReply && <button type="button" className="ws-text-button ca-card__reply-toggle" aria-expanded={writing} disabled={sending} onClick={() => setWriting((open) => !open)}><MessageSquare size={14} /> Reply</button>}
       </> : <>
@@ -92,6 +91,7 @@ export function ProposalCard({ proposal, status, onApply, onDismiss, onReply }: 
         {onReply && <button type="button" className="ws-text-button ca-card__reply-toggle" aria-expanded={writing} disabled={sending} onClick={() => setWriting((open) => !open)}><MessageSquare size={14} /> Reply</button>}
       </>}
     </div>
+    {sending && <p className="ca-card__why" aria-live="polite"><Loader2 className="ws-spin" size={13} /> {progress || "Thinking"}…</p>}
     {writing && onReply && status !== "done" && status !== "dismissed" && <form className="ca-card__compose" onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <textarea value={draft} rows={2} maxLength={500} autoFocus placeholder={asking ? "用你自己的话回答" : "比如：这个我已经报名了 / 这就是我加过的 Personal Tutorial / 改到周四下午"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); } }} disabled={sending} />
       <div className="ca-card__compose-row"><small className="ws-muted">助手会按你的话改这张卡，并记住这句话</small><button type="submit" className="ws-pill ws-pill--solid" disabled={sending || !draft.trim()}>{sending ? <Loader2 className="ws-spin" size={14} /> : "Send"}</button></div>

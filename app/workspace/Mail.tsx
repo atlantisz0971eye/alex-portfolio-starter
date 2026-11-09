@@ -2,6 +2,7 @@
 
 import { CalendarPlus, ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
 import { PageTitle, TopRow } from "./Shell";
+import { setOpenMail } from "./assistantFocus";
 import { keepInNotebook } from "./keep";
 import { notice } from "./notice";
 import { MailSchedule } from "./MailSchedule";
@@ -206,6 +207,9 @@ export function MailMessage({ summary, onClose, onError, pane = false }: { summa
   const [live, setLive] = useState<Turn | null>(null);
   const [question, setQuestion] = useState("");
   const abort = useRef<AbortController | null>(null);
+
+  // While this email is on screen the assistant is told which one it is.
+  useEffect(() => setOpenMail({ account: summary.account, id: summary.id }), [summary.account, summary.id]);
 
   useEffect(() => {
     let cancelled = false;

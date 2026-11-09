@@ -27,15 +27,30 @@ export type TodayPlan = {
   basedOn: { from: string; subject: string }[];
 };
 /** What the person has told the assistant about its suggestions, kept so later plans do not suggest the same thing again. */
-type Remark = { at: string; about: string; text: string };
+/** `dismissed` marks a card the person set aside without a word: weaker than something they said, and kept for less time. */
+type Remark = { at: string; about: string; text: string; dismissed?: true };
 type TodayState = { seen: string[]; zone?: string; plan?: TodayPlan; lastGenerated?: string; lastCheck?: string; remarks?: Remark[] };
 const MAX_REMARKS = 40;
 const REMARK_DAYS = 60;
+const MAX_DISMISSED = 15;
+const DISMISSED_DAYS = 14;
+
+/** Adds a remark and trims the list, counting dismissals apart so they never push out what the person actually said. */
+function withRemark(remarks: Remark[] | undefined, remark: Remark) {
+  const all = [...(remarks ?? []), remark];
+  const said = all.filter((item) => !item.dismissed).slice(-MAX_REMARKS);
+  const dismissed = all.filter((item) => item.dismissed).slice(-MAX_DISMISSED);
+  return [...said, ...dismissed].sort((a, b) => a.at.localeCompare(b.at));
+}
 
 function remarksBlock(remarks: Remark[] | undefined) {
-  const recent = (remarks ?? []).filter((item) => Date.now() - Date.parse(item.at) < REMARK_DAYS * 86_400_000);
-  if (!recent.length) return "";
-  return `\n用户之前对日程建议说过的话（按这些处理，不要再提已经处理过的事，也不要把它们和别的日程搞混）：\n${recent.slice(-20).map((item) => `- ${item.at.slice(0, 10)} 关于「${item.about}」：${item.text}`).join("\n")}`;
+  const within = (item: Remark, days: number) => Date.now() - Date.parse(item.at) < days * 86_400_000;
+  const said = (remarks ?? []).filter((item) => !item.dismissed && within(item, REMARK_DAYS));
+  const dismissed = (remarks ?? []).filter((item) => item.dismissed && within(item, DISMISSED_DAYS));
+  return [
+    said.length ? `\n用户之前对日程建议说过的话（按这些处理，不要再提已经处理过的事，也不要把它们和别的日程搞混）：\n${said.slice(-20).map((item) => `- ${item.at.slice(0, 10)} 关于「${item.about}」：${item.text}`).join("\n")}` : "",
+    dismissed.length ? `\n用户最近没有采纳、直接忽略的建议（没说原因；同一件事不要再提议或再问，除非新邮件里它有了变化）：\n${dismissed.slice(-10).map((item) => `- ${item.at.slice(0, 10)}「${item.about}」：${item.text}`).join("\n")}` : "",
+  ].join("");
 }
 
 const statePath = async () => `${await scopeRoot()}today/state.json`;
@@ -61,6 +76,9 @@ async function writeState(state: TodayState) {
   await put(await statePath(), JSON.stringify(state), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
+/** Told what the assistant is looking up while a plan or a reply is being written, so the wait is not a blank spinner. */
+type Progress = (name: string, label: string) => void;
+
 type Inbox = { messages: MailSummary[]; /** Addresses whose Gmail access has expired, so their mail is missing from `messages`. */ expired: string[] };
 
 /** Recent inbox messages across accounts, newest first. Accounts that fail are skipped; the ones that need reconnecting are named. */
@@ -72,6 +90,11 @@ async function recentInbox(days = 2, max = 25): Promise<Inbox> {
 }
 
 const relevant = (message: MailSummary) => message.category === "primary" || message.category === "updates";
+
+/** The time zone of the browser that last opened Today: where the person is, as far as the workspace knows. */
+export async function savedZone() {
+  try { return (await readState()).zone ?? null; } catch { return null; }
+}
 
 /** The saved plan for today, if there is one. */
 export async function readPlan() {
@@ -99,7 +122,7 @@ const PLAN_TASK = `你现在要为用户制定“今天的日程建议”，不�
 
 const CLAIMS_PROPOSAL = /已提议|请确认|提议(加入|修改|删除|如下)/;
 
-async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = [], previous?: TodayPlan): Promise<TodayPlan> {
+async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = [], previous?: TodayPlan, onTool?: Progress): Promise<TodayPlan> {
   const proposals: Proposal[] = [];
   const kept = waiting(previous, wallDate(Date.now(), zone));
   const keptBlock = kept.length ? `\n\n下面这些提议已经在等用户确认，卡片会继续显示，不要再提议同样的事：\n${kept.map((item) => `- ${cardLine(item).replace(/\n/g, "；")}`).join("\n")}` : "";
@@ -108,13 +131,13 @@ async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["
     { role: "system", content: await agentSystem(zone, "today", PLAN_TASK + remarksBlock(remarks)) },
     { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。${expired.length ? `\n\n注意：${expired.join("、")} 的 Gmail 授权已过期，读不到这个邮箱的邮件。不要说“没有新邮件”；在“今天重点”第一条写明这个邮箱需要在 Mail 页重新连接。` : ""}\n\n新邮件：\n${list || (expired.length ? "（读不到）" : "（没有新邮件，请根据已有日程和最近的邮件给出建议）")}${keptBlock}` },
   ];
-  let text = await runAgentLoop(messages, { zone, proposals, ask: true }, {}, 6, true);
+  let text = await runAgentLoop(messages, { zone, proposals, ask: true }, { onTool }, 6, true);
   // The model sometimes writes that it proposed events without calling a tool, which leaves the person nothing to confirm.
   if (!proposals.length && CLAIMS_PROPOSAL.test(text)) {
     messages.push({ role: "assistant", content: text });
     messages.push({ role: "user", content: "你在上面说提议了日程，但没有调用 calendar_create / calendar_update / calendar_delete，所以用户看不到可以确认的卡片。现在为你提到的每一条调用相应的工具（填 why）；不值得提议的就不提。然后只输出改写后的完整计划 Markdown，不要写“请确认”。" });
     try {
-      const retried = await runAgentLoop(messages, { zone, proposals, ask: true }, {}, 4, true);
+      const retried = await runAgentLoop(messages, { zone, proposals, ask: true }, { onTool }, 4, true);
       if (retried.trim()) text = retried;
     } catch { /* keep the first answer */ }
     if (!proposals.length) text = `${text.replace(/[，,]?\s*请确认[:：]?/g, "：").trim()}\n\n_这些建议没有生成可以确认的卡片：可以在日历里手动添加，或点右上角重新生成。_`;
@@ -180,7 +203,7 @@ async function ensureLayout(zone: string, saved: Awaited<ReturnType<typeof readL
  * Looks for new mail and, when there is some worth acting on, writes a fresh plan for today.
  * Shared by the scheduled job and the app. `force` regenerates even without new mail.
  */
-export async function checkToday(options: { zone?: string; force?: boolean }) {
+export async function checkToday(options: { zone?: string; force?: boolean; onTool?: Progress }) {
   if (!mailConfigured() || !(await readAccounts()).length) return { configured: false as const };
   const state = await readState();
   const zone = validZone(options.zone ?? state.zone ?? "Europe/London");
@@ -196,18 +219,20 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
   let updated = false;
   if (shouldGenerate) {
     const base = options.force ? inbox.filter((message) => message.unread && relevant(message)) : worth.length ? worth : inbox.filter((message) => message.unread && relevant(message));
-    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired, state.plan);
+    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired, state.plan, options.onTool);
     updated = true;
   }
   // Mail held back by the cool-down stays "new" so the next check handles it.
   const handled = shouldGenerate ? inbox : inbox.filter((message) => !relevant(message) || seen.has(message.id));
+  // Writing a plan takes a while; what the person said or dismissed meanwhile is read again rather than overwritten.
+  const remarks = updated ? (await readState()).remarks : state.remarks;
   await writeState({
     seen: [...new Set([...handled.map((message) => message.id), ...state.seen])].slice(0, MAX_SEEN),
     zone,
     plan,
     lastGenerated: updated ? new Date().toISOString() : state.lastGenerated,
     lastCheck: new Date().toISOString(),
-    remarks: state.remarks,
+    remarks,
   });
   // A new plan is the event that changes what matters today, so the arrangement is remade with it.
   if (updated) { try { await refreshLayout(zone); } catch { /* the plan is saved either way */ } }
@@ -235,7 +260,7 @@ function cardLine(proposal: Proposal) {
  * The assistant reads the card and the answer, may propose corrected changes in its place, and the answer is kept
  * so later plans take it into account. The original card is set aside; new cards follow it.
  */
-export async function discussProposal(pid: string, message: string, zoneInput?: string) {
+export async function discussProposal(pid: string, message: string, zoneInput?: string, onTool?: Progress) {
   const state = await readState();
   const original = state.plan?.proposals.find((item) => item.pid === pid);
   if (!state.plan || !original) throw new Error("no such proposal");
@@ -248,7 +273,7 @@ export async function discussProposal(pid: string, message: string, zoneInput?: 
     { role: "system", content: await agentSystem(zone, "today", DISCUSS_TASK + remarksBlock(state.remarks)) },
     { role: "user", content: `${cardLine(original)}\n\n我的回复：${text}` },
   ];
-  const answer = (await runAgentLoop(messages, { zone, proposals, ask: true }, {}, 5, true)).trim().slice(0, 400) || "收到。";
+  const answer = (await runAgentLoop(messages, { zone, proposals, ask: true }, { onTool }, 5, true)).trim().slice(0, 400) || "收到。";
   // read again so a plan written meanwhile is not overwritten with an old copy
   const fresh = await readState();
   const plan = fresh.plan ?? state.plan;
@@ -256,9 +281,24 @@ export async function discussProposal(pid: string, message: string, zoneInput?: 
   const updated: PlanProposal = { ...(at >= 0 ? plan.proposals[at] : original), status: "dismissed", reply: { you: text, answer } };
   // If the card is no longer on the plan, it goes back at the end with the answer, so what was said is not lost.
   plan.proposals = at >= 0 ? [...plan.proposals.slice(0, at), updated, ...proposals, ...plan.proposals.slice(at + 1)].slice(0, 16) : [...plan.proposals, updated, ...proposals].slice(-16);
-  const remarks = [...(fresh.remarks ?? []), { at: new Date().toISOString(), about: about.slice(0, 80), text }].slice(-MAX_REMARKS);
+  const remarks = withRemark(fresh.remarks, { at: new Date().toISOString(), about: about.slice(0, 80), text });
   await writeState({ ...fresh, plan, remarks });
   return { answer, added: proposals.length };
+}
+
+/** The plan, its cards and what the person has said about earlier ones, as text for Claude over MCP. */
+export async function todaySummary() {
+  const state = await readState();
+  const plan = state.plan;
+  if (!plan) return "No plan has been made yet. It is written in the web app from the calendar and new mail.";
+  const outcome = { applied: "confirmed", dismissed: "set aside" };
+  const cards = plan.proposals.map((item) => `- [${item.status ? outcome[item.status] : "waiting for an answer"}] ${cardLine(item).replace(/\n/g, "；")}${item.reply ? `；他的回复：${item.reply.you}；助手：${item.reply.answer}` : ""}`);
+  return [
+    `Plan for ${plan.date}, written ${plan.generatedAt}${plan.basedOn.length ? `, from mail: ${plan.basedOn.map((item) => item.subject).join(" · ")}` : ""}`,
+    plan.text,
+    `Cards (${cards.length}):\n${cards.join("\n") || "(none)"}`,
+    remarksBlock(state.remarks).trim() || "(He has said nothing about earlier suggestions.)",
+  ].join("\n\n").slice(0, 9000);
 }
 
 /** Marks one proposal on the plan as applied or dismissed so it does not come back. */
@@ -266,6 +306,12 @@ export async function resolveProposal(pid: string, status: "applied" | "dismisse
   const state = await readState();
   const found = state.plan?.proposals.find((item) => item.pid === pid);
   if (!found) return;
+  // A card set aside without a reply is remembered too, or the next plan proposes the same thing again.
+  if (status === "dismissed" && !found.status) {
+    const shown = found.after ?? found.before;
+    const what = found.op === "ask" ? "跳过了这个问题" : `${found.op === "create" ? "新建日程" : found.op === "update" ? "修改日程" : found.op === "delete" ? "删除日程" : found.op}${shown ? `（${shown.start}）` : ""}`;
+    state.remarks = withRemark(state.remarks, { at: new Date().toISOString(), about: (found.ask?.about ?? shown?.title ?? found.op).slice(0, 80), text: what, dismissed: true });
+  }
   found.status = status;
   await writeState(state);
 }

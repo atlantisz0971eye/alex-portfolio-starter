@@ -541,6 +541,7 @@
 .ca-card__compose-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ca-card__done { display: inline-flex; align-items: center; gap: 6px; color: #4f8a5b; font-size: 14px; }
 .ca-all { align-self: flex-start; }
+.ca-new { align-self: flex-end; font-size: 13px; }
 @media (hover: hover) { .ef__cats button:hover, .ef__days button:not(.is-on):hover { background: #48484a; } }
 
 

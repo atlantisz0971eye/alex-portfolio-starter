@@ -18,7 +18,7 @@ const fn = (name: string, description: string, properties: Record<string, unknow
   function: { name, description, parameters: { type: "object", properties, required } },
 });
 
-const eventProps = {
+export const eventProps = {
   title: { type: "string" },
   start: { type: "string", description: 'Local time "YYYY-MM-DDTHH:mm" (no offset), or "YYYY-MM-DD" for all-day events.' },
   end: { type: "string", description: "Same format as start. For all-day events this is the day after the last day. Optional; defaults to one hour or one day." },
@@ -84,6 +84,7 @@ export function describeCall(name: string, rawArgs: string) {
     case "notes_append": return "Preparing a note";
     case "mindstream_list": case "mindstream_read": return "Reading your mindstream";
     case "library_list": return "Looking through your library";
+    case "ask_user": return "Preparing a question";
     case "library_search": return `Searching a book: ${String(args.query ?? "").slice(0, 60)}`;
     default: return "Preparing a calendar change";
   }
@@ -103,7 +104,7 @@ const whyOf = (args: Record<string, unknown>) => typeof args.why === "string" &&
 const cut = (text: string) => text.length > RESULT_LIMIT ? `${text.slice(0, RESULT_LIMIT)}\n…(shortened)` : text;
 
 /** Titles of existing timed events that overlap the proposed time (all-day events are not counted). */
-async function conflictsFor(fields: { start: string; end: string; allDay: boolean }, ignoreId?: string) {
+export async function conflictsFor(fields: { start: string; end: string; allDay: boolean }, ignoreId?: string) {
   if (fields.allDay) return [];
   const start = Date.parse(fields.start);
   const end = Date.parse(fields.end);
