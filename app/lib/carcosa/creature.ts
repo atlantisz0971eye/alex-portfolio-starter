@@ -3,9 +3,12 @@ import { readEvents, workDay, type LedgerEvent } from "./ledger";
 
 /**
  * Carcosa as a creature. She eats what the ledger records of development (synced changes, commits, ticks, deploys),
- * learns the owner's routine from when that happens, and is rewarded for keeping it rather than for volume: stopping
- * near the usual end and declared rest days feed her too, and a day far above the usual load leaves her too full to
- * move. With the owner's own check-ins (mood, energy, sleep) she learns which parts of the rhythm go with worse days
+ * learns the owner's routine from when that happens, and is rewarded for keeping it rather than for volume. Work is
+ * eaten in meals, not bites: events less than 45 minutes apart are one meal, and a meal fills her less with every
+ * extra mouthful, so a burst of small commits is still one meal. Commits made with Claude count for less than the
+ * owner's own. She does not digest while asleep (outside the usual hours), so a good evening still shows in the
+ * morning; stopping near the usual end feeds her that same evening, declared rest days feed her, and the first
+ * check-in of the day is breakfast. A day far above the usual load leaves her too full to move. With the owner's own check-ins (mood, energy, sleep) she learns which parts of the rhythm go with worse days
  * for this person, and says so plainly. Everything is computed on each read from the ledger and the check-ins.
  *
  * Phases: eating (fed in the last half hour), heavy (today is far above the usual load), resting (a declared rest day),
@@ -15,7 +18,7 @@ import { readEvents, workDay, type LedgerEvent } from "./ledger";
  */
 export type Phase = "eating" | "heavy" | "resting" | "sleeping" | "yak" | "lump";
 export type Sky = "suns" | "both" | "star";
-export type Bite = { at: string; kind: "sync" | "commit" | "deploy" | "tick" | "rest"; label: string; value: number };
+export type Bite = { at: string; kind: "meal" | "rest" | "breakfast"; label: string; value: number };
 export type Signal = { key: string; level: "both" | "star"; text: string };
 export type Finding = { key: string; text: string; diff: number; n: [number, number] };
 export type JournalDay = { day: string; intensity: number; valence: number };
@@ -40,13 +43,46 @@ export const clockOf = (s: number) => { const t = (s + 5) % 24; return `${String
 const instant = (day: string, s: number) => Date.parse(`${day}T05:00:00Z`) + s * HOUR;
 const prevDay = (day: string) => new Date(Date.parse(`${day}T12:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
 
-/** How much a ledger event feeds her. Only what the owner did counts; a deploy is the end of a meal, not a big one. */
-function bite(e: LedgerEvent): Bite | null {
-  if (e.kind === "commit") return { at: e.at, kind: "commit", label: `${e.repo.split("/")[1]} · ${e.message}`, value: 3 };
-  if (e.kind === "sync" && e.changed > 0) return { at: e.at, kind: "sync", label: `${e.source} · ${e.changed} files synced`, value: Math.min(e.changed, 12) * 0.4 };
-  if (e.kind === "tick" && e.delta > 0) return { at: e.at, kind: "tick", label: `${e.source} · ✓${e.delta}`, value: e.delta };
-  if (e.kind === "deploy" && /prod/i.test(e.env) && e.state === "success") return { at: e.at, kind: "deploy", label: `${e.repo.split("/")[1]} · deployed ${e.sha.slice(0, 7)}`, value: 2 };
+/** One mouthful of work, before it is gathered into a meal. Deploys add nothing: they close a meal. */
+type Mouthful = { ms: number; value: number; kind: "commit" | "sync" | "tick" | "deploy"; claude: boolean; source: string };
+const CLAUDE_SHARE = 0.3;
+const MEAL_GAP = 45 * 60_000;
+/** A meal's worth: fills fast at first, then each extra mouthful adds less, up to MEAL_MAX. */
+const MEAL_MAX = 6;
+const mealValue = (raw: number) => MEAL_MAX * (1 - Math.exp(-raw / 5));
+
+function mouthful(e: LedgerEvent): Mouthful | null {
+  const ms = Date.parse(e.at);
+  if (e.kind === "commit") return { ms, kind: "commit", claude: !!e.claude, source: e.repo.split("/")[1] ?? e.repo, value: 3 };
+  if (e.kind === "sync" && e.changed > 0) return { ms, kind: "sync", claude: false, source: e.source, value: Math.min(e.changed, 12) * 0.4 };
+  if (e.kind === "tick" && e.delta > 0) return { ms, kind: "tick", claude: false, source: e.source, value: e.delta };
+  if (e.kind === "deploy" && /prod/i.test(e.env) && e.state === "success") return { ms, kind: "deploy", claude: false, source: e.repo.split("/")[1] ?? e.repo, value: 0 };
   return null;
+}
+
+/** Gathers mouthfuls into meals. Within a meal, repeated syncs of one folder count once (the largest). */
+export function meals(items: Mouthful[]): (Bite & { first: number; last: number })[] {
+  const sorted = [...items].sort((a, b) => a.ms - b.ms);
+  const groups: Mouthful[][] = [];
+  for (const m of sorted) {
+    const last = groups[groups.length - 1];
+    if (last && m.ms - last[last.length - 1].ms <= MEAL_GAP) last.push(m); else groups.push([m]);
+  }
+  return groups.map((g) => {
+    const syncs = new Map<string, number>();
+    let own = 0;
+    let withClaude = 0;
+    for (const m of g) if (m.kind === "sync") syncs.set(m.source, Math.max(syncs.get(m.source) ?? 0, m.value)); else if (m.claude) withClaude += m.value; else own += m.value;
+    for (const v of syncs.values()) own += v;
+    // what Claude's commits add on top of the owner's own share of the meal counts for CLAUDE_SHARE of it
+    const value = mealValue(own) + CLAUDE_SHARE * (mealValue(own + withClaude) - mealValue(own));
+    const count = (kind: Mouthful["kind"], claude?: boolean) => g.filter((m) => m.kind === kind && (claude === undefined || m.claude === claude)).length;
+    const mine = count("commit", false); const helped = count("commit", true); const synced = count("sync"); const ticked = g.filter((m) => m.kind === "tick").reduce((n, m) => n + m.value, 0); const deployed = count("deploy");
+    const parts = [mine && `${mine} commit${mine > 1 ? "s" : ""}`, helped && `${helped} with Claude`, synced && `${synced} sync${synced > 1 ? "s" : ""}`, ticked && `✓${ticked}`, deployed && `${deployed} deploy${deployed > 1 ? "s" : ""}`].filter(Boolean);
+    const repos = [...new Set(g.map((m) => m.source))].slice(0, 2).join(", ");
+    const first = g[0].ms; const last = g[g.length - 1].ms;
+    return { at: new Date(last).toISOString(), kind: "meal" as const, label: `${repos} · ${parts.join(" · ")}`, value, first, last };
+  });
 }
 
 const median = (xs: number[]) => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -56,20 +92,26 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 export async function creatureView(options: { journal?: JournalDay[]; notes?: Notes; now?: number } = {}): Promise<CreatureView> {
   const now = options.now ?? Date.now();
   const [events, notes] = await Promise.all([readEvents(now - 60 * DAY_MS), options.notes ?? readNotes().catch((): Notes => ({}))]);
-  const work = events.map(bite).filter((b): b is Bite => !!b).sort((a, b) => a.at.localeCompare(b.at));
+  const mouthfuls = events.map(mouthful).filter((m): m is Mouthful => !!m);
+  const work = meals(mouthfuls);
   const today = workDay(now);
   const restDays = new Set(Object.entries(notes).filter(([, n]) => n.rest).map(([d]) => d));
 
-  // per work day: when it started and ended and how much was eaten (60 days kept for calibration, 28 for the routine)
+  // per work day: when it started and ended (any mouthful, Claude's too) and how much was eaten (meals)
   const byDay = new Map<string, { first: number; last: number; load: number }>();
   const hours = Array<number>(24).fill(0);
   const learnFrom = workDay(now - LEARN_DAYS * DAY_MS);
-  for (const b of work) {
-    const ms = Date.parse(b.at); const d = workDay(ms); const s = shifted(ms);
-    const day = byDay.get(d) ?? { first: s, last: s, load: 0 };
-    day.first = Math.min(day.first, s); day.last = Math.max(day.last, s); day.load += b.value;
+  for (const m of mouthfuls) {
+    const d = workDay(m.ms); const sh = shifted(m.ms);
+    const day = byDay.get(d) ?? { first: sh, last: sh, load: 0 };
+    day.first = Math.min(day.first, sh); day.last = Math.max(day.last, sh);
     byDay.set(d, day);
-    if (d >= learnFrom) hours[Math.floor((s + 5) % 24)] += b.value;
+  }
+  for (const meal of work) {
+    const d = workDay(meal.last);
+    const day = byDay.get(d);
+    if (day) day.load += meal.value;
+    if (d >= learnFrom) hours[Math.floor((shifted(meal.last) + 5) % 24)] += meal.value;
   }
   const past = [...byDay.entries()].filter(([d]) => d !== today && d >= learnFrom && !restDays.has(d)).map(([, v]) => v);
   const learning = past.length < 5;
@@ -78,18 +120,35 @@ export async function creatureView(options: { journal?: JournalDay[]; notes?: No
   const medianLoad = median(past.map((d) => d.load));
   const total = hours.reduce((a, b) => a + b, 0) || 1;
 
-  // treats: stopping near the usual end, and declared rest days; they feed her but are not work
+  // awake: inside the usual hours (with half an hour either side); before she has learned them, 09:00 to 23:00 London
+  const wakeFrom = !learning && start !== null ? start - 0.5 : 4;
+  const wakeTo = !learning && end !== null ? end + 0.5 : 18;
+  const awake = (ms: number) => { const sh = shifted(ms); return sh >= wakeFrom && sh <= wakeTo; };
+  /** Hours she was awake between two instants, in quarter hours: digestion only runs then. */
+  const awakeHours = (from: number, to: number) => { let h = 0; for (let t = from; t < to; t += HOUR / 4) if (awake(t)) h += 0.25; return h; };
+
+  // treats: stopping near the usual end (given that evening, once nothing more came), declared rest days, breakfast
   const treats: Bite[] = [];
-  if (!learning && end !== null) for (const [d, v] of byDay) if (d !== today && d >= learnFrom && v.last <= end + 0.75) treats.push({ at: new Date(instant(d, v.last + 1)).toISOString(), kind: "rest", label: `按时收工 · ${d.slice(5)} ${clockOf(v.last)}`, value: 4 });
+  if (!learning && end !== null) for (const [d, v] of byDay) {
+    const at = instant(d, end + 0.75);
+    if (d >= learnFrom && !restDays.has(d) && v.last <= end + 0.75 && at <= now) treats.push({ at: new Date(at).toISOString(), kind: "rest", label: `按时收工 · ${d.slice(5)} ${clockOf(v.last)}`, value: 4 });
+  }
   for (const d of restDays) if (d >= learnFrom && d <= today) treats.push({ at: new Date(instant(d, 7)).toISOString(), kind: "rest", label: `休息日 · ${d.slice(5)}`, value: 8 });
-  const food = [...work, ...treats].filter((b) => Date.parse(b.at) <= now).sort((a, b) => a.at.localeCompare(b.at));
+  for (const [d, n] of Object.entries(notes)) {
+    if (d < learnFrom || d > today || (!n.mood && !n.energy && typeof n.sleep !== "number")) continue;
+    const at = Date.parse(n.at);
+    const when = Number.isFinite(at) && workDay(at) === d ? at : instant(d, start ?? 4);
+    treats.push({ at: new Date(when).toISOString(), kind: "breakfast", label: `早饭 · ${d.slice(5)} 打卡`, value: 2 });
+  }
+  const food: Bite[] = [...work.map(({ first: _f, last: _l, ...b }) => b), ...treats].filter((b) => Date.parse(b.at) <= now).sort((a, b) => a.at.localeCompare(b.at));
 
   const t = byDay.get(today);
   const restToday = restDays.has(today);
-  const lastWork = work[work.length - 1];
-  const lastMs = lastWork ? Date.parse(lastWork.at) : 0;
+  const lastMs = mouthfuls.reduce((m, x) => Math.max(m, x.ms), 0);
   const lastFood = food[food.length - 1];
-  const satiety = Math.min(1, food.reduce((sum, b) => sum + b.value * 0.5 ** ((now - Date.parse(b.at)) / HALF_LIFE), 0) / Math.max(12, medianLoad * 0.6));
+  // only what is less than three days old can still matter; digestion halves it every six awake hours
+  const recent = food.filter((b) => now - Date.parse(b.at) < 3 * DAY_MS);
+  const satiety = Math.min(1, recent.reduce((sum, b) => sum + b.value * 0.5 ** (awakeHours(Date.parse(b.at), now) / (HALF_LIFE / HOUR)), 0) / Math.max(10, medianLoad * 0.6));
 
   // days in a row with work, counting back from today (or yesterday, if today has not started); a rest day ends it
   const streakAt = (from: string) => { let n = 0; let d = from; for (let i = 0; i < 60; i += 1) { if (byDay.has(d) && !restDays.has(d)) n += 1; else break; d = prevDay(d); } return n; };
