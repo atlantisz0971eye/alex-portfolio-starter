@@ -25,6 +25,7 @@ type DevelopmentContent = { title: string; eyebrow: string; intro: string; liveL
 const NIGHT_URL = "https://night-8looming-jasmine.vercel.app/web/";
 const GA1A_URL = "https://leaf-exhibition.vercel.app/";
 const TRYIN_URL = "https://tryin-pi.vercel.app/";
+const SONIC_URL = "https://alexsoniclab.vercel.app/";
 
 // A red and black night, and the green of the leaf archive, to echo the sections around them.
 const NIGHT_FIELD = "radial-gradient(circle at 24% 28%, rgba(214,40,40,.62), transparent 36%), radial-gradient(circle at 80% 72%, rgba(122,12,18,.6), transparent 44%), linear-gradient(145deg, #0a0204, #2a0609 55%, #060102)";
@@ -33,12 +34,16 @@ const LEAF_FIELD = "radial-gradient(circle at 72% 24%, rgba(181,203,154,.5), tra
 // A dark photographic print with a trace of ember, the colour of the burnt shadow the piece leaves behind the foreground.
 const TRYIN_FIELD = "radial-gradient(circle at 74% 38%, rgba(192,100,58,.4), transparent 34%), radial-gradient(circle at 24% 80%, rgba(230,225,214,.1), transparent 44%), linear-gradient(145deg, #0b0a09, #1b1a18 55%, #070605)";
 
+// Phosphor green on black, the console's own ink.
+const SONIC_FIELD = "radial-gradient(circle at 70% 46%, rgba(120,214,120,.36), transparent 34%), radial-gradient(circle at 22% 78%, rgba(60,120,70,.3), transparent 44%), linear-gradient(145deg, #050805, #0d150e 55%, #030503)";
+
 /** The colour each work lends the background signal while it is looked at, and the field's own resting colour. */
 export const DEVELOPMENT_GLOW: Record<string, [number, number, number]> = {
   rest: [150, 158, 222],
   "night-8looming-jasmine": [228, 52, 52],
   "ga1a-poetry-leaf-archive": [170, 206, 132],
   tryin: [214, 118, 66],
+  alexsoniclab: [120, 220, 120],
 };
 
 export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
@@ -94,6 +99,21 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         host: "tryin-pi.vercel.app",
         field: TRYIN_FIELD,
       },
+      {
+        slug: "alexsoniclab",
+        index: "04",
+        title: "alexsonicLAb",
+        subtitle: "Any website, played as techno",
+        type: "Interactive web instrument",
+        summary: "Type a web address. A server opens the page in a headless browser and sends back only its shape: boxes, lines of text, section edges. Scroll it under the read head and five players turn it into techno on a two-deck ASCII console. The same instrument opens this portfolio.",
+        quote: { text: "the sound stops when you leave", note: "Deck A loops a captured bar · deck B plays the page live · crossfade between them" },
+        poster: "/development/alexsoniclab-cover.webp",
+        posterPosition: "center center",
+        tags: ["Interactive web", "Sound", "ASCII", "Headless browser"],
+        href: SONIC_URL,
+        host: "alexsoniclab.vercel.app",
+        field: SONIC_FIELD,
+      },
     ],
   },
   zh: {
@@ -147,6 +167,21 @@ export const DEVELOPMENT_CONTENT: Record<Language, DevelopmentContent> = {
         href: TRYIN_URL,
         host: "tryin-pi.vercel.app",
         field: TRYIN_FIELD,
+      },
+      {
+        slug: "alexsoniclab",
+        index: "04",
+        title: "alexsonicLAb",
+        subtitle: "把任何网站放成 techno",
+        type: "互动网页乐器",
+        summary: "输入一个网址，服务器在无头浏览器里打开那个页面，只传回它的形状：盒子、一行行文字、分区边界。把它滚过读头，五个乐手在双唱盘 ASCII 控制台上把它放成 techno。这个作品集的开场页用的就是同一件乐器。",
+        quote: { text: "the sound stops when you leave", note: "deck A 循环截下的小节 · deck B 现场放页面 · 交叉推子在两边之间混" },
+        poster: "/development/alexsoniclab-cover.webp",
+        posterPosition: "center center",
+        tags: ["互动网页", "声音", "ASCII", "无头浏览器"],
+        href: SONIC_URL,
+        host: "alexsoniclab.vercel.app",
+        field: SONIC_FIELD,
       },
     ],
   },
