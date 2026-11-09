@@ -1,4 +1,4 @@
-import { describeCall, runTool, TOOLS, type Proposal, type ToolContext } from "./agentTools";
+import { ASK_TOOL, describeCall, runTool, TOOLS, type Proposal, type ToolContext } from "./agentTools";
 import { DeepSeekError, streamChat, type ChatMessage } from "./workspaceDeepSeek";
 
 type Events = {
@@ -23,7 +23,7 @@ export async function runAgentLoop(messages: ChatMessage[], ctx: ToolContext, ev
     if (closing) messages.push({ role: "user", content: "（系统提示：查询步骤已用完，不能再调用工具。请直接根据上面已经查到的内容回答；没来得及查的部分明确说出来。）" });
     let text = "";
     let pending: { id: string; name: string; args: string }[] = [];
-    for await (const part of streamChat(messages, TOOLS, 1800, events.signal, closing)) {
+    for await (const part of streamChat(messages, ctx.ask ? [...TOOLS, ASK_TOOL] : TOOLS, 1800, events.signal, closing)) {
       if (part.kind === "text") {
         if (!text && full) { full += "\n\n"; events.onText?.("\n\n"); }
         text += part.text;

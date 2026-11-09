@@ -529,6 +529,10 @@
 .ca-card__why { margin: 0; font-size: 13px; color: var(--text-2); }
 .ca-card__warn { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--warn); }
 .ca-card__actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.ca-card--ask { border-left: 3px solid var(--accent, #4a6fb8); }
+.ca-card__question { font-size: 15px; line-height: 1.5; }
+.ca-card__option { font-size: 13px; }
+.ca-card__actions { flex-wrap: wrap; }
 .ca-card__reply { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--f2); font-size: 13px; line-height: 1.5; }
 .ca-card__reply b { font-weight: 600; }
 .ca-card__reply-toggle { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; }

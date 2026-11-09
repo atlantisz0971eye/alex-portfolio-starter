@@ -52,7 +52,7 @@ export type Summary = { title: string; start: string; end: string; allDay: boole
 export type Proposal = {
   /** Names this proposal for as long as it is shown, so a decision is recorded against the right card even after the list around it changes. */
   pid?: string;
-  op: "create" | "update" | "delete" | "note_create" | "note_append" | "ms_note" | "ms_board";
+  op: "create" | "update" | "delete" | "note_create" | "note_append" | "ms_note" | "ms_board" | "ask";
   id?: string;
   scope?: "this" | "all";
   occurrenceDate?: string;
@@ -63,6 +63,8 @@ export type Proposal = {
   conflicts: string[];
   /** Why the assistant proposes it, e.g. the email that changed a class. */
   why?: string;
+  /** For "ask": a question for the person whose answer decides what to do, with up to three quick answers. */
+  ask?: { question: string; about: string; options: string[] };
   /** For note proposals: what will be written. */
   note?: { id?: string; title: string; markdown: string; parentId?: string | null };
   /** For mindstream proposals: which mindstream, and what will change. */
@@ -117,7 +119,11 @@ export const calendarLines = (occurrences: Occurrence[], zone: string) => {
   return occurrences.map((item) => `- [${item.id}] ${item.title} | ${local(item.start, item.allDay)} → ${local(item.end, item.allDay)}${item.allDay ? " (all-day)" : ""} | ${item.category}${item.location ? ` | ${item.location}` : ""}${item.recurring ? ` | repeats (occurrence ${item.occurrenceDate})` : ""}${isTimetable(item) ? " | RCA 课表" : ""}`);
 };
 
-export type ToolContext = { zone: string; proposals: Proposal[] };
+/** `ask` lets the run put questions to the person as cards (the Today plan and replies to its cards). */
+export type ToolContext = { zone: string; proposals: Proposal[]; ask?: boolean };
+
+/** Only offered where the answer can come back: the Today plan, whose cards can be answered. */
+export const ASK_TOOL: ToolSpec = fn("ask_user", "Ask the user a short question as a card on the Today screen when what to do depends on something only they know (did they already sign up, which group are they in, will they go). They can tap a quick answer or reply in words; the answer comes back to you and is remembered. At most three per plan.", { question: { type: "string", description: "One short question in Chinese, e.g. 你已经报名 Gian Luca 的个人辅导了吗？" }, about: { type: "string", description: "What it is about, a few words, e.g. Gian Luca 个人辅导" }, options: { type: "array", items: { type: "string" }, description: "Up to three short quick answers, e.g. [\"已经报了\", \"还没，帮我加提醒\", \"不去\"]" }, why: whyProp }, ["question", "about"]);
 
 const propose = (ctx: ToolContext, proposal: Proposal) => { ctx.proposals.push({ pid: crypto.randomUUID(), ...proposal }); };
 
@@ -126,6 +132,15 @@ const ALLOWED = new Set(TOOLS.map((tool) => tool.function.name));
 
 /** Runs one tool call. Read tools return text for the model; writes only record a proposal the person confirms. */
 export async function runTool(name: string, rawArgs: string, ctx: ToolContext): Promise<string> {
+  if (name === "ask_user" && ctx.ask) {
+    const args = parse(rawArgs);
+    const question = typeof args.question === "string" ? args.question.trim().slice(0, 200) : "";
+    if (!question) return "Error: give the question.";
+    if (ctx.proposals.filter((item) => item.op === "ask").length >= 3) return "Error: at most three questions per plan; put the rest in the text.";
+    const options = Array.isArray(args.options) ? args.options.filter((item): item is string => typeof item === "string" && !!item.trim()).map((item) => item.trim().slice(0, 30)).slice(0, 3) : [];
+    propose(ctx, { op: "ask", ask: { question, about: typeof args.about === "string" ? args.about.trim().slice(0, 60) : question.slice(0, 60), options }, conflicts: [], ...whyOf(args) });
+    return "Asked. The user will see it as a card with your quick answers and can reply; do not ask it again in the text, just say (见下方问题).";
+  }
   if (!ALLOWED.has(name)) return `Error: ${name.slice(0, 40)} is not available. You can read, propose calendar changes and propose adding to a note.`;
   const args = parse(rawArgs);
   const zone = validZone(ctx.zone);
