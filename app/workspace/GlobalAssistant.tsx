@@ -55,7 +55,9 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     try {
       await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen, mindstreamId: screen === "mindstreams" ? currentMindstream() : null }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
         if (event.t === "tool" && typeof event.label === "string") patchLast((item) => ({ ...item, tools: [...(item.tools ?? []), event.label as string] }));
-        else if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
+        else if (event.t === "action" && event.action && typeof event.action === "object") patchLast((item) => ({ ...item, proposals: [...(item.proposals ?? []), event.action as Proposal], status: [...(item.status ?? []), "pending" as Status] }));
+        // The closing list only matters when the cards did not already arrive one by one.
+        else if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => item.proposals?.length ? item : ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
       });
     } catch (cause) {
       if (controller.signal.aborted) return;

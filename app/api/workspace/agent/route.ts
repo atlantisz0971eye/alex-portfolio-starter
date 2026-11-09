@@ -11,6 +11,7 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_STEPS = 6;
+const MAX_PROPOSALS = 12;
 const calls = new Map<string, { count: number; until: number }>();
 
 /**
@@ -60,9 +61,12 @@ export async function POST(request: Request) {
       signal: request.signal,
       onText: (delta) => send({ t: "delta", v: delta }),
       onTool: (name, label) => send({ t: "tool", name, label }),
+      // Each card goes out when it is made: a turn that later times out or is stopped keeps what it already proposed.
+      onProposal: (proposal) => { if (proposals.indexOf(proposal) < MAX_PROPOSALS) send({ t: "action", action: proposal }); },
     }, MAX_STEPS);
     if (request.signal.aborted) return;
-    if (proposals.length) send({ t: "actions", actions: proposals.slice(0, 12) });
+    // The whole list once more, for a page loaded before cards were sent one at a time.
+    if (proposals.length) send({ t: "actions", actions: proposals.slice(0, MAX_PROPOSALS) });
     send({ t: "done" });
   });
 }

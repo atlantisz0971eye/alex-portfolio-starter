@@ -1,9 +1,11 @@
-import { describeCall, runTool, TOOLS, type ToolContext } from "./agentTools";
+import { describeCall, runTool, TOOLS, type Proposal, type ToolContext } from "./agentTools";
 import { DeepSeekError, streamChat, type ChatMessage } from "./workspaceDeepSeek";
 
 type Events = {
   onText?: (delta: string) => void;
   onTool?: (name: string, label: string) => void;
+  /** Called as soon as a tool records a proposal, so it is not lost if the rest of the turn fails. */
+  onProposal?: (proposal: Proposal) => void;
   signal?: AbortSignal;
 };
 
@@ -40,7 +42,9 @@ export async function runAgentLoop(messages: ChatMessage[], ctx: ToolContext, ev
     for (const call of pending) {
       if (events.signal?.aborted) return full;
       events.onTool?.(call.name, describeCall(call.name, call.args));
+      const before = ctx.proposals.length;
       messages.push({ role: "tool", tool_call_id: call.id, content: await runTool(call.name, call.args, ctx) });
+      ctx.proposals.slice(before).forEach((proposal) => events.onProposal?.(proposal));
     }
   }
   return finalOnly && last.trim() ? last : full;
