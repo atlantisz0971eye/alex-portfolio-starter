@@ -29,11 +29,13 @@ const eventProps = {
   repeat: { type: "object", description: 'Recurrence: {"freq":"daily|weekly|monthly|yearly","interval":1,"byDay":[0-6, Sunday=0],"until":"YYYY-MM-DD","count":n}' },
 };
 
+const whyProp = { type: "string", description: "Optional. One short sentence on what prompted this change, e.g. which email said so and what it said. Shown to the user on the proposal." };
+
 export const TOOLS: ToolSpec[] = [
   fn("calendar_list", "List calendar events between two local times. The next 30 days are already in the system prompt; use this for other ranges.", { from: { type: "string", description: 'Local "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm"' }, to: { type: "string" } }, ["from", "to"]),
-  fn("calendar_create", "Propose a new calendar event. Nothing is saved until the user confirms.", eventProps, ["title", "start"]),
-  fn("calendar_update", "Propose changes to an existing event. Only include the fields to change. Nothing is saved until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string", description: "YYYY-MM-DD, required for repeating events" }, event: { type: "object", properties: eventProps } }, ["id", "event"]),
-  fn("calendar_delete", "Propose deleting an event. Nothing is deleted until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string" } }, ["id"]),
+  fn("calendar_create", "Propose a new calendar event. Nothing is saved until the user confirms.", { ...eventProps, why: whyProp }, ["title", "start"]),
+  fn("calendar_update", "Propose changes to an existing event. Only include the fields to change. Nothing is saved until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string", description: "YYYY-MM-DD, required for repeating events" }, event: { type: "object", properties: eventProps }, why: whyProp }, ["id", "event"]),
+  fn("calendar_delete", "Propose deleting an event. Nothing is deleted until the user confirms.", { id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string" }, why: whyProp }, ["id"]),
   fn("mail_search", "Search the user's Gmail (read-only). Supports Gmail search syntax such as from:, subject:, newer_than:7d, is:unread. Returns sender, subject, date and a snippet.", { query: { type: "string" }, account: { type: "string", description: "Optional account id to limit the search" }, max: { type: "number" } }, ["query"]),
   fn("mail_read", "Read one email in full (text only, read-only). Use ids returned by mail_search.", { account: { type: "string" }, id: { type: "string" } }, ["account", "id"]),
   fn("notes_search", "Search the user's notes by words in the title or text. Returns note ids, titles and snippets.", { query: { type: "string" } }, ["query"]),
@@ -57,6 +59,8 @@ export type Proposal = {
   before?: Summary;
   after?: Summary;
   conflicts: string[];
+  /** Why the assistant proposes it, e.g. the email that changed a class. */
+  why?: string;
   /** For note proposals: what will be written. */
   note?: { id?: string; title: string; markdown: string; parentId?: string | null };
   /** For mindstream proposals: which mindstream, and what will change. */
@@ -90,6 +94,8 @@ function parse(raw: string): Record<string, unknown> {
   }
 }
 
+const whyOf = (args: Record<string, unknown>) => typeof args.why === "string" && args.why.trim() ? { why: args.why.trim().slice(0, 240) } : {};
+
 const cut = (text: string) => text.length > RESULT_LIMIT ? `${text.slice(0, RESULT_LIMIT)}\n…(shortened)` : text;
 
 /** Titles of existing timed events that overlap the proposed time (all-day events are not counted). */
@@ -101,9 +107,12 @@ async function conflictsFor(fields: { start: string; end: string; allDay: boolea
   return occurrences.filter((entry) => !entry.allDay && entry.id !== ignoreId && Date.parse(entry.start) < end && Date.parse(entry.end) > start).map((entry) => entry.title).slice(0, 3);
 }
 
+/** Events imported from the RCA timetable carry this at the start of their notes. */
+export const isTimetable = (item: { notes?: string }) => (item.notes ?? "").startsWith("RCA timetable (Celcat)");
+
 export const calendarLines = (occurrences: Occurrence[], zone: string) => {
   const local = (iso: string, allDay: boolean) => allDay ? iso : new Intl.DateTimeFormat("sv-SE", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)).replace(" ", "T");
-  return occurrences.map((item) => `- [${item.id}] ${item.title} | ${local(item.start, item.allDay)} → ${local(item.end, item.allDay)}${item.allDay ? " (all-day)" : ""} | ${item.category}${item.location ? ` | ${item.location}` : ""}${item.recurring ? ` | repeats (occurrence ${item.occurrenceDate})` : ""}`);
+  return occurrences.map((item) => `- [${item.id}] ${item.title} | ${local(item.start, item.allDay)} → ${local(item.end, item.allDay)}${item.allDay ? " (all-day)" : ""} | ${item.category}${item.location ? ` | ${item.location}` : ""}${item.recurring ? ` | repeats (occurrence ${item.occurrenceDate})` : ""}${isTimetable(item) ? " | RCA 课表" : ""}`);
 };
 
 export type ToolContext = { zone: string; proposals: Proposal[] };
@@ -126,10 +135,11 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         return cut(occurrences.length ? calendarLines(occurrences.slice(0, 150), zone).join("\n") : "No events in that range.");
       }
       case "calendar_create": {
+        const { why: _why, ...event } = args;
         const doc = await readCalendar();
-        const fields = buildFields(args, zone, doc.categories);
+        const fields = buildFields(event, zone, doc.categories);
         const conflicts = await conflictsFor(fields);
-        ctx.proposals.push({ op: "create", event: args, after: summary(fields), conflicts });
+        ctx.proposals.push({ op: "create", event, after: summary(fields), conflicts, ...whyOf(args) });
         return `Proposed creating "${fields.title}". Awaiting the user's confirmation.${conflicts.length ? ` It overlaps with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "calendar_update":
@@ -146,13 +156,13 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         }
         const before = summary(fieldsOf(shown ?? series));
         if (name === "calendar_delete") {
-          ctx.proposals.push({ op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [] });
+          ctx.proposals.push({ op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [], ...whyOf(args) });
           return `Proposed deleting "${before.title}". Awaiting the user's confirmation.`;
         }
         const patch = args.event && typeof args.event === "object" ? args.event as Record<string, unknown> : {};
         const fields = buildFields(patch, zone, doc.categories, fieldsOf(shown && scope === "this" ? shown : series));
         const conflicts = await conflictsFor(fields, series.id);
-        ctx.proposals.push({ op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts });
+        ctx.proposals.push({ op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts, ...whyOf(args) });
         return `Proposed changing "${before.title}". Awaiting the user's confirmation.${conflicts.length ? ` It would overlap with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "mail_search": {
