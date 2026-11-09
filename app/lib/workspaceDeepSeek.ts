@@ -162,9 +162,10 @@ type ToolChunk = { choices?: { delta?: { content?: string | null; tool_calls?: {
 
 /**
  * One streamed model turn with tool support: yields text as it arrives, then any tool calls the model asked for.
- * Uses the same stall rules as streamDeepSeek so a queued request fails fast.
+ * Uses the same stall rules as streamDeepSeek so a queued request fails fast. `answerOnly` keeps the tools in the
+ * request, so earlier calls still make sense to the model, but forbids calling them.
  */
-export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], maxTokens: number, signal?: AbortSignal): AsyncGenerator<ChatPart> {
+export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], maxTokens: number, signal?: AbortSignal, answerOnly = false): AsyncGenerator<ChatPart> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new DeepSeekError(0);
   await charge();
@@ -181,7 +182,7 @@ export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], ma
     const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: MODEL, thinking: { type: "disabled" }, messages, tools, temperature: 0.2, max_tokens: maxTokens, stream: true }),
+      body: JSON.stringify({ model: MODEL, thinking: { type: "disabled" }, messages, tools, ...(answerOnly ? { tool_choice: "none" } : {}), temperature: 0.2, max_tokens: maxTokens, stream: true }),
       signal: controller.signal,
       cache: "no-store",
     });

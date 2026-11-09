@@ -23,6 +23,8 @@ const SUGGESTIONS: Record<AssistantScreen | "home", string[]> = {
   home: ["Summarize my week and unread mail", "Add events from my recent emails", "Find a free 2-hour slot this week"],
 };
 
+const HISTORY_CHARS = 1500;
+
 type Props = { open: boolean; onClose: () => void; screen: AssistantScreen | null; onChanged: () => void; onError: (message: string) => void };
 
 /** Chat with DeepSeek across the library, mail and calendar. It proposes calendar changes; nothing is written until you confirm each one. */
@@ -43,7 +45,8 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
-    const history = messages.filter((item) => item.text).slice(-6).map((item) => ({ role: item.role, content: item.text }));
+    // Long answers are cut for the model's memory only; the screen keeps them whole.
+    const history = messages.filter((item) => item.text).slice(-6).map((item) => ({ role: item.role, content: item.text.length > HISTORY_CHARS ? `${item.text.slice(0, HISTORY_CHARS)}…` : item.text }));
     setFailure(null);
     setInput("");
     setBusy(true);
@@ -52,7 +55,9 @@ export function GlobalAssistant({ open, onClose, screen, onChanged, onError }: P
     try {
       await streamNdjson("/api/workspace/agent", { message, history, zone: zone(), context: screen, mindstreamId: screen === "mindstreams" ? currentMindstream() : null }, (delta) => patchLast((item) => ({ ...item, text: item.text + delta })), controller.signal, (event) => {
         if (event.t === "tool" && typeof event.label === "string") patchLast((item) => ({ ...item, tools: [...(item.tools ?? []), event.label as string] }));
-        else if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
+        else if (event.t === "action" && event.action && typeof event.action === "object") patchLast((item) => ({ ...item, proposals: [...(item.proposals ?? []), event.action as Proposal], status: [...(item.status ?? []), "pending" as Status] }));
+        // The closing list only matters when the cards did not already arrive one by one.
+        else if (event.t === "actions" && Array.isArray(event.actions)) patchLast((item) => item.proposals?.length ? item : ({ ...item, proposals: event.actions as Proposal[], status: (event.actions as Proposal[]).map(() => "pending" as Status) }));
       });
     } catch (cause) {
       if (controller.signal.aborted) return;

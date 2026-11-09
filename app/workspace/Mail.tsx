@@ -3,6 +3,7 @@
 import { CalendarPlus, ChevronLeft, Loader2, Mail as MailIcon, Paperclip, RefreshCw, Search, Send, Sparkles, Square, X } from "lucide-react";
 import { PageTitle, TopRow } from "./Shell";
 import { keepInNotebook } from "./keep";
+import { notice } from "./notice";
 import { MailSchedule } from "./MailSchedule";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
@@ -237,7 +238,7 @@ export function MailMessage({ summary, onClose, onError, pane = false }: { summa
   const shown = detail ?? summary;
   const keep = () => {
     const body = detail?.body ? detail.body.replace(/\s+/g, " ").trim().slice(0, 700) : summary.snippet;
-    keepInNotebook(`Email from ${shown.from}: ${shown.subject}\n${body}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
+    keepInNotebook(`Email from ${shown.from}: ${shown.subject}\n${body}`).then(() => notice("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
   };
   return <div className={`mail-view${pane ? " mail-view--pane" : ""}`}>
     {!pane && <header className="mail-view__bar">

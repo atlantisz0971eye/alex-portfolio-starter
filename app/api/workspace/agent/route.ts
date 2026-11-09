@@ -11,6 +11,7 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_STEPS = 6;
+const MAX_PROPOSALS = 12;
 const calls = new Map<string, { count: number; until: number }>();
 
 /**
@@ -28,8 +29,9 @@ export async function POST(request: Request) {
   calls.set(key, { count: count + 1, until: now + 60_000 });
 
   let body: { message?: unknown; history?: unknown; zone?: unknown; context?: unknown; mindstreamId?: unknown };
+  // Room for the message and the six earlier turns the client sends, in Chinese (three bytes a character).
+  if (Number(request.headers.get("content-length")) > 48_000) return Response.json({ error: "too_large" }, { status: 413 });
   try {
-    if (Number(request.headers.get("content-length")) > 14_000) throw new Error("too large");
     body = await request.json();
   } catch {
     return Response.json({ error: "invalid_request" }, { status: 400 });
@@ -59,9 +61,12 @@ export async function POST(request: Request) {
       signal: request.signal,
       onText: (delta) => send({ t: "delta", v: delta }),
       onTool: (name, label) => send({ t: "tool", name, label }),
+      // Each card goes out when it is made: a turn that later times out or is stopped keeps what it already proposed.
+      onProposal: (proposal) => { if (proposals.indexOf(proposal) < MAX_PROPOSALS) send({ t: "action", action: proposal }); },
     }, MAX_STEPS);
     if (request.signal.aborted) return;
-    if (proposals.length) send({ t: "actions", actions: proposals.slice(0, 12) });
+    // The whole list once more, for a page loaded before cards were sent one at a time.
+    if (proposals.length) send({ t: "actions", actions: proposals.slice(0, MAX_PROPOSALS) });
     send({ t: "done" });
   });
 }

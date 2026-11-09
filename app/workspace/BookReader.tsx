@@ -12,6 +12,7 @@ import { isTranslatable, toBlocks } from "./readerText";
 import { useReaderPrefs } from "./readerPrefs";
 import type { PdfSelection } from "./PdfPages";
 import { keepInNotebook } from "./keep";
+import { notice } from "./notice";
 import { useBookmarks } from "./useBookmarks";
 import { useTranslations } from "./useTranslations";
 
@@ -559,7 +560,7 @@ export default function BookReader({ book, onBack, onAssistant, onError, stream,
 
   const keep = (text: string) => {
     const where = `${displayTitle(book.document)}${currentPageRef.current ? `, p. ${currentPageRef.current}` : ""}`;
-    keepInNotebook(`“${text.trim()}”\n— ${where}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
+    keepInNotebook(`“${text.trim()}”\n— ${where}`).then(() => notice("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
     clearSelection();
   };
 

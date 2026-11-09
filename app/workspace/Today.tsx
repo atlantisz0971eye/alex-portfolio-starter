@@ -9,13 +9,14 @@ import { MailMessage, type MailItem } from "./Mail";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
 import { PageTitle, TopRow, type Tab } from "./Shell";
 import { keepInNotebook } from "./keep";
+import { notice } from "./notice";
 import { Paper } from "./Paper";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
 type Block = "plan" | "proposals" | "schedule" | "mail";
 type Layout = { headline: string; kicker: string; order: Block[]; focus: Block | null };
-type View = { configured: boolean; layout?: Layout | null; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[] };
+type View = { configured: boolean; layout?: Layout | null; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[]; reauth?: string[] };
 
 const COLORS: Record<string, string> = { personal: "#4a6fb8", study: "#4f8a5b", work: "#b9822e", other: "#8a5aa8" };
 const today = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -36,7 +37,8 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   const [view, setView] = useState<View | null>(null);
   const [planning, setPlanning] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [local, setLocal] = useState<Record<number, Status>>({});
+  // Keyed by the proposal's own id, so a plan that is replaced underneath never hands a status to a different card.
+  const [local, setLocal] = useState<Record<string, Status>>({});
   const [open, setOpen] = useState<MailItem | null>(null);
   // The front page is off until the viewer turns it on, and a hidden one is never fetched, so it costs nothing.
 
@@ -67,7 +69,6 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   async function regenerate() {
     if (planning) return;
     setPlanning(true);
-    setLocal({});
     try {
       await parseResponse(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "refresh", zone: zone() }) }));
       await load();
@@ -78,28 +79,28 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
     }
   }
 
-  const statusOf = (proposal: Plan["proposals"][number], index: number): Status => local[index] ?? (proposal.status === "applied" ? "done" : proposal.status === "dismissed" ? "dismissed" : "pending");
-  const record = (index: number, status: "applied" | "dismissed") => void fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "proposal", index, status }) }).catch(() => undefined);
+  const pidOf = (proposal: Plan["proposals"][number], index: number) => proposal.pid ?? `${plan?.generatedAt}-${index}`;
+  const statusOf = (proposal: Plan["proposals"][number], index: number): Status => local[pidOf(proposal, index)] ?? (proposal.status === "applied" ? "done" : proposal.status === "dismissed" ? "dismissed" : "pending");
+  const record = (pid: string, status: "applied" | "dismissed") => void fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "proposal", pid, status }) }).catch(() => undefined);
 
-  async function apply(index: number) {
-    const proposal = plan?.proposals[index];
+  async function apply(pid: string) {
+    const proposal = plan?.proposals.find((item, index) => pidOf(item, index) === pid);
     if (!proposal) return;
-    setLocal((current) => ({ ...current, [index]: "applying" }));
+    setLocal((current) => ({ ...current, [pid]: "applying" }));
     try {
       await applyProposal(proposal);
-      setLocal((current) => ({ ...current, [index]: "done" }));
-      record(index, "applied");
+      setLocal((current) => ({ ...current, [pid]: "done" }));
+      record(pid, "applied");
       onChanged();
       void load();
     } catch (cause) {
-      setLocal((current) => ({ ...current, [index]: "failed" }));
+      setLocal((current) => ({ ...current, [pid]: "failed" }));
       onError(cause instanceof Error ? cause.message : "Could not apply the change.");
     }
   }
-  async function reply(index: number, message: string) {
+  async function reply(pid: string, message: string) {
     try {
-      const result = await parseResponse<{ answer: string; added: number }>(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discuss", index, message, zone: zone() }) }));
-      setLocal({});
+      const result = await parseResponse<{ answer: string; added: number }>(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discuss", pid, message, zone: zone() }) }));
       await load();
       if (result.added) onChanged();
     } catch (cause) {
@@ -107,7 +108,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
       throw cause;
     }
   }
-  const dismiss = (index: number) => { setLocal((current) => ({ ...current, [index]: "dismissed" })); record(index, "dismissed"); };
+  const dismiss = (pid: string) => { setLocal((current) => ({ ...current, [pid]: "dismissed" })); record(pid, "dismissed"); };
 
   const now = Date.now();
   const mail = useMemo(() => {
@@ -132,6 +133,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
         {view && !view.configured && <div className="empty"><Inbox size={28} /><p>Mail is not set up yet.</p><small>Today builds your plan from your calendar and new email.</small></div>}
         {view && view.configured && !view.connected && <div className="empty"><Inbox size={28} /><p>Connect Gmail to get a plan for today.</p><a className="ws-pill ws-pill--solid" href="/api/workspace/mail/connect">Connect Gmail</a><small>Read-only access. New mail updates your plan automatically.</small></div>}
 
+        {view?.connected && (view.reauth ?? []).map((email) => <p key={email} className="mail-banner">Access to {email} expired, so its mail is missing from today’s plan. <a href={`/api/workspace/mail/connect?hint=${encodeURIComponent(email)}`}>Reconnect</a></p>)}
         {view && view.connected && <div className="today__grid" data-directed={layout ? "" : undefined}>
           <div className="today__main">
             <section className="ws-card today__plan" aria-live="polite" {...place("plan")}>
@@ -141,7 +143,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
                   {stale && <p className="today__stale">This plan is from an earlier day. <button type="button" onClick={() => void regenerate()}>Make today’s plan</button></p>}
                   <div className={`ws-markdown${planning ? " is-updating" : ""}`}><ReactMarkdown>{plan.text}</ReactMarkdown></div>
                   {planning && <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Updating…</p>}
-                  <button type="button" className="ws-text-button today__keep" onClick={() => void keepInNotebook(`Today’s plan, ${plan.date}\n${plan.text}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."))}>keep in notebook</button>
+                  <button type="button" className="ws-text-button today__keep" onClick={() => void keepInNotebook(`Today’s plan, ${plan.date}\n${plan.text}`).then(() => notice("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."))}>keep in notebook</button>
                   {plan.basedOn.length > 0 && <p className="today__based">{plan.reason === "new_mail" ? "Updated for new mail" : "Based on"}: {plan.basedOn.slice(0, 3).map((item) => item.subject).join(" · ")}{plan.basedOn.length > 3 ? ` · +${plan.basedOn.length - 3}` : ""}</p>}
                 </> : <>
                   <p className="ws-muted">No plan yet.</p>
@@ -151,7 +153,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
 
             {plan && plan.proposals.length > 0 && <section className="today__proposals" aria-label="Suggested calendar changes" {...place("proposals")}>
               <h2 className="section-label">From your mail</h2>
-              {plan.proposals.map((proposal, index) => <ProposalCard key={index} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(index)} onDismiss={() => dismiss(index)} onReply={(text) => reply(index, text)} />)}
+              {plan.proposals.map((proposal, index) => { const pid = pidOf(proposal, index); return <ProposalCard key={pid} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(pid)} onDismiss={() => dismiss(pid)} onReply={(text) => reply(pid, text)} />; })}
             </section>}
           </div>
 
@@ -168,7 +170,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
             </section>
             <section aria-label="New mail" {...place("mail")}>
             <h2 className="section-label">New mail {mail.length > 0 && <span>{mail.length}</span>}</h2>
-            {mail.length === 0 ? <p className="today__none"><Check size={14} /> You’re all caught up.</p> : <ul className="today__mail">
+            {mail.length === 0 ? (view.reauth?.length ? <p className="today__none">Mail could not be read.</p> : <p className="today__none"><Check size={14} /> You’re all caught up.</p>) : <ul className="today__mail">
               {mail.slice(0, showAll ? 40 : 5).map((message) => <li key={`${message.account}-${message.id}`}>
                 <button type="button" onClick={() => setOpen(message)}>
                   <span className="mail-dot is-unread" />

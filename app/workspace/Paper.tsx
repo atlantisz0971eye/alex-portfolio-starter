@@ -4,6 +4,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseResponse } from "./api";
 import { keepInNotebook } from "./keep";
+import { notice } from "./notice";
 
 type Item = { id: string; title: string; zh: string; summary: string; note: string; source: string; url: string; published: string | null };
 type Section = { key: string; label: string; zh: string; items: Item[] };
@@ -59,7 +60,7 @@ export function Paper({ onError }: { onError: (message: string) => void }) {
     }
   }
 
-  const keep = (item: Item) => void keepInNotebook(`${item.zh}\n${item.summary}\n${item.source} · ${item.url}`).then(() => onError("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
+  const keep = (item: Item) => void keepInNotebook(`${item.zh}\n${item.summary}\n${item.source} · ${item.url}`).then(() => notice("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."));
 
   return <section className="paper" aria-label="Front page">
     <div className="paper__bar">

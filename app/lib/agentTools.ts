@@ -50,6 +50,8 @@ export const TOOLS: ToolSpec[] = [
 
 export type Summary = { title: string; start: string; end: string; allDay: boolean; location: string; category: string; repeat?: unknown };
 export type Proposal = {
+  /** Names this proposal for as long as it is shown, so a decision is recorded against the right card even after the list around it changes. */
+  pid?: string;
   op: "create" | "update" | "delete" | "note_create" | "note_append" | "ms_note" | "ms_board" | "ask";
   id?: string;
   scope?: "this" | "all";
@@ -123,6 +125,8 @@ export type ToolContext = { zone: string; proposals: Proposal[]; ask?: boolean }
 /** Only offered where the answer can come back: the Today plan, whose cards can be answered. */
 export const ASK_TOOL: ToolSpec = fn("ask_user", "Ask the user a short question as a card on the Today screen when what to do depends on something only they know (did they already sign up, which group are they in, will they go). They can tap a quick answer or reply in words; the answer comes back to you and is remembered. At most three per plan.", { question: { type: "string", description: "One short question in Chinese, e.g. 你已经报名 Gian Luca 的个人辅导了吗？" }, about: { type: "string", description: "What it is about, a few words, e.g. Gian Luca 个人辅导" }, options: { type: "array", items: { type: "string" }, description: "Up to three short quick answers, e.g. [\"已经报了\", \"还没，帮我加提醒\", \"不去\"]" }, why: whyProp }, ["question", "about"]);
 
+const propose = (ctx: ToolContext, proposal: Proposal) => { ctx.proposals.push({ pid: crypto.randomUUID(), ...proposal }); };
+
 /** Only these tools run; mindstream edits and new notes are left to the person and to Claude over MCP. */
 const ALLOWED = new Set(TOOLS.map((tool) => tool.function.name));
 
@@ -134,7 +138,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
     if (!question) return "Error: give the question.";
     if (ctx.proposals.filter((item) => item.op === "ask").length >= 3) return "Error: at most three questions per plan; put the rest in the text.";
     const options = Array.isArray(args.options) ? args.options.filter((item): item is string => typeof item === "string" && !!item.trim()).map((item) => item.trim().slice(0, 30)).slice(0, 3) : [];
-    ctx.proposals.push({ op: "ask", ask: { question, about: typeof args.about === "string" ? args.about.trim().slice(0, 60) : question.slice(0, 60), options }, conflicts: [], ...whyOf(args) });
+    propose(ctx, { op: "ask", ask: { question, about: typeof args.about === "string" ? args.about.trim().slice(0, 60) : question.slice(0, 60), options }, conflicts: [], ...whyOf(args) });
     return "Asked. The user will see it as a card with your quick answers and can reply; do not ask it again in the text, just say (见下方问题).";
   }
   if (!ALLOWED.has(name)) return `Error: ${name.slice(0, 40)} is not available. You can read, propose calendar changes and propose adding to a note.`;
@@ -154,7 +158,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         const doc = await readCalendar();
         const fields = buildFields(event, zone, doc.categories);
         const conflicts = await conflictsFor(fields);
-        ctx.proposals.push({ op: "create", event, after: summary(fields), conflicts, ...whyOf(args) });
+        propose(ctx, { op: "create", event, after: summary(fields), conflicts, ...whyOf(args) });
         return `Proposed creating "${fields.title}". Awaiting the user's confirmation.${conflicts.length ? ` It overlaps with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "calendar_update":
@@ -171,13 +175,13 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         }
         const before = summary(fieldsOf(shown ?? series));
         if (name === "calendar_delete") {
-          ctx.proposals.push({ op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [], ...whyOf(args) });
+          propose(ctx, { op: "delete", id: series.id, scope, occurrenceDate, before, conflicts: [], ...whyOf(args) });
           return `Proposed deleting "${before.title}". Awaiting the user's confirmation.`;
         }
         const patch = args.event && typeof args.event === "object" ? args.event as Record<string, unknown> : {};
         const fields = buildFields(patch, zone, doc.categories, fieldsOf(shown && scope === "this" ? shown : series));
         const conflicts = await conflictsFor(fields, series.id);
-        ctx.proposals.push({ op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts, ...whyOf(args) });
+        propose(ctx, { op: "update", id: series.id, scope, occurrenceDate, event: patch, before, after: summary(fields), conflicts, ...whyOf(args) });
         return `Proposed changing "${before.title}". Awaiting the user's confirmation.${conflicts.length ? ` It would overlap with: ${conflicts.join(", ")}.` : ""}`;
       }
       case "mail_search": {
@@ -185,9 +189,14 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         const accounts = (await readAccounts()).filter((account) => !args.account || account.id === args.account);
         if (!accounts.length) return "No mail account is connected.";
         const max = Math.min(12, Math.max(1, Math.floor(Number(args.max) || 8)));
-        const found = (await Promise.all(accounts.map((account) => listMessages(account, { q: String(args.query ?? "").slice(0, 300), max }).then((result) => result.messages).catch((error) => error instanceof MailAuthError ? [] : [])))).flat();
+        // An account that could not be read is named in the result, so an empty answer is never mistaken for "no mail".
+        const expired: string[] = [];
+        const failed: string[] = [];
+        const found = (await Promise.all(accounts.map((account) => listMessages(account, { q: String(args.query ?? "").slice(0, 300), max }).then((result) => result.messages).catch((error) => { (error instanceof MailAuthError ? expired : failed).push(account.email); return []; })))).flat();
         found.sort((a, b) => b.date - a.date);
-        return cut(found.length ? found.slice(0, max).map((message) => `- [account ${message.account} | id ${message.id}] ${new Date(message.date).toISOString().slice(0, 16)} | ${message.from} <${message.fromEmail}> | ${message.subject} | ${message.snippet.slice(0, 160)}${message.unread ? " | unread" : ""}`).join("\n") : "No matching emails.");
+        const unread = [expired.length ? `Gmail access expired for ${expired.join(", ")}: that mail could not be searched. Tell the user to reconnect it on the Mail page.` : "", failed.length ? `Gmail could not be reached for ${failed.join(", ")}: that mail was not searched. Tell the user.` : ""].filter(Boolean).join("\n");
+        if (!found.length) return unread ? `Error: ${unread}` : "No matching emails.";
+        return cut(`${unread ? `${unread}\n` : ""}${found.slice(0, max).map((message) => `- [account ${message.account} | id ${message.id}] ${new Date(message.date).toISOString().slice(0, 16)} | ${message.from} <${message.fromEmail}> | ${message.subject} | ${message.snippet.slice(0, 160)}${message.unread ? " | unread" : ""}`).join("\n")}`);
       }
       case "mail_read": {
         if (!mailConfigured()) return "Mail is not set up.";
@@ -214,7 +223,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if (!found || found.note.deletedAt) return "Error: no note has that id.";
         const markdown = String(args.markdown ?? "").slice(0, 20_000);
         if (!markdown.trim()) return "Error: there is nothing to add.";
-        ctx.proposals.push({ op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
+        propose(ctx, { op: "note_append", note: { id: found.note.id, title: found.note.title || "Untitled", markdown }, conflicts: [] });
         return `Proposed adding text to "${found.note.title || "Untitled"}". Awaiting the user's confirmation.`;
       }
       case "mindstream_list": {

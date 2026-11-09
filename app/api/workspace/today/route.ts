@@ -22,20 +22,21 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const denied = await calendarGuard();
   if (denied) return denied;
-  let body: { action?: unknown; zone?: unknown; index?: unknown; status?: unknown; message?: unknown };
+  let body: { action?: unknown; zone?: unknown; pid?: unknown; status?: unknown; message?: unknown };
   try {
     if (Number(request.headers.get("content-length")) > 4000) throw new Error("too large");
     body = await request.json();
   } catch {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
+  const pid = typeof body.pid === "string" && body.pid.length <= 80 ? body.pid : "";
   try {
-    if (body.action === "proposal" && Number.isInteger(body.index) && (body.status === "applied" || body.status === "dismissed")) {
-      await resolveProposal(body.index as number, body.status);
+    if (body.action === "proposal" && pid && (body.status === "applied" || body.status === "dismissed")) {
+      await resolveProposal(pid, body.status);
       return Response.json({ ok: true });
     }
-    if (body.action === "discuss" && Number.isInteger(body.index) && typeof body.message === "string" && body.message.trim()) {
-      return Response.json(await discussProposal(body.index as number, body.message, typeof body.zone === "string" ? validZone(body.zone) : undefined));
+    if (body.action === "discuss" && pid && typeof body.message === "string" && body.message.trim()) {
+      return Response.json(await discussProposal(pid, body.message, typeof body.zone === "string" ? validZone(body.zone) : undefined));
     }
     if (body.action === "check" || body.action === "refresh") {
       const result = await checkToday({ zone: typeof body.zone === "string" ? validZone(body.zone) : undefined, force: body.action === "refresh" });
