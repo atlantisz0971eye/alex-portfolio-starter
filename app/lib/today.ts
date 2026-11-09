@@ -76,6 +76,9 @@ async function writeState(state: TodayState) {
   await put(await statePath(), JSON.stringify(state), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
+/** Told what the assistant is looking up while a plan or a reply is being written, so the wait is not a blank spinner. */
+type Progress = (name: string, label: string) => void;
+
 type Inbox = { messages: MailSummary[]; /** Addresses whose Gmail access has expired, so their mail is missing from `messages`. */ expired: string[] };
 
 /** Recent inbox messages across accounts, newest first. Accounts that fail are skipped; the ones that need reconnecting are named. */
@@ -114,7 +117,7 @@ const PLAN_TASK = `你现在要为用户制定“今天的日程建议”，不�
 
 const CLAIMS_PROPOSAL = /已提议|请确认|提议(加入|修改|删除|如下)/;
 
-async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = [], previous?: TodayPlan): Promise<TodayPlan> {
+async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = [], previous?: TodayPlan, onTool?: Progress): Promise<TodayPlan> {
   const proposals: Proposal[] = [];
   const kept = waiting(previous, wallDate(Date.now(), zone));
   const keptBlock = kept.length ? `\n\n下面这些提议已经在等用户确认，卡片会继续显示，不要再提议同样的事：\n${kept.map((item) => `- ${cardLine(item).replace(/\n/g, "；")}`).join("\n")}` : "";
@@ -123,13 +126,13 @@ async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["
     { role: "system", content: await agentSystem(zone, "today", PLAN_TASK + remarksBlock(remarks)) },
     { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。${expired.length ? `\n\n注意：${expired.join("、")} 的 Gmail 授权已过期，读不到这个邮箱的邮件。不要说“没有新邮件”；在“今天重点”第一条写明这个邮箱需要在 Mail 页重新连接。` : ""}\n\n新邮件：\n${list || (expired.length ? "（读不到）" : "（没有新邮件，请根据已有日程和最近的邮件给出建议）")}${keptBlock}` },
   ];
-  let text = await runAgentLoop(messages, { zone, proposals, ask: true }, {}, 6, true);
+  let text = await runAgentLoop(messages, { zone, proposals, ask: true }, { onTool }, 6, true);
   // The model sometimes writes that it proposed events without calling a tool, which leaves the person nothing to confirm.
   if (!proposals.length && CLAIMS_PROPOSAL.test(text)) {
     messages.push({ role: "assistant", content: text });
     messages.push({ role: "user", content: "你在上面说提议了日程，但没有调用 calendar_create / calendar_update / calendar_delete，所以用户看不到可以确认的卡片。现在为你提到的每一条调用相应的工具（填 why）；不值得提议的就不提。然后只输出改写后的完整计划 Markdown，不要写“请确认”。" });
     try {
-      const retried = await runAgentLoop(messages, { zone, proposals, ask: true }, {}, 4, true);
+      const retried = await runAgentLoop(messages, { zone, proposals, ask: true }, { onTool }, 4, true);
       if (retried.trim()) text = retried;
     } catch { /* keep the first answer */ }
     if (!proposals.length) text = `${text.replace(/[，,]?\s*请确认[:：]?/g, "：").trim()}\n\n_这些建议没有生成可以确认的卡片：可以在日历里手动添加，或点右上角重新生成。_`;
@@ -195,7 +198,7 @@ async function ensureLayout(zone: string, saved: Awaited<ReturnType<typeof readL
  * Looks for new mail and, when there is some worth acting on, writes a fresh plan for today.
  * Shared by the scheduled job and the app. `force` regenerates even without new mail.
  */
-export async function checkToday(options: { zone?: string; force?: boolean }) {
+export async function checkToday(options: { zone?: string; force?: boolean; onTool?: Progress }) {
   if (!mailConfigured() || !(await readAccounts()).length) return { configured: false as const };
   const state = await readState();
   const zone = validZone(options.zone ?? state.zone ?? "Europe/London");
@@ -211,7 +214,7 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
   let updated = false;
   if (shouldGenerate) {
     const base = options.force ? inbox.filter((message) => message.unread && relevant(message)) : worth.length ? worth : inbox.filter((message) => message.unread && relevant(message));
-    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired, state.plan);
+    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired, state.plan, options.onTool);
     updated = true;
   }
   // Mail held back by the cool-down stays "new" so the next check handles it.
@@ -252,7 +255,7 @@ function cardLine(proposal: Proposal) {
  * The assistant reads the card and the answer, may propose corrected changes in its place, and the answer is kept
  * so later plans take it into account. The original card is set aside; new cards follow it.
  */
-export async function discussProposal(pid: string, message: string, zoneInput?: string) {
+export async function discussProposal(pid: string, message: string, zoneInput?: string, onTool?: Progress) {
   const state = await readState();
   const original = state.plan?.proposals.find((item) => item.pid === pid);
   if (!state.plan || !original) throw new Error("no such proposal");
@@ -265,7 +268,7 @@ export async function discussProposal(pid: string, message: string, zoneInput?: 
     { role: "system", content: await agentSystem(zone, "today", DISCUSS_TASK + remarksBlock(state.remarks)) },
     { role: "user", content: `${cardLine(original)}\n\n我的回复：${text}` },
   ];
-  const answer = (await runAgentLoop(messages, { zone, proposals, ask: true }, {}, 5, true)).trim().slice(0, 400) || "收到。";
+  const answer = (await runAgentLoop(messages, { zone, proposals, ask: true }, { onTool }, 5, true)).trim().slice(0, 400) || "收到。";
   // read again so a plan written meanwhile is not overwritten with an old copy
   const fresh = await readState();
   const plan = fresh.plan ?? state.plan;

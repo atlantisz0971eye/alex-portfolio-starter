@@ -3,7 +3,7 @@
 import { ArrowRight, Check, Inbox, Loader2, MapPin, RefreshCw, Sparkles, Sun } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
-import { parseResponse } from "./api";
+import { parseResponse, streamNdjson } from "./api";
 import { timeFormat, zone } from "./calendarFormat";
 import { MailMessage, type MailItem } from "./Mail";
 import { applyProposal, ProposalCard, type Proposal, type Status } from "./ProposalCards";
@@ -36,6 +36,9 @@ type Props = { onError: (message: string) => void; onSignOut: () => void; onTab:
 export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }: Props) {
   const [view, setView] = useState<View | null>(null);
   const [planning, setPlanning] = useState(false);
+  // What the assistant is looking up right now, for the plan and for a card being answered.
+  const [progress, setProgress] = useState("");
+  const [replying, setReplying] = useState<{ pid: string; label: string } | null>(null);
   const [showAll, setShowAll] = useState(false);
   // Keyed by the proposal's own id, so a plan that is replaced underneath never hands a status to a different card.
   const [local, setLocal] = useState<Record<string, Status>>({});
@@ -69,8 +72,9 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
   async function regenerate() {
     if (planning) return;
     setPlanning(true);
+    setProgress("");
     try {
-      await parseResponse(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "refresh", zone: zone() }) }));
+      await streamNdjson("/api/workspace/today", { action: "refresh", zone: zone() }, () => undefined, new AbortController().signal, (event) => { if (event.t === "tool" && typeof event.label === "string") setProgress(event.label); });
       await load();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Could not make a plan.");
@@ -99,13 +103,20 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
     }
   }
   async function reply(pid: string, message: string) {
+    setReplying({ pid, label: "" });
     try {
-      const result = await parseResponse<{ answer: string; added: number }>(await fetch("/api/workspace/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discuss", pid, message, zone: zone() }) }));
+      let added = 0;
+      await streamNdjson("/api/workspace/today", { action: "discuss", pid, message, zone: zone() }, () => undefined, new AbortController().signal, (event) => {
+        if (event.t === "tool" && typeof event.label === "string") setReplying({ pid, label: event.label });
+        else if (event.t === "result" && typeof event.added === "number") added = event.added;
+      });
       await load();
-      if (result.added) onChanged();
+      if (added) onChanged();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Could not send your reply.");
       throw cause;
+    } finally {
+      setReplying(null);
     }
   }
   const dismiss = (pid: string) => { setLocal((current) => ({ ...current, [pid]: "dismissed" })); record(pid, "dismissed"); };
@@ -138,11 +149,11 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
           <div className="today__main">
             <section className="ws-card today__plan" aria-live="polite" {...place("plan")}>
               <div className="ws-card__head"><span><Sparkles size={15} /> Suggested plan</span>{plan && <small>{ago(Date.parse(plan.generatedAt))}</small>}</div>
-              {planning && !plan ? <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Reading your mail and calendar…</p>
+              {planning && !plan ? <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> {progress || "Reading your mail and calendar"}…</p>
                 : plan ? <>
                   {stale && <p className="today__stale">This plan is from an earlier day. <button type="button" onClick={() => void regenerate()}>Make today’s plan</button></p>}
                   <div className={`ws-markdown${planning ? " is-updating" : ""}`}><ReactMarkdown>{plan.text}</ReactMarkdown></div>
-                  {planning && <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> Updating…</p>}
+                  {planning && <p className="ws-muted"><Loader2 className="ws-spin" size={14} /> {progress || "Updating"}…</p>}
                   <button type="button" className="ws-text-button today__keep" onClick={() => void keepInNotebook(`Today’s plan, ${plan.date}\n${plan.text}`).then(() => notice("Kept in your notebook.")).catch((cause) => onError(cause instanceof Error ? cause.message : "Could not keep it."))}>keep in notebook</button>
                   {plan.basedOn.length > 0 && <p className="today__based">{plan.reason === "new_mail" ? "Updated for new mail" : "Based on"}: {plan.basedOn.slice(0, 3).map((item) => item.subject).join(" · ")}{plan.basedOn.length > 3 ? ` · +${plan.basedOn.length - 3}` : ""}</p>}
                 </> : <>
@@ -153,7 +164,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
 
             {plan && plan.proposals.length > 0 && <section className="today__proposals" aria-label="Suggested calendar changes" {...place("proposals")}>
               <h2 className="section-label">From your mail</h2>
-              {plan.proposals.map((proposal, index) => { const pid = pidOf(proposal, index); return <ProposalCard key={pid} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(pid)} onDismiss={() => dismiss(pid)} onReply={(text) => reply(pid, text)} />; })}
+              {plan.proposals.map((proposal, index) => { const pid = pidOf(proposal, index); return <ProposalCard key={pid} proposal={proposal} status={statusOf(proposal, index)} onApply={() => void apply(pid)} onDismiss={() => dismiss(pid)} onReply={(text) => reply(pid, text)} progress={replying?.pid === pid ? replying.label : undefined} />; })}
             </section>}
           </div>
 

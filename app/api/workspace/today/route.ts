@@ -3,6 +3,26 @@ import { validZone } from "../../../lib/calendarTime";
 import { MailAuthError } from "../../../lib/gmail";
 import { DeepSeekError, deepSeekErrorCode } from "../../../lib/workspaceDeepSeek";
 import { checkToday, discussProposal, resolveProposal, todayView } from "../../../lib/today";
+import { ndjson } from "../../../lib/workspaceStream";
+
+/**
+ * Planning and answering a card take the model several look-ups, so they answer as a stream: a "tool" event for each
+ * look-up, then "result" with the outcome and "done".
+ */
+function streamed(work: (onTool: (name: string, label: string) => void) => Promise<Record<string, unknown>>) {
+  return ndjson(async (send) => {
+    send({ t: "start" });
+    try {
+      const result = await work((_name, label) => send({ t: "tool", label }));
+      send({ t: "result", ...result });
+      send({ t: "done" });
+    } catch (error) {
+      // The stream reports DeepSeek failures itself; the others are named here.
+      if (error instanceof DeepSeekError) throw error;
+      send({ t: "error", code: error instanceof MailAuthError ? "mail_reauth" : "today_failed" });
+    }
+  });
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -18,7 +38,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** "check" looks for new mail (and plans if there is some); "refresh" always plans; "proposal" records a decision; "discuss" answers a card in words. */
+/** "check" looks for new mail (and plans if there is some); "refresh" always plans; "proposal" records a decision; "discuss" answers a card in words. "refresh" and "discuss" answer as a stream. */
 export async function POST(request: Request) {
   const denied = await calendarGuard();
   if (denied) return denied;
@@ -30,18 +50,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
   const pid = typeof body.pid === "string" && body.pid.length <= 80 ? body.pid : "";
+  const zone = typeof body.zone === "string" ? validZone(body.zone) : undefined;
   try {
     if (body.action === "proposal" && pid && (body.status === "applied" || body.status === "dismissed")) {
       await resolveProposal(pid, body.status);
       return Response.json({ ok: true });
     }
     if (body.action === "discuss" && pid && typeof body.message === "string" && body.message.trim()) {
-      return Response.json(await discussProposal(pid, body.message, typeof body.zone === "string" ? validZone(body.zone) : undefined));
+      const message = body.message;
+      return streamed((onTool) => discussProposal(pid, message, zone, onTool));
     }
-    if (body.action === "check" || body.action === "refresh") {
-      const result = await checkToday({ zone: typeof body.zone === "string" ? validZone(body.zone) : undefined, force: body.action === "refresh" });
-      return Response.json(result);
-    }
+    if (body.action === "refresh") return streamed((onTool) => checkToday({ zone, force: true, onTool }));
+    if (body.action === "check") return Response.json(await checkToday({ zone }));
     return Response.json({ error: "invalid_request" }, { status: 400 });
   } catch (error) {
     if (error instanceof DeepSeekError) return Response.json({ error: deepSeekErrorCode(error.status) }, { status: 502 });
