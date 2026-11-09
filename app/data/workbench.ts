@@ -52,7 +52,7 @@ type WorkbenchContent = {
 };
 
 /** The day these diagrams were drawn from the code and the devlog. */
-export const WORKBENCH_AS_OF = "2026-11-08";
+export const WORKBENCH_AS_OF = "2026-11-09";
 
 export const WORKBENCH_CONTENT: Record<Language, WorkbenchContent> = {
   en: {
@@ -287,11 +287,12 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     repo: "alex-portfolio-starter",
     stack: ["Next.js App Router", "Tailwind CSS", "Web Audio", "DeepSeek"],
     copy: {
-      en: { status: "Live · changing", summary: "This site: bilingual themes, gallery and bio, the Entanglement orbit with its generated narration, and this workbench." },
-      zh: { status: "在线 · 持续修改", summary: "就是这个网站：双语主题、画廊与简介，带生成叙述的 Entanglement 三圈，以及这块工作台。" },
+      en: { status: "Live · changing", summary: "This site: the alexsonicLAb welcome that plays the page as techno, bilingual themes, gallery and bio, the Entanglement orbit with its generated narration, and this workbench." },
+      zh: { status: "在线 · 持续修改", summary: "就是这个网站：把页面放成 techno 的 alexsonicLAb 开场页、双语主题、画廊与简介，带生成叙述的 Entanglement 三圈，以及这块工作台。" },
     },
     diagram: {
       nodes: [
+        { id: "lab", label: "alexsonicLAb", sub: "welcome · plays this page", kind: "app", col: 0, row: 0 },
         { id: "visitor", label: "Visitor", sub: "en / 中文", kind: "actor", col: 0, row: 1 },
         { id: "content", label: "Content data", sub: "content.ts · orbit.ts", kind: "store", col: 1, row: 0 },
         { id: "page", label: "Home page", sub: "themes · gallery · bio", kind: "app", col: 1, row: 1 },
@@ -303,6 +304,8 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
         { id: "ds", label: "DeepSeek", sub: "narration", kind: "external", col: 4, row: 1 },
       ],
       edges: [
+        { from: "visitor", to: "lab" },
+        { from: "lab", to: "page", dashed: true },
         { from: "visitor", to: "page" },
         { from: "content", to: "page" },
         { from: "content", to: "search" },
@@ -315,10 +318,54 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     },
   },
   {
+    slug: "alexsoniclab",
+    group: "bench",
+    index: "06",
+    title: "alexsonicLAb",
+    repo: "alexsoniclab",
+    href: "https://alexsoniclab.vercel.app/",
+    stack: ["Next.js", "Playwright · Chromium", "Web Audio", "Vercel Fluid"],
+    copy: {
+      en: { status: "Live · changing", summary: "Any public page, read by a headless browser behind a guard proxy and sent back as geometry only, then played as techno by the same two-deck Lab that opens this site." },
+      zh: { status: "在线 · 持续修改", summary: "任何公开网页：在守卫代理后面由无头浏览器读取，只传回几何形状，再交给打开这个网站的同一个双唱盘 Lab 放成 techno。" },
+    },
+    diagram: {
+      nodes: [
+        { id: "visitor", label: "Visitor", sub: "URL · scroll · keys", kind: "actor", col: 0, row: 0 },
+        { id: "site", label: "Target site", sub: "any public page", kind: "external", col: 0, row: 2 },
+        { id: "api", label: "/api/scan", sub: "rate limit · cache", kind: "app", col: 1, row: 0 },
+        { id: "chromium", label: "Headless Chromium", sub: "one browser per scan", kind: "app", col: 1, row: 1 },
+        { id: "guard", label: "Guard proxy", sub: "DNS pinned · no private IPs", kind: "app", col: 1, row: 2 },
+        { id: "snapshot", label: "Snapshot", sub: "geometry only · CDN 1 h", kind: "store", col: 2, row: 0 },
+        { id: "read", label: "snapshotPage", sub: "boxes · lines · sections", kind: "app", col: 2, row: 1 },
+        { id: "aidj", label: "AI DJ", sub: "seeded set · no model", kind: "app", col: 2, row: 2 },
+        { id: "lab", label: "SonicLab", sub: "rows → ASCII · read head", kind: "app", col: 3, row: 0 },
+        { id: "players", label: "Five players", sub: "one page signal each", kind: "app", col: 3, row: 1 },
+        { id: "portfolio", label: "Portfolio", sub: "same Lab · sync-lab", kind: "external", col: 4, row: 0 },
+        { id: "synth", label: "Two-deck synth", sub: "Web Audio · crossfader", kind: "app", col: 4, row: 1 },
+        { id: "take", label: "Take", sub: "audio · #perf link", kind: "store", col: 4, row: 2 },
+      ],
+      edges: [
+        { from: "visitor", to: "api" },
+        { from: "api", to: "chromium" },
+        { from: "chromium", to: "guard" },
+        { from: "guard", to: "site" },
+        { from: "chromium", to: "read" },
+        { from: "read", to: "snapshot" },
+        { from: "snapshot", to: "lab" },
+        { from: "lab", to: "players" },
+        { from: "aidj", to: "players", dashed: true },
+        { from: "players", to: "synth" },
+        { from: "synth", to: "take" },
+        { from: "portfolio", to: "lab", dashed: true },
+      ],
+    },
+  },
+  {
     slug: "dys-utopia-system",
     workSlug: "dys-utopia",
     group: "studio",
-    index: "06",
+    index: "07",
     title: "Dys/Utopia",
     repo: "Interactive model · TouchDesigner",
     href: "https://vimeo.com/1151628483",
@@ -354,7 +401,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     slug: "bloom-system-framework",
     workSlug: "bloom-system",
     group: "studio",
-    index: "07",
+    index: "08",
     title: "Bloom System · I Am Working",
     repo: "Generative framework · film",
     href: "https://vimeo.com/1150589247",
@@ -392,7 +439,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     slug: "electromagnetic-decay-system",
     workSlug: "electromagnetic-decay",
     group: "studio",
-    index: "08",
+    index: "09",
     title: "Electromagnetic Decay",
     repo: "Listening apparatus · Raspberry Pi 5",
     href: "https://vimeo.com/1150600847",
@@ -431,7 +478,7 @@ export const WORKBENCH_PROJECTS: WorkbenchProject[] = [
     slug: "fitting-reality-system",
     workSlug: "fitting-reality",
     group: "studio",
-    index: "09",
+    index: "10",
     title: "Fitting Reality",
     repo: "Interactive installation · two screens",
     href: "https://vimeo.com/1151388456",
