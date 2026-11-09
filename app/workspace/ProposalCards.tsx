@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Loader2, TriangleAlert } from "lucide-react";
+import { Check, Loader2, MessageSquare, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { parseResponse } from "./api";
 import { dayFormat, timeFormat, zone } from "./calendarFormat";
 import { flushMindstream, notifyMindstreamChanged } from "./mindstreamBus";
@@ -18,6 +19,8 @@ export type Proposal = {
   after?: Summary;
   conflicts: string[];
   why?: string;
+  /** The person's answer on the card and what the assistant did with it (Today only). */
+  reply?: { you: string; answer: string };
 };
 export type Status = "pending" | "applying" | "done" | "failed" | "dismissed";
 
@@ -49,11 +52,20 @@ export async function applyProposal(proposal: Proposal) {
   }
 }
 
-type CardProps = { proposal: Proposal; status: Status; onApply: () => void; onDismiss: () => void };
+type CardProps = { proposal: Proposal; status: Status; onApply: () => void; onDismiss: () => void; onReply?: (text: string) => Promise<void> };
 
 /** One proposed change, with the buttons that confirm or dismiss it. */
-export function ProposalCard({ proposal, status, onApply, onDismiss }: CardProps) {
+export function ProposalCard({ proposal, status, onApply, onDismiss, onReply }: CardProps) {
   const shown = proposal.after ?? proposal.before;
+  const [writing, setWriting] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  async function send() {
+    const text = draft.trim();
+    if (!text || !onReply || sending) return;
+    setSending(true);
+    try { await onReply(text); setDraft(""); setWriting(false); } finally { setSending(false); }
+  }
   return <div className={`ca-card ca-card--${proposal.op === "ms_note" || proposal.op === "ms_board" ? (proposal.ms?.mode === "replace" ? "update" : "create") : proposal.op.replace("note_", "")} is-${status}`}>
     <div className="ca-card__head"><b>{proposal.op === "ms_note" ? (proposal.ms?.mode === "replace" ? "Rewrite mindstream note" : "Add to mindstream note") : proposal.op === "ms_board" ? "Change mindstream board" : proposal.op === "note_create" ? "New note" : proposal.op === "note_append" ? "Add to note" : proposal.op === "create" ? "New event" : proposal.op === "update" ? "Change event" : "Delete event"}</b>{proposal.scope === "this" && <small>This occurrence only</small>}</div>
     {proposal.ms && <p className="ca-card__after"><strong>{proposal.ms.title}</strong>{proposal.ms.why && <span>{proposal.ms.why}</span>}{proposal.ms.markdown && <span className="ca-card__note">{proposal.ms.markdown.slice(0, 360)}{proposal.ms.markdown.length > 360 ? "…" : ""}</span>}{proposal.ms.lines && <span className="ca-card__note">{proposal.ms.lines.slice(0, 8).join("\n")}{proposal.ms.lines.length > 8 ? `\n…and ${proposal.ms.lines.length - 8} more` : ""}</span>}</p>}
@@ -62,11 +74,17 @@ export function ProposalCard({ proposal, status, onApply, onDismiss }: CardProps
     {shown && <p className={proposal.op === "delete" ? "ca-card__gone" : "ca-card__after"}><strong>{shown.title}</strong><span>{when(shown)}{shown.location ? ` · ${shown.location}` : ""}</span></p>}
     {proposal.why && <p className="ca-card__why">{proposal.why}</p>}
     {proposal.conflicts.length > 0 && <p className="ca-card__warn"><TriangleAlert size={14} /> Overlaps with {proposal.conflicts.join(", ")}</p>}
+    {proposal.reply && <div className="ca-card__reply"><p><b>你：</b>{proposal.reply.you}</p><p><b>助手：</b>{proposal.reply.answer}</p></div>}
     <div className="ca-card__actions">
-      {status === "done" ? <span className="ca-card__done"><Check size={15} /> Done</span> : status === "dismissed" ? <span className="ws-muted">Dismissed</span> : <>
-        <button type="button" className={`ws-pill${proposal.op === "delete" ? " ws-pill--danger" : " ws-pill--solid"}`} disabled={status === "applying"} onClick={onApply}>{status === "applying" ? <Loader2 className="ws-spin" size={14} /> : status === "failed" ? "Try again" : proposal.op === "delete" ? "Delete" : "Confirm"}</button>
-        <button type="button" className="ws-text-button" onClick={onDismiss}>Dismiss</button>
+      {status === "done" ? <span className="ca-card__done"><Check size={15} /> Done</span> : status === "dismissed" ? <span className="ws-muted">{proposal.reply ? "Answered" : "Dismissed"}</span> : <>
+        <button type="button" className={`ws-pill${proposal.op === "delete" ? " ws-pill--danger" : " ws-pill--solid"}`} disabled={status === "applying" || sending} onClick={onApply}>{status === "applying" ? <Loader2 className="ws-spin" size={14} /> : status === "failed" ? "Try again" : proposal.op === "delete" ? "Delete" : "Confirm"}</button>
+        <button type="button" className="ws-text-button" disabled={sending} onClick={onDismiss}>Dismiss</button>
+        {onReply && <button type="button" className="ws-text-button ca-card__reply-toggle" aria-expanded={writing} disabled={sending} onClick={() => setWriting((open) => !open)}><MessageSquare size={14} /> Reply</button>}
       </>}
     </div>
+    {writing && onReply && status !== "done" && status !== "dismissed" && <form className="ca-card__compose" onSubmit={(event) => { event.preventDefault(); void send(); }}>
+      <textarea value={draft} rows={2} maxLength={500} autoFocus placeholder="比如：这个我已经报名了 / 这就是我加过的 Personal Tutorial / 改到周四下午" onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); } }} disabled={sending} />
+      <div className="ca-card__compose-row"><small className="ws-muted">助手会按你的话改这张卡，并记住这句话</small><button type="submit" className="ws-pill ws-pill--solid" disabled={sending || !draft.trim()}>{sending ? <Loader2 className="ws-spin" size={14} /> : "Send"}</button></div>
+    </form>}
   </div>;
 }
