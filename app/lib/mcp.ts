@@ -1,6 +1,7 @@
 import { createEvent, CalendarInputError, deleteEvent, updateEvent } from "./calendarStore";
 import { validZone } from "./calendarTime";
-import { runTool } from "./agentTools";
+import { conflictsFor, eventProps, runTool } from "./agentTools";
+import { savedZone } from "./today";
 import { DevlogError, deleteEntry, deleteProject, readEntries, readProjects, saveEntry, saveProject, validDate, validId } from "./devlogStore";
 import { applyBoardOps, applyNoteEdit, ensureNote, resolveBoardId, type BoardOp } from "./mindstreamOps";
 import { BoardError, readBoard, updateBoard } from "./boardStore";
@@ -21,7 +22,15 @@ import { writeDevlog } from "./carcosa/scribe";
 type Json = Record<string, unknown>;
 type Tool = { name: string; description: string; inputSchema: Json; readOnly: boolean; destructive?: boolean; run: (args: Json, zone: string) => Promise<string> };
 
-const ZONE = () => validZone(process.env.WORKSPACE_ZONE || "Europe/London");
+const zoneProp = { type: "string", description: "Optional IANA time zone for the local times, e.g. Asia/Shanghai. Defaults to the zone of the browser that last opened the workspace." };
+/** The zone a call asks for, else where the person last used the web app, else the configured one. Only calendar and devlog dates need it. */
+async function zoneFor(tool: string, args: Json) {
+  const fallback = process.env.WORKSPACE_ZONE || "Europe/London";
+  if (!/^(calendar_|devlog_add_entry$)/.test(tool)) return validZone(fallback);
+  const asked = str(args.zone, 60).trim();
+  return validZone(asked || (await savedZone()) || fallback);
+}
+const overlap = (titles: string[]) => (titles.length ? ` It overlaps with: ${titles.join(", ")}.` : "");
 const str = (value: unknown, max = 20_000) => (typeof value === "string" ? value.slice(0, max) : "");
 const obj = (properties: Json, required: string[] = []): Json => ({ type: "object", properties, required, additionalProperties: false });
 const read = (name: string) => async (args: Json, zone: string) => runTool(name, JSON.stringify(args), { zone, proposals: [] });
@@ -183,14 +192,15 @@ const TOOLS: Tool[] = [
     await deleteEntry(entry.id);
     return `Deleted "${entry.title || "the entry"}" (${entry.date}).`;
   } },
-  { name: "calendar_list", readOnly: true, description: "List calendar events between two local times.", inputSchema: obj({ from: { type: "string", description: "YYYY-MM-DD or YYYY-MM-DDTHH:mm" }, to: { type: "string" } }, ["from", "to"]), run: read("calendar_list") },
-  { name: "calendar_add_event", readOnly: false, description: "Add a calendar event. Times are local, 'YYYY-MM-DDTHH:mm', or 'YYYY-MM-DD' for all-day.", inputSchema: obj({ title: { type: "string" }, start: { type: "string" }, end: { type: "string" }, allDay: { type: "boolean" }, category: { type: "string" }, location: { type: "string" }, notes: { type: "string" } }, ["title", "start"]), run: async (args, zone) => {
-    const event = await createEvent(args, zone, "agent");
-    return `Added "${event.title}" to the calendar.`;
+  { name: "calendar_list", readOnly: true, description: "List calendar events between two local times. Each line starts with the event id in brackets.", inputSchema: obj({ from: { type: "string", description: "YYYY-MM-DD or YYYY-MM-DDTHH:mm" }, to: { type: "string" }, zone: zoneProp }, ["from", "to"]), run: read("calendar_list") },
+  { name: "calendar_add_event", readOnly: false, description: "Add a calendar event, once or repeating. Times are local, 'YYYY-MM-DDTHH:mm', or 'YYYY-MM-DD' for all-day. The reply gives the new event's id and names any timed events it overlaps.", inputSchema: obj({ ...eventProps, category: { type: "string" }, zone: zoneProp }, ["title", "start"]), run: async (args, zone) => {
+    const { zone: _zone, ...fields } = args;
+    const event = await createEvent(fields, zone, "agent");
+    return `Added "${event.title}" to the calendar (id ${event.id}).${overlap(await conflictsFor(event, event.id))}`;
   } },
-  { name: "calendar_update_event", readOnly: false, description: "Change an existing calendar event; only include the fields to change.", inputSchema: obj({ id: { type: "string" }, event: { type: "object" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string" } }, ["id", "event"]), run: async (args, zone) => {
+  { name: "calendar_update_event", readOnly: false, description: "Change an existing calendar event; only include the fields to change (title, start, end, allDay, category, location, notes, repeat; repeat null stops it repeating). For one occurrence of a repeating event use scope 'this' with occurrenceDate; that occurrence becomes its own event and the reply gives its id.", inputSchema: obj({ id: { type: "string" }, event: { type: "object", properties: eventProps }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string", description: "YYYY-MM-DD" }, zone: zoneProp }, ["id", "event"]), run: async (args, zone) => {
     const event = await updateEvent(str(args.id, 80), (args.event ?? {}) as Json, args.scope === "this" ? "this" : "all", typeof args.occurrenceDate === "string" ? args.occurrenceDate : undefined, zone, "agent");
-    return `Updated "${event.title}".`;
+    return `Updated "${event.title}" (id ${event.id}).${event.repeat ? "" : overlap(await conflictsFor(event, event.id))}`;
   } },
   { name: "calendar_delete_event", readOnly: false, destructive: true, description: "Delete a calendar event. For a repeating event, scope 'this' with occurrenceDate (YYYY-MM-DD) removes one occurrence; 'all' removes the series.", inputSchema: obj({ id: { type: "string" }, scope: { type: "string", enum: ["this", "all"] }, occurrenceDate: { type: "string" } }, ["id"]), run: async (args) => {
     await deleteEvent(str(args.id, 80), args.scope === "this" ? "this" : "all", typeof args.occurrenceDate === "string" ? args.occurrenceDate : undefined);
@@ -247,7 +257,8 @@ export async function handleMessage(message: Json, options: { mail: boolean } = 
     const tool = tools(options.mail).find((item) => item.name === params.name);
     if (!tool) return rpcError(id, -32602, `Unknown tool ${str(params.name, 60)}`);
     try {
-      const text = await tool.run((params.arguments ?? {}) as Json, ZONE());
+      const args = (params.arguments ?? {}) as Json;
+      const text = await tool.run(args, await zoneFor(tool.name, args));
       return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text }], isError: text.startsWith("Error:") } };
     } catch (error) {
       const known = error instanceof DevlogError || error instanceof MindError || error instanceof BoardError || error instanceof NoteError || error instanceof CalendarInputError || error instanceof LibraryError;

@@ -91,6 +91,11 @@ async function recentInbox(days = 2, max = 25): Promise<Inbox> {
 
 const relevant = (message: MailSummary) => message.category === "primary" || message.category === "updates";
 
+/** The time zone of the browser that last opened Today: where the person is, as far as the workspace knows. */
+export async function savedZone() {
+  try { return (await readState()).zone ?? null; } catch { return null; }
+}
+
 /** The saved plan for today, if there is one. */
 export async function readPlan() {
   return (await readState()).plan ?? null;
