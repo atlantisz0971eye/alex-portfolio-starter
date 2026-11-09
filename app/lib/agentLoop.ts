@@ -10,14 +10,18 @@ type Events = {
 /**
  * Runs the tool-calling conversation: the model reads the calendar, mail, notes and library through tools
  * until it answers. Write tools only record proposals in `ctx`; nothing is changed here.
+ * After `maxSteps` rounds of tool calls the model gets one more turn in which it may only answer, so what the
+ * last round found is used instead of thrown away.
  */
 export async function runAgentLoop(messages: ChatMessage[], ctx: ToolContext, events: Events = {}, maxSteps = 6, finalOnly = false) {
   let full = "";
   let last = "";
-  for (let step = 0; step < maxSteps; step += 1) {
+  for (let step = 0; step <= maxSteps; step += 1) {
+    const closing = step === maxSteps;
+    if (closing) messages.push({ role: "user", content: "（系统提示：查询步骤已用完，不能再调用工具。请直接根据上面已经查到的内容回答；没来得及查的部分明确说出来。）" });
     let text = "";
     let pending: { id: string; name: string; args: string }[] = [];
-    for await (const part of streamChat(messages, TOOLS, 1800, events.signal)) {
+    for await (const part of streamChat(messages, TOOLS, 1800, events.signal, closing)) {
       if (part.kind === "text") {
         if (!text && full) { full += "\n\n"; events.onText?.("\n\n"); }
         text += part.text;
@@ -27,7 +31,7 @@ export async function runAgentLoop(messages: ChatMessage[], ctx: ToolContext, ev
         pending = part.calls;
       }
     }
-    if (!pending.length) {
+    if (!pending.length || closing) {
       if (!full.trim()) throw new DeepSeekError(502);
       last = text;
       break;
@@ -38,7 +42,6 @@ export async function runAgentLoop(messages: ChatMessage[], ctx: ToolContext, ev
       events.onTool?.(call.name, describeCall(call.name, call.args));
       messages.push({ role: "tool", tool_call_id: call.id, content: await runTool(call.name, call.args, ctx) });
     }
-    if (step === maxSteps - 1) { const note = "\n\n（查询步骤已达上限，以上是目前找到的结果。）"; full += note; events.onText?.(note); }
   }
   return finalOnly && last.trim() ? last : full;
 }
