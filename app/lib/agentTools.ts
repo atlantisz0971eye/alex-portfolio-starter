@@ -170,9 +170,14 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         const accounts = (await readAccounts()).filter((account) => !args.account || account.id === args.account);
         if (!accounts.length) return "No mail account is connected.";
         const max = Math.min(12, Math.max(1, Math.floor(Number(args.max) || 8)));
-        const found = (await Promise.all(accounts.map((account) => listMessages(account, { q: String(args.query ?? "").slice(0, 300), max }).then((result) => result.messages).catch((error) => error instanceof MailAuthError ? [] : [])))).flat();
+        // An account that could not be read is named in the result, so an empty answer is never mistaken for "no mail".
+        const expired: string[] = [];
+        const failed: string[] = [];
+        const found = (await Promise.all(accounts.map((account) => listMessages(account, { q: String(args.query ?? "").slice(0, 300), max }).then((result) => result.messages).catch((error) => { (error instanceof MailAuthError ? expired : failed).push(account.email); return []; })))).flat();
         found.sort((a, b) => b.date - a.date);
-        return cut(found.length ? found.slice(0, max).map((message) => `- [account ${message.account} | id ${message.id}] ${new Date(message.date).toISOString().slice(0, 16)} | ${message.from} <${message.fromEmail}> | ${message.subject} | ${message.snippet.slice(0, 160)}${message.unread ? " | unread" : ""}`).join("\n") : "No matching emails.");
+        const unread = [expired.length ? `Gmail access expired for ${expired.join(", ")}: that mail could not be searched. Tell the user to reconnect it on the Mail page.` : "", failed.length ? `Gmail could not be reached for ${failed.join(", ")}: that mail was not searched. Tell the user.` : ""].filter(Boolean).join("\n");
+        if (!found.length) return unread ? `Error: ${unread}` : "No matching emails.";
+        return cut(`${unread ? `${unread}\n` : ""}${found.slice(0, max).map((message) => `- [account ${message.account} | id ${message.id}] ${new Date(message.date).toISOString().slice(0, 16)} | ${message.from} <${message.fromEmail}> | ${message.subject} | ${message.snippet.slice(0, 160)}${message.unread ? " | unread" : ""}`).join("\n")}`);
       }
       case "mail_read": {
         if (!mailConfigured()) return "Mail is not set up.";

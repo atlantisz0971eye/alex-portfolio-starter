@@ -15,7 +15,7 @@ type Plan = { generatedAt: string; date: string; text: string; proposals: (Propo
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
 type Block = "plan" | "proposals" | "schedule" | "mail";
 type Layout = { headline: string; kicker: string; order: Block[]; focus: Block | null };
-type View = { configured: boolean; layout?: Layout | null; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[] };
+type View = { configured: boolean; layout?: Layout | null; connected?: boolean; zone?: string; plan?: Plan | null; events?: Event[]; mail?: (MailItem & { category: string })[]; reauth?: string[] };
 
 const COLORS: Record<string, string> = { personal: "#4a6fb8", study: "#4f8a5b", work: "#b9822e", other: "#8a5aa8" };
 const today = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -132,6 +132,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
         {view && !view.configured && <div className="empty"><Inbox size={28} /><p>Mail is not set up yet.</p><small>Today builds your plan from your calendar and new email.</small></div>}
         {view && view.configured && !view.connected && <div className="empty"><Inbox size={28} /><p>Connect Gmail to get a plan for today.</p><a className="ws-pill ws-pill--solid" href="/api/workspace/mail/connect">Connect Gmail</a><small>Read-only access. New mail updates your plan automatically.</small></div>}
 
+        {view?.connected && (view.reauth ?? []).map((email) => <p key={email} className="mail-banner">Access to {email} expired, so its mail is missing from today’s plan. <a href={`/api/workspace/mail/connect?hint=${encodeURIComponent(email)}`}>Reconnect</a></p>)}
         {view && view.connected && <div className="today__grid" data-directed={layout ? "" : undefined}>
           <div className="today__main">
             <section className="ws-card today__plan" aria-live="polite" {...place("plan")}>
@@ -168,7 +169,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
             </section>
             <section aria-label="New mail" {...place("mail")}>
             <h2 className="section-label">New mail {mail.length > 0 && <span>{mail.length}</span>}</h2>
-            {mail.length === 0 ? <p className="today__none"><Check size={14} /> You’re all caught up.</p> : <ul className="today__mail">
+            {mail.length === 0 ? (view.reauth?.length ? <p className="today__none">Mail could not be read.</p> : <p className="today__none"><Check size={14} /> You’re all caught up.</p>) : <ul className="today__mail">
               {mail.slice(0, showAll ? 40 : 5).map((message) => <li key={`${message.account}-${message.id}`}>
                 <button type="button" onClick={() => setOpen(message)}>
                   <span className="mail-dot is-unread" />

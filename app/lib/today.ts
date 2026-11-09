@@ -52,11 +52,14 @@ async function writeState(state: TodayState) {
   await put(await statePath(), JSON.stringify(state), { access: "private", allowOverwrite: true, contentType: "application/json" });
 }
 
-/** Recent inbox messages across accounts, newest first. Accounts that fail are skipped. */
-async function recentInbox(days = 2, max = 25): Promise<MailSummary[]> {
+type Inbox = { messages: MailSummary[]; /** Addresses whose Gmail access has expired, so their mail is missing from `messages`. */ expired: string[] };
+
+/** Recent inbox messages across accounts, newest first. Accounts that fail are skipped; the ones that need reconnecting are named. */
+async function recentInbox(days = 2, max = 25): Promise<Inbox> {
   const accounts = await readAccounts();
-  const lists = await Promise.all(accounts.map((account) => listMessages(account, { q: `in:inbox newer_than:${days}d`, max }).then((result) => result.messages).catch((error) => error instanceof MailAuthError ? [] : [])));
-  return lists.flat().sort((a, b) => b.date - a.date);
+  const expired: string[] = [];
+  const lists = await Promise.all(accounts.map((account) => listMessages(account, { q: `in:inbox newer_than:${days}d`, max }).then((result) => result.messages).catch((error) => { if (error instanceof MailAuthError) expired.push(account.email); return [] as MailSummary[]; })));
+  return { messages: lists.flat().sort((a, b) => b.date - a.date), expired };
 }
 
 const relevant = (message: MailSummary) => message.category === "primary" || message.category === "updates";
@@ -86,12 +89,12 @@ const PLAN_TASK = `你现在要为用户制定“今天的日程建议”，不�
 
 const CLAIMS_PROPOSAL = /已提议|请确认|提议(加入|修改|删除|如下)/;
 
-async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[]): Promise<TodayPlan> {
+async function generate(zone: string, emails: MailSummary[], reason: TodayPlan["reason"], remarks?: Remark[], expired: string[] = []): Promise<TodayPlan> {
   const proposals: Proposal[] = [];
   const list = emails.slice(0, 12).map((message) => `- [account ${message.account} | id ${message.id}] ${new Date(message.date).toISOString().slice(0, 16)} | ${message.from} <${message.fromEmail}> | ${message.subject} | ${message.snippet.slice(0, 160)}`).join("\n");
   const messages: ChatMessage[] = [
     { role: "system", content: await agentSystem(zone, "today", PLAN_TASK + remarksBlock(remarks)) },
-    { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。\n\n新邮件：\n${list || "（没有新邮件，请根据已有日程和最近的邮件给出建议）"}` },
+    { role: "user", content: `${reason === "manual" ? "用户刚刚点了“重新生成”。" : "刚收到新邮件。"}请制定今天的建议。${expired.length ? `\n\n注意：${expired.join("、")} 的 Gmail 授权已过期，读不到这个邮箱的邮件。不要说“没有新邮件”；在“今天重点”第一条写明这个邮箱需要在 Mail 页重新连接。` : ""}\n\n新邮件：\n${list || (expired.length ? "（读不到）" : "（没有新邮件，请根据已有日程和最近的邮件给出建议）")}` },
   ];
   let text = await runAgentLoop(messages, { zone, proposals }, {}, 6, true);
   // The model sometimes writes that it proposed events without calling a tool, which leaves the person nothing to confirm.
@@ -125,7 +128,7 @@ async function layoutFacts(zone: string, plan: TodayPlan | undefined, owner: boo
   const start = zonedToInstant(wall.y, wall.m, wall.d, 0, 0, zone);
   const end = zonedToInstant(wall.y, wall.m, wall.d + 1, 0, 0, zone);
   const local = new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
-  const [{ occurrences }, inbox] = await Promise.all([listOccurrences(start, end), recentInbox(3, 20).catch(() => [] as MailSummary[])]);
+  const [{ occurrences }, inbox] = await Promise.all([listOccurrences(start, end), recentInbox(3, 20).then((result) => result.messages).catch(() => [] as MailSummary[])]);
   const facts: LayoutFacts = {
     now: local.format(Date.now()),
     plan: (plan?.date === wallDate(Date.now(), zone) ? plan.text : "").slice(0, 900),
@@ -169,7 +172,7 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
   if (!mailConfigured() || !(await readAccounts()).length) return { configured: false as const };
   const state = await readState();
   const zone = validZone(options.zone ?? state.zone ?? "Europe/London");
-  const inbox = await recentInbox();
+  const { messages: inbox, expired } = await recentInbox();
   const seen = new Set(state.seen);
   const fresh = inbox.filter((message) => !seen.has(message.id));
   const worth = fresh.filter(relevant);
@@ -181,7 +184,7 @@ export async function checkToday(options: { zone?: string; force?: boolean }) {
   let updated = false;
   if (shouldGenerate) {
     const base = options.force ? inbox.filter((message) => message.unread && relevant(message)) : worth.length ? worth : inbox.filter((message) => message.unread && relevant(message));
-    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks);
+    plan = await generate(zone, base, options.force ? "manual" : first ? "first" : "new_mail", state.remarks, expired);
     updated = true;
   }
   // Mail held back by the cool-down stays "new" so the next check handles it.
@@ -263,9 +266,9 @@ export async function todayView(zoneInput?: string) {
   const wall = wallParts(Date.now(), zone);
   const start = zonedToInstant(wall.y, wall.m, wall.d, 0, 0, zone);
   const end = zonedToInstant(wall.y, wall.m, wall.d + 1, 0, 0, zone);
-  const [{ occurrences }, inbox, saved] = await Promise.all([
+  const [{ occurrences }, { messages: inbox, expired }, saved] = await Promise.all([
     listOccurrences(start, end),
-    accounts.length ? recentInbox(3, 20) : Promise.resolve([] as MailSummary[]),
+    accounts.length ? recentInbox(3, 20) : Promise.resolve<Inbox>({ messages: [], expired: [] }),
     readLayout(),
   ]);
   try { await ensureLayout(zone, saved); } catch { /* optional */ }
@@ -278,6 +281,7 @@ export async function todayView(zoneInput?: string) {
     lastCheck: state.lastCheck ?? null,
     events: occurrences,
     mail: inbox.filter((message) => message.unread && relevant(message)).slice(0, 10),
+    reauth: expired,
     accounts: accounts.map((account) => ({ id: account.id, email: account.email })),
   };
 }
