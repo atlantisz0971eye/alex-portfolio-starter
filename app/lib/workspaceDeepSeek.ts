@@ -158,7 +158,7 @@ export type ToolSpec = { type: "function"; function: { name: string; description
 export type ToolCall = { id: string; name: string; args: string };
 export type ChatPart = { kind: "text"; text: string } | { kind: "tool_calls"; calls: ToolCall[] };
 
-type ToolChunk = { choices?: { delta?: { content?: string | null; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] } }[] };
+type ToolChunk = { choices?: { finish_reason?: string | null; delta?: { content?: string | null; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] } }[] };
 
 /**
  * One streamed model turn with tool support: yields text as it arrives, then any tool calls the model asked for.
@@ -178,6 +178,7 @@ export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], ma
   signal?.addEventListener("abort", onAbort);
   arm(FIRST_TOKEN_MS);
   const calls = new Map<number, ToolCall>();
+  let cut = false;
   try {
     const response = await fetch(ENDPOINT, {
       method: "POST",
@@ -205,7 +206,9 @@ export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], ma
         if (data === "[DONE]") break outer;
         arm(IDLE_MS);
         try {
-          const delta = (JSON.parse(data) as ToolChunk).choices?.[0]?.delta;
+          const choice = (JSON.parse(data) as ToolChunk).choices?.[0];
+          if (choice?.finish_reason === "length") cut = true;
+          const delta = choice?.delta;
           if (delta?.content) yield { kind: "text", text: delta.content };
           for (const part of delta?.tool_calls ?? []) {
             const current = calls.get(part.index) ?? { id: "", name: "", args: "" };
@@ -219,6 +222,8 @@ export async function* streamChat(messages: ChatMessage[], tools: ToolSpec[], ma
         }
       }
     }
+    // An answer that ran into the token limit says so, instead of stopping mid-sentence as if it were finished.
+    if (cut && !calls.size) yield { kind: "text", text: "\n\n（回答太长，到这里被截断了。说“继续”可以接着写。）" };
     if (calls.size) yield { kind: "tool_calls", calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, call], index) => ({ ...call, id: call.id || `call_${index}` })) };
   } catch (error) {
     if (error instanceof DeepSeekError) throw error;
