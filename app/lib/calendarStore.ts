@@ -1,12 +1,14 @@
 import { get, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
+import { feedEvents, isFeedId } from "./calendarFeed";
 import { scopeRoot } from "./workspaceScope";
 import {
   addDaysToKey, dateKey, daysBetweenKeys, expand, isDateOnly, toInstant, validZone, wallDate, wallParts, zonedToInstant,
   type Occurrence, type Repeat, type StoredEvent,
 } from "./calendarTime";
 
-export type Category = { id: string; name: string; color: string };
+/** `readOnly` marks a subscribed calendar (see calendarFeed.ts): shown, never written to. */
+export type Category = { id: string; name: string; color: string; readOnly?: boolean };
 type CalendarDoc = { categories: Category[]; events: StoredEvent[] };
 
 const calendarPath = async () => `${await scopeRoot()}calendar/data.json`;
@@ -98,11 +100,16 @@ export function buildFields(raw: Record<string, unknown>, zone: string, categori
   };
 }
 
+/** Own events and subscribed ones together; subscribed occurrences carry their `source`. */
 export async function listOccurrences(from: number, to: number) {
-  const doc = await readCalendar();
-  const occurrences = doc.events.flatMap((event) => expand(event, from, to)).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.title.localeCompare(b.title));
-  return { occurrences, categories: doc.categories };
+  const [doc, subscribed] = await Promise.all([readCalendar(), feedEvents().catch(() => ({ events: [], feeds: [] }))]);
+  const feedOccurrences = subscribed.events.flatMap(({ source, ...event }) => expand(event, from, to).map((occurrence) => ({ ...occurrence, source })));
+  const categories: Category[] = [...doc.categories, ...subscribed.feeds.map((feed) => ({ id: feed.id, name: feed.name, color: feed.color, readOnly: true }))];
+  const occurrences = [...doc.events.flatMap((event) => expand(event, from, to)), ...feedOccurrences].sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.title.localeCompare(b.title));
+  return { occurrences, categories };
 }
+
+const READ_ONLY = "That event comes from a subscribed timetable and is read-only here; change it at its source.";
 
 export async function createEvent(raw: Record<string, unknown>, zone: string, by: "user" | "agent") {
   const doc = await readCalendar();
@@ -115,6 +122,7 @@ export async function createEvent(raw: Record<string, unknown>, zone: string, by
 
 /** Edits a whole event or series ("all"), or detaches one occurrence of a series ("this"). */
 export async function updateEvent(id: string, raw: Record<string, unknown>, scope: "this" | "all", occurrenceDate: string | undefined, zone: string, by: "user" | "agent") {
+  if (isFeedId(id)) throw new CalendarInputError(READ_ONLY);
   const doc = await readCalendar();
   const series = doc.events.find((event) => event.id === id);
   if (!series) throw new CalendarInputError("That event no longer exists.");
@@ -158,6 +166,7 @@ export async function updateEvent(id: string, raw: Record<string, unknown>, scop
 }
 
 export async function deleteEvent(id: string, scope: "this" | "all", occurrenceDate?: string) {
+  if (isFeedId(id)) throw new CalendarInputError(READ_ONLY);
   const doc = await readCalendar();
   const series = doc.events.find((event) => event.id === id);
   if (!series) throw new CalendarInputError("That event no longer exists.");

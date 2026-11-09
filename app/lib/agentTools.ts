@@ -1,3 +1,4 @@
+import { isFeedId } from "./calendarFeed";
 import { buildFields, CalendarInputError, fieldsOf, listOccurrences, readCalendar } from "./calendarStore";
 import { expand, toInstant, validZone, type Occurrence } from "./calendarTime";
 import { getMessage, listMessages, MailAuthError } from "./gmail";
@@ -103,7 +104,7 @@ async function conflictsFor(fields: { start: string; end: string; allDay: boolea
 
 export const calendarLines = (occurrences: Occurrence[], zone: string) => {
   const local = (iso: string, allDay: boolean) => allDay ? iso : new Intl.DateTimeFormat("sv-SE", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)).replace(" ", "T");
-  return occurrences.map((item) => `- [${item.id}] ${item.title} | ${local(item.start, item.allDay)} → ${local(item.end, item.allDay)}${item.allDay ? " (all-day)" : ""} | ${item.category}${item.location ? ` | ${item.location}` : ""}${item.recurring ? ` | repeats (occurrence ${item.occurrenceDate})` : ""}`);
+  return occurrences.map((item) => `- [${item.id}] ${item.title} | ${local(item.start, item.allDay)} → ${local(item.end, item.allDay)}${item.allDay ? " (all-day)" : ""} | ${item.category}${item.location ? ` | ${item.location}` : ""}${item.recurring ? ` | repeats (occurrence ${item.occurrenceDate})` : ""}${"source" in item && item.source ? " | read-only timetable" : ""}`);
 };
 
 export type ToolContext = { zone: string; proposals: Proposal[] };
@@ -135,6 +136,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       case "calendar_update":
       case "calendar_delete": {
         const doc = await readCalendar();
+        if (isFeedId(args.id)) return "Error: that event comes from the subscribed school timetable and is read-only. Tell the user to change it at its source.";
         const series = doc.events.find((event) => event.id === args.id);
         if (!series) return "Error: no event has that id. Use an id from the calendar list.";
         const scope = args.scope === "this" ? "this" : "all";
