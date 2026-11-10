@@ -54,6 +54,8 @@ export const errors: Record<string, string> = {
   ai_failed: "DeepSeek could not read your mail just now. Try again.",
   today_failed: "Today could not be updated. Try again.",
   no_mail_accounts: "Connect a Gmail account first.",
+  invalid_fieldnote: "That note could not be saved. Write something or paste a link first.",
+  fieldnotes_failed: "Fieldnotes could not be reached. Try again.",
 };
 
 export async function parseResponse<T>(response: Response): Promise<T> {

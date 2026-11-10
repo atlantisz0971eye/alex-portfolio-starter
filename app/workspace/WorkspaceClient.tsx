@@ -22,6 +22,7 @@ import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, 
 import { Today } from "./Today";
 import { CarcosaPet, CarcosaProvider } from "./Carcosa";
 import { CarcosaHead, CarcosaNow, type CarcosaSub } from "./CarcosaPage";
+import { Fieldnotes } from "./Fieldnotes";
 
 type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
 
@@ -134,7 +135,7 @@ function App() {
   const [tab, setTab] = useState<Tab>("today");
   // which part of Carcosa is open: the ledger and the notebook are the former Devlog and Mindstreams tabs
   const [carcosaSub, setCarcosaSub] = useState<CarcosaSub>("pet");
-  useEffect(() => { try { const saved = localStorage.getItem("ws-carcosa-sub"); if (saved === "pet" || saved === "now" || saved === "ledger" || saved === "notebook") setCarcosaSub(saved); } catch { /* default */ } }, []);
+  useEffect(() => { try { const saved = localStorage.getItem("ws-carcosa-sub"); if (saved === "pet" || saved === "now" || saved === "ledger" || saved === "notebook" || saved === "fieldnotes") setCarcosaSub(saved); } catch { /* default */ } }, []);
   const chooseSub = useCallback((next: CarcosaSub) => { setCarcosaSub(next); try { localStorage.setItem("ws-carcosa-sub", next); } catch { /* per-viewer */ } }, []);
   // the old tab names still arrive from a few places; they open the matching part of Carcosa
   useEffect(() => { if (tab === "mindstreams") { setTab("carcosa"); setCarcosaSub("notebook"); } else if (tab === "devlog") { setTab("carcosa"); setCarcosaSub("ledger"); } }, [tab]);
@@ -410,6 +411,7 @@ function App() {
             {carcosaSub === "pet" ? <CarcosaPet />
               : carcosaSub === "now" ? <CarcosaNow onError={setError} />
               : carcosaSub === "ledger" ? <Devlog embedded onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); chooseSub("notebook"); }} />
+              : carcosaSub === "fieldnotes" ? <Fieldnotes onError={setError} />
               : <Mind embedded onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />}
           </div>
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
