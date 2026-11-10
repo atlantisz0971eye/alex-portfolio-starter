@@ -328,6 +328,67 @@
 .ws-root[data-skin="byte"] .carcosa-tabs button::before { content: "□ "; }
 .ws-root[data-skin="byte"] .carcosa-tabs button.is-on { color: var(--text); font-weight: 700; }
 .ws-root[data-skin="byte"] .carcosa-tabs button.is-on::before { content: "■ "; color: var(--blue); }
+/* ---- Carcosa → Fieldnotes: forms that work on a phone, and notes shown as written ---- */
+.ws-root[data-skin="byte"] .carcosa-tabs { flex-wrap: wrap; row-gap: 6px; }
+.ws-root[data-skin="byte"] .fn { max-width: 760px; font-size: 14px; }
+.ws-root[data-skin="byte"] .fn-modes { gap: 2ch; font-size: 14px; }
+.ws-root[data-skin="byte"] .fn .carcosa-row { align-items: center; }
+.ws-root[data-skin="byte"] .fn .carcosa-row .ws-text-button { font-size: 14px; }
+.ws-root[data-skin="byte"] .fn-form { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+.ws-root[data-skin="byte"] .fn-form > .carcosa-muted { margin: 0; }
+.ws-root[data-skin="byte"] .fn-field, .ws-root[data-skin="byte"] .fn-questions label { display: flex; flex-direction: column; gap: 6px; }
+.ws-root[data-skin="byte"] .fn-field > span, .ws-root[data-skin="byte"] .fn-questions label > span, .ws-root[data-skin="byte"] .fn-scale > span, .ws-root[data-skin="byte"] .fn-chips > span { color: var(--text-2); font-size: 13px; }
+.ws-root[data-skin="byte"] .fn textarea { width: 100%; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--text-2) 45%, transparent); border-radius: 0; background: none; color: var(--text); line-height: 1.55; resize: vertical; field-sizing: content; min-height: 2.6em; }
+.ws-root[data-skin="byte"] .fn textarea:focus { border-color: var(--text); }
+.ws-root[data-skin="byte"] .fn-scale, .ws-root[data-skin="byte"] .fn-chips { display: flex; flex-direction: column; gap: 6px; }
+.ws-root[data-skin="byte"] .fn-scale > div, .ws-root[data-skin="byte"] .fn-chips > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.ws-root[data-skin="byte"] .fn-scale button, .ws-root[data-skin="byte"] .fn-chips button { min-width: 34px; height: 32px; padding: 0 8px; border: 1px solid color-mix(in srgb, var(--text-2) 45%, transparent); background: none; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; }
+.ws-root[data-skin="byte"] .fn-scale > div { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); max-width: 440px; gap: 4px; }
+.ws-root[data-skin="byte"] .fn-scale button { min-width: 0; padding: 0; }
+.ws-root[data-skin="byte"] .fn-scale button.is-on, .ws-root[data-skin="byte"] .fn-chips button.is-on { border-color: var(--text); background: var(--text); color: var(--bg); font-weight: 700; }
+.ws-root[data-skin="byte"] .fn-inline { color: var(--text-2); font-size: 13px; }
+.ws-root[data-skin="byte"] .fn-inline input { width: min(100%, 28ch); margin-left: .5ch; padding: 4px 6px; border: 0; border-bottom: 1px solid var(--text-2); border-radius: 0; background: none; color: var(--text); }
+.ws-root[data-skin="byte"] .fn .carcosa-fields { margin: 0; }
+.ws-root[data-skin="byte"] .fn .carcosa-fields input[type="date"] { width: auto; }
+.ws-root[data-skin="byte"] .fn-questions { display: flex; flex-direction: column; gap: 18px; }
+.ws-root[data-skin="byte"] .fn-questions fieldset { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.ws-root[data-skin="byte"] .fn-questions legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.ws-root[data-skin="byte"] .fn-more > summary { color: var(--text-2); font-size: 13px; cursor: pointer; }
+.ws-root[data-skin="byte"] .fn-more[open] > summary { margin-bottom: 14px; }
+.ws-root[data-skin="byte"] .fn-save { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 3ch; }
+.ws-root[data-skin="byte"] .fn-save .carcosa-muted { margin: 0; }
+.ws-root[data-skin="byte"] .fn-save .ws-text-button, .ws-root[data-skin="byte"] .fn-actions .ws-text-button, .ws-root[data-skin="byte"] .fn-gaps .ws-text-button, .ws-root[data-skin="byte"] .fn-addendum-form .ws-text-button { font-size: 14px; }
+.ws-root[data-skin="byte"] .fn-capture { padding: 10px 12px; border-left: 2px solid var(--blue); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.ws-root[data-skin="byte"] .fn-capture p { margin: 0 0 4px; }
+.ws-root[data-skin="byte"] .fn-capture .carcosa-muted svg { display: inline; vertical-align: -2px; margin-right: .5ch; }
+.ws-root[data-skin="byte"] .fn-capture__head { color: var(--text-2); }
+.ws-root[data-skin="byte"] .fn-capture__title { font-weight: 700; }
+.ws-root[data-skin="byte"] .fn-capture__label em { margin-left: 1ch; color: var(--text-2); font-style: normal; font-size: 11px; }
+.ws-root[data-skin="byte"] .fn-capture details { margin: 4px 0; color: var(--text-2); }
+.ws-root[data-skin="byte"] .fn-capture details p { margin-top: 6px; max-height: 14em; overflow-y: auto; }
+.ws-root[data-skin="byte"] .fn-capture summary { cursor: pointer; }
+.ws-root[data-skin="byte"] .fn-capture a { color: var(--text-2); font-size: 12px; }
+.ws-root[data-skin="byte"] .fn-note { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.ws-root[data-skin="byte"] .fn-note[data-withdrawn] > :not(header):not(.fn-actions) { opacity: .45; }
+.ws-root[data-skin="byte"] .fn-note header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 2ch; margin-bottom: 8px; font-size: 13px; }
+.ws-root[data-skin="byte"] .fn-note header time { color: var(--text-2); }
+.ws-root[data-skin="byte"] .fn-tag { padding: 0 6px; border: 1px solid var(--text-2); color: var(--text-2); font-size: 11px; }
+.ws-root[data-skin="byte"] .fn-raw { margin: 0 0 8px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ws-root[data-skin="byte"] .fn-facts { margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.ws-root[data-skin="byte"] .fn-answers { margin: 0 0 8px; }
+.ws-root[data-skin="byte"] .fn-answers dt { margin-top: 8px; color: var(--text-2); font-size: 12px; }
+.ws-root[data-skin="byte"] .fn-answers dd { margin: 2px 0 0; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ws-root[data-skin="byte"] .fn-note .fn-capture { margin-bottom: 8px; }
+.ws-root[data-skin="byte"] .fn-note .carcosa-muted { margin: 0 0 6px; }
+.ws-root[data-skin="byte"] .fn-addendum { margin: 8px 0 0; padding-left: 2ch; border-left: 1px solid var(--text-2); line-height: 1.65; white-space: pre-wrap; }
+.ws-root[data-skin="byte"] .fn-addendum time { display: block; color: var(--text-2); font-size: 12px; }
+.ws-root[data-skin="byte"] .fn-addendum-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0 3ch; margin-top: 8px; }
+.ws-root[data-skin="byte"] .fn-actions { display: flex; gap: 3ch; margin: 0; }
+.ws-root[data-skin="byte"] .fn-actions .ws-text-button { color: var(--text-2) !important; min-height: 32px; }
+.ws-root[data-skin="byte"] .fn-summary, .ws-root[data-skin="byte"] .fn-gaps { margin: 0; padding: 0; list-style: none; line-height: 1.8; }
+.ws-root[data-skin="byte"] .fn-summary li::before { content: "□ "; color: var(--text-2); }
+.ws-root[data-skin="byte"] .fn-gaps li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 2ch; border-bottom: 1px solid var(--line); }
+.ws-root[data-skin="byte"] .fn-filter { margin-bottom: 4px; font-size: 13px; }
 /* one page holds the whole tab; the sections inside it are plain blocks, not pages of their own */
 .ws-root[data-skin="byte"] .is-embedded { display: block; padding: 2vw 0 0; }
 .ws-root[data-skin="byte"] .pagetitle--quiet { min-height: 0; margin: 0 0 1vw; }
