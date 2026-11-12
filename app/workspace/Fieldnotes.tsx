@@ -194,7 +194,7 @@ export function Fieldnotes({ onError }: { onError: (message: string) => void }) 
       setView((current) => current && { ...current, notes: [note, ...current.notes], counts: { ...current.counts, [note.kind]: current.counts[note.kind] + 1 }, gaps: current.gaps.filter((g) => g.day !== (note.about ?? note.day)) });
       // the note is saved; reading the link happens after and apart, so a slow site never holds up the record or the next one
       if (note.capture?.url) void readLink(note.id);
-    } catch (cause) { onError(cause instanceof Error ? cause.message : "Could not save."); }
+    } catch (cause) { onError(`${cause instanceof Error ? cause.message : "Could not save."} 没有保存；你写的内容还留在这个页面里。`); }
     finally { setSaving(false); }
   }
 
@@ -213,6 +213,7 @@ export function Fieldnotes({ onError }: { onError: (message: string) => void }) 
   const period = view.notes.filter((n) => !n.withdrawn && n.kind !== "reflection" && (n.about ?? n.day) >= from && (n.about ?? n.day) <= to);
   const history = view.notes.filter((n) => filter === "all" || n.kind === filter);
   const mode = MODES.find((m) => m.id === kind)!;
+  const last = view.notes[0];
 
   return <section className="is-embedded fn">
     <div className="carcosa-row">
@@ -261,6 +262,8 @@ export function Fieldnotes({ onError }: { onError: (message: string) => void }) 
         {draft.about && <button type="button" className="ws-text-button" onClick={() => set({ about: "" })}>改为记今天</button>}
         <span className="carcosa-muted">保存后原文不能再改，只能加后记。</span>
       </div>
+      {/* proof that the last note landed, without putting its words back in front of the person */}
+      <p className="carcosa-muted">{last ? `已保存 ${view.notes.length} 条，最近一条：${KIND_LABEL[last.kind]} · ${when.format(new Date(last.at))}。` : "还没有保存过记录。"}</p>
     </div>
 
     {fresh.length > 0 && <>
