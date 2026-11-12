@@ -57,6 +57,19 @@ app/
 
 本地开发时把这些值放在未提交的 `.env.local`。访问密钥和 Blob 令牌都不得以 `NEXT_PUBLIC_` 开头。配置缺失时，Workspace 会保持锁定或提示资料库尚未连接。私人文档只存入 Private Blob Store，并由已登录的服务端接口读取；会话使用 HttpOnly Cookie。第一版登录限流是函数实例内的兜底措施，发布前还应在 Vercel Firewall 为 `/api/workspace/session` 和 `/api/workspace/assistant` 配置跨实例限流。
 
+## Alex Workspace · 导航
+
+八个入口，按“在那里做什么”分组，任何内容最多在入口下面一层：
+
+- **Today**：今天的计划、日程、新邮件；日期下面一行是 Carcosa 的状态，快到平时收工的时间会多出“收工：记一条”，直接打开收工微记录。
+- **Fieldnotes**：研究记录。四种记录各是一个分页（**触发**、**收工**、**单次**、**反思**），加上 **回看**。每个分页有自己的地址（例如 `/workspace#fieldnotes/trigger`），可以收藏或加到手机主屏，一步到位。
+- **Notebook**：随手写，由模型归档；右上角 **archive** 是旧的 Mindstreams 页面和白板。
+- **Projects**：**Status**（各项目现状）、**Devlog**（开发日志）、**Alignment**（本地 / GitHub / 生产三方比对，仅站主）。
+- **Library**、**Mail**、**Calendar**。
+- **Carcosa**：**Yak**（宠物、今天的自报、每日一读）和 **Patterns**（作息、她学到的规律、吃了什么、日记网络 Self、删除自报）。
+
+宽屏（≥1060px）时入口常驻左上角一行小字，点一下就切换；窄屏和手机上点 **index** 打开整页大字导航。助手、主题、Members、Drive sync 和退出都在 index 里。当前位置写在地址里（例如 `/workspace#projects/devlog`），刷新、后退和收藏都会回到原处。
+
 ## Alex Workspace · 把项目同步到 Google Drive
 
 `tools/drivesync/` 是一个跑在你电脑上的小脚本：标记文件夹后，它用 rclone 把这些文件夹镜像到 Drive，并向 Workspace 报告在线状态；侧栏的 **Drive sync**（仅站主可见）显示电脑是否在线、每个文件夹的同步情况和错误，还能点 **Sync now**。需要在 Vercel 设置 `WORKSPACE_SYNC_TOKEN`（至少 32 个字符，与电脑上 `~/.drivesync/config.json` 里的一致）。安装和用法见 `tools/drivesync/README.md`。
@@ -109,7 +122,7 @@ Workspace 的 **Calendar** 是自带的日历，不依赖 Google。事件存放�
 
 ## Alex Workspace · Mindstreams
 
-Mindstreams 现在是 **Carcosa → Notebook** 分页（旧的 Mindstreams 链接会自动打开这里）。它取代了原来的 Notes 标签：它是一棵页面树（保留子页面、收藏、废纸篓、搜索、导出 Markdown），而每个页面都是一篇笔记加一块与它配对的白板，两者保持同步，由 DeepSeek 互相转换。子页面本身也是完整的 Mindstream，有自己的白板（sub board）。宽屏时左边页面树、中间笔记、右边白板；窄一些的窗口和手机上顶部切换 Note / Board。白板在第一次打开页面时才会创建，所以只写笔记不会变重。词汇本、助手的笔记工具和今天面板仍然使用同一个笔记存储。早先单独创建的白板会在打开 Mindstreams 时自动在页面树里补上一页。
+Mindstreams 现在在 **Notebook → archive** 里（Notebook 是随手写、自动归档的新笔记本）。它取代了原来的 Notes 标签：它是一棵页面树（保留子页面、收藏、废纸篓、搜索、导出 Markdown），而每个页面都是一篇笔记加一块与它配对的白板，两者保持同步，由 DeepSeek 互相转换。子页面本身也是完整的 Mindstream，有自己的白板（sub board）。宽屏时左边页面树、中间笔记、右边白板；窄一些的窗口和手机上顶部切换 Note / Board。白板在第一次打开页面时才会创建，所以只写笔记不会变重。词汇本、助手的笔记工具和今天面板仍然使用同一个笔记存储。早先单独创建的白板会在打开 Mindstreams 时自动在页面树里补上一页。
 
 **白板**：无限画布，文字卡、照片、PDF 页都能摆上去，自动保存。**Scan notes** 直接拍纸质笔记（自动去阴影、提亮），**Photo** 从相册导入，**PDF** 从资料库或小文件（≤4 MB）导入页面。选中照片后点 **Read notes**：识别文字（可手动改错字），再整理成层级卡片，预览确认后才加到画布并连线。
 
@@ -123,7 +136,7 @@ Mindstreams 现在是 **Carcosa → Notebook** 分页（旧的 Mindstreams 链�
 
 ## Alex Workspace · Devlog
 
-Devlog 现在是 **Carcosa → Ledger** 分页（旧链接会自动打开这里）。各个项目的开发日志按时间线浏览，可按项目筛选，顶部有最近 18 周的活动格。每个项目有名称、状态、颜色，以及可选的 GitHub 仓库和文件夹范围。
+Devlog 在 **Projects → Devlog** 分页。各个项目的开发日志按时间线浏览，可按项目筛选，顶部有最近 18 周的活动格。每个项目有名称、状态、颜色，以及可选的 GitHub 仓库和文件夹范围。
 
 条目有四种：**手写条目**（日期、标题、Markdown 正文、最多 6 张照片），**Carcosa 的记录**（见下一节，由账本自动写，末尾标 `_Logged by Carcosa_`），**Mindstream 快照**（把某个 Mindstream 钉到某一天），**回顾**（选择最近 30 / 90 天或全部，DeepSeek 起草一篇可编辑的项目回顾）。Claude 通过 MCP 写的条目标 `_Logged by Claude_`。某一天已经有人手写或 Claude 写过，Carcosa 就不会再写。
 
@@ -131,14 +144,14 @@ Devlog 现在是 **Carcosa → Ledger** 分页（旧链接会自动打开这里�
 
 ## Alex Workspace · Carcosa
 
-侧栏的 **Carcosa** 标签有四个分页：**Yak**（宠物本身）、**Now**（三方比对）、**Ledger**（Devlog）、**Notebook**（Mindstreams）。
+**Carcosa** 有两个分页：**Yak**（每天看的：宠物、今天的自报、每日一读）和 **Patterns**（偶尔看的：作息、规律、吃了什么、日记网络 Self）。它依赖的账本和 Devlog 在 **Projects** 里。
 
-**账本（Now）**：把三个来源按提交号对齐，保证 Devlog 里看到的是真的。
+**账本（Projects → Alignment）**：把三个来源按提交号对齐，保证 Devlog 里看到的是真的。
 - 本地：Drive Sync 1.3 起每次上报会带上每个文件夹的 git 状态（当前分支、HEAD、未提交和未推送的数量）；
 - GitHub：主分支的提交，每 10 分钟随 `/api/cron/today` 读一次；
 - 生产：Vercel 写到 GitHub 的部署记录。
 
-对不上的地方会列出来（未推送、未提交、本地落后需要 pull、部署失败、生产落后、某天缺 devlog、令牌读不到某个仓库）。一个工作日从伦敦时间 05:00 算起，熬夜算前一天。安静 30 分钟后，书记员用 DeepSeek 把一天的提交写成 Devlog 条目，证据行由代码生成；同一时间只有一个书记员在写（Blob 里有一把 3 分钟的锁），所以定时任务、“check now” 和 MCP 同时触发也不会重复写。智能体的每次写入记在 `audit.json`，在 Now 页底部可见。
+对不上的地方会列出来（未推送、未提交、本地落后需要 pull、部署失败、生产落后、某天缺 devlog、令牌读不到某个仓库）。一个工作日从伦敦时间 05:00 算起，熬夜算前一天。安静 30 分钟后，书记员用 DeepSeek 把一天的提交写成 Devlog 条目，证据行由代码生成；同一时间只有一个书记员在写（Blob 里有一把 3 分钟的锁），所以定时任务、“check now” 和 MCP 同时触发也不会重复写。智能体的每次写入记在 `audit.json`，在 Alignment 页底部可见。
 
 **宠物（Yak）**：Carcosa 只吃账本里的开发记录（提交 3、同步每个文件 0.4、勾选 1、生产部署 2），六小时消化一半；在平时收工时间附近停手（+4）和宣布的休息日（+8）也算喂它。单日工作量超过平时 2 倍时会“吃撑了”。从最近 28 天学你的作息（通常几点开始、几点收工、一天多少量），据此显示阶段（吃、牦牛、菌核、睡、休息、吃撑）和天空：双日表示节律如常，黑星表示明显偏离（远超平时收工、远超平时的量、连续很多天），两者同框表示正在偏离。主题开关的“自动”模式跟着天空切换浅色和深色。
 
@@ -153,7 +166,7 @@ Devlog 现在是 **Carcosa → Ledger** 分页（旧链接会自动打开这里�
 
 ## Alex Workspace · Fieldnotes（AI 协作自我民族志）
 
-**Carcosa → Fieldnotes** 是研究记录：和 AI 一起工作时的分工、情绪与判断，以及刷到新发布时的反应。四种记录，都是手写：
+**Fieldnotes**（顶层入口）是研究记录：和 AI 一起工作时的分工、情绪与判断，以及刷到新发布时的反应。四种记录，都是手写：
 
 - **触发**：粘贴链接（或 app 里“复制链接”得到的整段文字），写第一反应、情绪关键词、强度。只贴链接不写感受也能保存，这类条目本身就是“看到了但没记感受”的数据。
 - **收工**：每个工作日 30 秒，满足感 1–10、“这像不像我做的”、一句原话。

@@ -18,11 +18,13 @@ import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
 import { Members } from "./Members";
 import { NOTICE } from "./notice";
-import { Sidebar, TabBar, ThemeContext, UserContext, type PublicUser, type Tab, type Theme, type ThemeMode } from "./Shell";
+import { CARCOSA_SECTIONS, FIELD_SECTIONS, hashOf, PROJECTS_SECTIONS, readRoute, SectionHead, Sidebar, TabBar, ThemeContext, UserContext, type CarcosaSub, type FieldSub, type ProjectsSub, type PublicUser, type Route, type Tab, type Theme, type ThemeMode } from "./Shell";
 import { Today } from "./Today";
-import { CarcosaPet, CarcosaProvider } from "./Carcosa";
-import { CarcosaHead, CarcosaNow, type CarcosaSub } from "./CarcosaPage";
+import { CarcosaPatterns, CarcosaPet, CarcosaProvider } from "./Carcosa";
+import { CarcosaNow } from "./CarcosaPage";
 import { Fieldnotes } from "./Fieldnotes";
+import { Projects } from "./Projects";
+import { Self } from "./Self";
 
 type Props = { authorized: boolean; configured: boolean; user: PublicUser | null };
 
@@ -132,17 +134,43 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page?: number; offset?: number } | null>(null);
-  const [tab, setTab] = useState<Tab>("today");
-  // which part of Carcosa is open: the ledger and the notebook are the former Devlog and Mindstreams tabs
-  const [carcosaSub, setCarcosaSub] = useState<CarcosaSub>("pet");
-  useEffect(() => { try { const saved = localStorage.getItem("ws-carcosa-sub"); if (saved === "pet" || saved === "now" || saved === "ledger" || saved === "notebook" || saved === "fieldnotes") setCarcosaSub(saved); } catch { /* default */ } }, []);
-  const chooseSub = useCallback((next: CarcosaSub) => { setCarcosaSub(next); try { localStorage.setItem("ws-carcosa-sub", next); } catch { /* per-viewer */ } }, []);
-  // the old tab names still arrive from a few places; they open the matching part of Carcosa
-  useEffect(() => { if (tab === "mindstreams") { setTab("carcosa"); setCarcosaSub("notebook"); } else if (tab === "devlog") { setTab("carcosa"); setCarcosaSub("ledger"); } }, [tab]);
+  // Where the viewer is: a destination, and the section last open in each of those that have sections.
+  const [route, setRoute] = useState<Route>({ tab: "today", fieldnotes: "trigger", projects: "status", carcosa: "pet" });
+  const { tab, fieldnotes: fieldSub, projects: projectsSub, carcosa: carcosaSub } = route;
+  const routeRef = useRef(route);
+  routeRef.current = route;
+  // The address being moved to from the URL; until the page has caught up with it, the URL is not written back.
+  const pending = useRef<string | null>(null);
+  const follow = useCallback((next: Route) => { if (hashOf(next) !== hashOf(routeRef.current)) pending.current = hashOf(next); setRoute(next); }, []);
+  useEffect(() => {
+    // the sections last used are remembered per browser; an address in the URL wins over them
+    let next = routeRef.current;
+    try {
+      const fieldnotes = localStorage.getItem("ws-fieldnotes-sub");
+      const projects = localStorage.getItem("ws-projects-sub");
+      const carcosa = localStorage.getItem("ws-carcosa-sub");
+      next = { ...next, fieldnotes: FIELD_SECTIONS.find((s) => s.id === fieldnotes)?.id ?? next.fieldnotes, projects: PROJECTS_SECTIONS.find((s) => s.id === projects)?.id ?? next.projects, carcosa: CARCOSA_SECTIONS.find((s) => s.id === carcosa)?.id ?? next.carcosa };
+    } catch { /* defaults */ }
+    follow(readRoute(next, window.location.hash) ?? next);
+    // back, forward, or an address typed by hand: a book on top would hide the page that was asked for
+    const moved = () => { const to = readRoute(routeRef.current, window.location.hash); if (!to) return; setAssistantOpen(false); setBook(null); follow(to); };
+    window.addEventListener("popstate", moved);
+    return () => window.removeEventListener("popstate", moved);
+  }, [follow]);
+  useEffect(() => {
+    const want = hashOf(route);
+    if (pending.current !== null) { if (pending.current !== want) return; pending.current = null; }
+    if (window.location.hash !== want) window.history[window.location.hash ? "pushState" : "replaceState"](null, "", want);
+  }, [route]);
+  const setTab = useCallback((next: Tab) => setRoute((current) => ({ ...current, tab: next })), []);
+  // looking back is not where writing starts, so it is not what a later visit opens on
+  const chooseField = useCallback((next: FieldSub) => { setRoute((current) => ({ ...current, tab: "fieldnotes", fieldnotes: next })); if (next !== "review") try { localStorage.setItem("ws-fieldnotes-sub", next); } catch { /* per-viewer */ } }, []);
+  const chooseProjects = useCallback((next: ProjectsSub) => { setRoute((current) => ({ ...current, projects: next })); try { localStorage.setItem("ws-projects-sub", next); } catch { /* per-viewer */ } }, []);
+  const chooseCarcosa = useCallback((next: CarcosaSub) => { setRoute((current) => ({ ...current, carcosa: next })); try { localStorage.setItem("ws-carcosa-sub", next); } catch { /* per-viewer */ } }, []);
   const [mindstreamRefresh, setMindstreamRefresh] = useState(0);
   const [streamOpenId, setStreamOpenId] = useState<string | null>(null);
   // A link from the devlog only applies to that visit.
-  useEffect(() => { if (!(tab === "carcosa" && carcosaSub === "notebook")) setStreamOpenId(null); }, [tab, carcosaSub]);
+  useEffect(() => { if (tab !== "notebook") setStreamOpenId(null); }, [tab]);
   const [globalOpen, setGlobalOpen] = useState(false);
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [notesRefresh, setNotesRefresh] = useState(0);
@@ -225,6 +253,7 @@ function App() {
     const result = params.get("mail");
     if (!result) return;
     setTab("mail");
+    pending.current = null;
     if (result === "error") setError(MAIL_NOTES[params.get("reason") ?? ""] ?? MAIL_NOTES.failed);
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
@@ -385,7 +414,7 @@ function App() {
 
   // Going to another part of the workspace from inside a book closes the book: the reader keeps its own progress, and the
   // page underneath is what was asked for. Without this the book stayed on top and every destination showed the same page.
-  const go = useCallback((next: Tab) => { setAssistantOpen(false); setBook(null); setTab(next); }, []);
+  const go = useCallback((next: Tab) => { setAssistantOpen(false); setBook(null); setTab(next); }, [setTab]);
   // The global assistant cannot show over a book; left "open" underneath, it would appear by itself when the book closes.
   useEffect(() => { if (book) setGlobalOpen(false); }, [book]);
 
@@ -403,16 +432,23 @@ function App() {
       <Sidebar tab={tab} onTab={go} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
       <div className="shell__main">
         {tab === "today"
-          ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
+          ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} onCloseDay={() => chooseField("micro")} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
           : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
-          : tab === "carcosa" || tab === "mindstreams" || tab === "devlog" ? <div className="page page--carcosa">
-            <CarcosaHead sub={carcosaSub} onSub={chooseSub} />
-            {carcosaSub === "pet" ? <CarcosaPet />
-              : carcosaSub === "now" ? <CarcosaNow onError={setError} />
-              : carcosaSub === "ledger" ? <Devlog embedded onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); chooseSub("notebook"); }} />
-              : carcosaSub === "fieldnotes" ? <Fieldnotes onError={setError} />
-              : <Mind embedded onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />}
+          : tab === "fieldnotes" ? <div className="page page--carcosa">
+            <SectionHead title="Fieldnotes" sections={FIELD_SECTIONS} sub={fieldSub} onSub={chooseField} />
+            <Fieldnotes section={fieldSub} onSection={chooseField} onError={setError} />
+          </div>
+          : tab === "notebook" ? <Mind onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />
+          : tab === "projects" ? <div className="page page--carcosa">
+            <SectionHead title="Projects" sections={PROJECTS_SECTIONS.filter((s) => !s.owner || user?.role === "owner")} sub={projectsSub} onSub={chooseProjects} />
+            {projectsSub === "devlog" ? <Devlog embedded onError={setError} onSignOut={() => void signOut()} onOpenStream={(id) => { setStreamOpenId(id); setTab("notebook"); }} />
+              : projectsSub === "alignment" && user?.role === "owner" ? <CarcosaNow onError={setError} />
+              : <section className="is-embedded"><Projects onError={setError} /></section>}
+          </div>
+          : tab === "carcosa" ? <div className="page page--carcosa">
+            <SectionHead title="Carcosa" sections={CARCOSA_SECTIONS} sub={carcosaSub} onSub={chooseCarcosa} />
+            {carcosaSub === "patterns" ? <CarcosaPatterns><h2 className="section-label">journal</h2><Self onError={setError} /></CarcosaPatterns> : <CarcosaPet />}
           </div>
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
@@ -420,7 +456,7 @@ function App() {
       <TabBar tab={tab} onTab={go} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
-    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "carcosa" ? (carcosaSub === "ledger" ? "devlog" : carcosaSub === "notebook" ? "mindstreams" : "carcosa") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "notebook" ? "mindstreams" : tab === "fieldnotes" ? "carcosa" : tab === "projects" ? (projectsSub === "alignment" ? "carcosa" : "devlog") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />

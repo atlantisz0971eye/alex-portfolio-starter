@@ -5,14 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseResponse } from "./api";
 import { PageTitle, TopRow } from "./Shell";
 import { Notes } from "./Notes";
-import { Projects } from "./Projects";
-import { Self } from "./Self";
+import { notice } from "./notice";
 import { useRemembered } from "./useSplit";
 
 type Derived = { title: string; topic: string; project: string; kind: string };
 type Item = { id: string; at: string; text: string; source: "notebook" | "devlog"; derived: Derived | null };
 type Data = { items: Item[]; topics: { name: string; project: string; summary: string }[]; projects: { name: string; summary: string }[]; overview: string; updatedAt: string };
-type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId: string | null; embedded?: boolean };
+type Props = { onError: (message: string) => void; onSignOut: () => void; refresh: number; openId: string | null };
 
 const day = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const UNSORTED = "Unsorted";
@@ -22,11 +21,13 @@ const UNSORTED = "Unsorted";
  * projects and topics with a short summary at each level. Nothing here is filed by hand. The earlier pages and boards
  * stay reachable as the archive.
  */
-export function Mind({ onError, onSignOut, refresh, openId, embedded = false }: Props) {
+export function Mind({ onError, onSignOut, refresh, openId }: Props) {
   const [data, setData] = useState<Data | null>(null);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
-  const [view, setView] = useRemembered("ws-mind-view", "tree");
+  // Projects and Self used to be views here; a browser that remembers one of them gets the tree.
+  const [remembered, setView] = useRemembered("ws-mind-view", "tree");
+  const view = remembered === "stream" ? "stream" : "tree";
   const [archive, setArchive] = useState(!!openId);
   const [rebuilding, setRebuilding] = useState(false);
   const [moving, setMoving] = useState<{ id: string; project: string; topic: string } | null>(null);
@@ -84,7 +85,7 @@ export function Mind({ onError, onSignOut, refresh, openId, embedded = false }: 
   async function importOld() {
     try {
       const result = await parseResponse<{ added: number; checked: number; remaining: number }>(await fetch("/api/workspace/mind", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "importNotes" }) }));
-      onError(result.checked === 0 ? "Everything is already in the notebook." : `Brought ${result.added} pages into the notebook${result.remaining ? `; ${result.remaining} more, press again` : ""}. They are being filed.`);
+      notice(result.checked === 0 ? "Everything is already in the notebook." : `Brought ${result.added} pages into the notebook${result.remaining ? `; ${result.remaining} more, press again` : ""}. They are being filed.`);
     } catch (cause) { onError(cause instanceof Error ? cause.message : "Could not import."); }
   }
 
@@ -119,7 +120,7 @@ export function Mind({ onError, onSignOut, refresh, openId, embedded = false }: 
   }, [data]);
 
   if (archive) return <>
-    <div className="mind__back"><button type="button" onClick={() => void importOld()}>import these pages into the notebook</button><button type="button" onClick={() => setArchive(false)}>← notebook</button></div>
+    <div className="mind__back"><button type="button" onClick={() => void importOld()}>import these pages into the notebook</button><button type="button" onClick={() => setArchive(false)}>← back to the notebook</button></div>
     <Notes onError={onError} onSignOut={onSignOut} refresh={refresh} openId={openId} />
   </>;
 
@@ -140,10 +141,10 @@ export function Mind({ onError, onSignOut, refresh, openId, embedded = false }: 
   const unfiled = data?.items.filter((item) => !item.derived) ?? [];
   const projectNames = [...new Set(data?.projects.map((project) => project.name) ?? [])];
   const topicNames = [...new Set(data?.topics.map((topic) => topic.name) ?? [])];
-  return <main className={embedded ? "page--mind is-embedded" : "page page--mind"}>
+  return <main className="page page--mind">
     <TopRow onSignOut={onSignOut} />
     <div className="page__inner">
-      <PageTitle quiet={embedded} actions={<><button type="button" className="ws-text-button" onClick={() => setArchive(true)}>archive</button><button type="button" className="ws-round" aria-label="Rebuild the map" title="Have the model file everything again" onClick={() => void rebuild()} disabled={rebuilding}>{rebuilding ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button></>}>Mindstreams</PageTitle>
+      <PageTitle actions={<><button type="button" className="ws-text-button" title="The earlier pages and boards" onClick={() => setArchive(true)}>archive</button><button type="button" className="ws-round" aria-label="Rebuild the map" title="Have the model file everything again" onClick={() => void rebuild()} disabled={rebuilding}>{rebuilding ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button></>}>Notebook</PageTitle>
       <textarea ref={box} className="mind__input" rows={3} value={text} placeholder="Write anything. It gets filed for you." aria-label="Write in the notebook" maxLength={4000}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void save(); } }} />
@@ -155,12 +156,8 @@ export function Mind({ onError, onSignOut, refresh, openId, embedded = false }: 
       <div className="mail-chips mind__tabs" role="group" aria-label="View">
         <button type="button" className={view === "tree" ? "is-on" : ""} onClick={() => setView("tree")}>Tree</button>
         <button type="button" className={view === "stream" ? "is-on" : ""} onClick={() => setView("stream")}>Stream</button>
-        <button type="button" className={view === "projects" ? "is-on" : ""} onClick={() => setView("projects")}>Projects</button>
-        <button type="button" className={view === "self" ? "is-on" : ""} onClick={() => setView("self")}>Self</button>
       </div>
-      {(view === "tree" || view === "stream") && data && data.items.length === 0 && <p className="mind__empty">Nothing yet. Write a thought above, in any order.</p>}
-      {view === "projects" && <Projects onError={onError} />}
-      {view === "self" && <Self onError={onError} />}
+      {data && data.items.length === 0 && <p className="mind__empty">Nothing yet. Write a thought above, in any order.</p>}
 
       <datalist id="mind-projects">{projectNames.map((name) => <option key={name} value={name} />)}</datalist><datalist id="mind-topics">{topicNames.map((name) => <option key={name} value={name} />)}</datalist>
       {view === "tree" && <>

@@ -11,6 +11,7 @@ import { PageTitle, TopRow, type Tab } from "./Shell";
 import { keepInNotebook } from "./keep";
 import { notice } from "./notice";
 import { Paper } from "./Paper";
+import { CarcosaLine, useClosingTime } from "./Carcosa";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
@@ -30,10 +31,31 @@ function ago(value: number) {
   return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
 }
 
-type Props = { onError: (message: string) => void; onSignOut: () => void; onTab: (tab: Tab) => void; refresh: number; onChanged: () => void; onSeen: () => void };
+type Props = { onError: (message: string) => void; onSignOut: () => void; onTab: (tab: Tab) => void; onCloseDay: () => void; refresh: number; onChanged: () => void; onSeen: () => void };
+
+/** One line that goes straight into the notebook, so a thought does not need a trip to another page. */
+function QuickNote({ onError, onOpen }: { onError: (message: string) => void; onOpen: () => void }) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    const value = text.trim();
+    if (!value || saving) return;
+    setSaving(true);
+    try { await keepInNotebook(value); setText(""); notice("Kept in your notebook."); }
+    catch (cause) { onError(cause instanceof Error ? cause.message : "Could not keep it."); }
+    finally { setSaving(false); }
+  }
+  return <div className="today__note">
+    <textarea className="mind__input" rows={1} value={text} placeholder="Write a thought. It goes to your notebook." aria-label="Write in the notebook" maxLength={4000} disabled={saving}
+      onChange={(event) => setText(event.target.value)}
+      onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void save(); } }} />
+    <p className="mind__hint">{saving ? "Saving…" : "Enter to save"} · <button type="button" onClick={onOpen}>open notebook</button></p>
+  </div>;
+}
 
 /** The home screen: a plan for today built from the calendar and new mail, today's schedule, and what just arrived. */
-export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }: Props) {
+export function Today({ onError, onSignOut, onTab, onCloseDay, refresh, onChanged, onSeen }: Props) {
+  const closing = useClosingTime();
   const [view, setView] = useState<View | null>(null);
   const [planning, setPlanning] = useState(false);
   // What the assistant is looking up right now, for the plan and for a card being answered.
@@ -133,9 +155,11 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
         <header className="today__head">
           <PageTitle actions={view?.connected ? <button type="button" className="ws-round" aria-label="Make a new plan" onClick={() => void regenerate()} disabled={planning}>{planning ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button> : undefined}>{layout?.headline || "Today"}</PageTitle>
           <p className="today__date"><Sun size={15} /> {today.format(new Date())}</p>
+          <p className="today__state"><CarcosaLine onOpen={() => onTab("carcosa")} />{closing && <button type="button" className="today__close" onClick={onCloseDay}>收工：记一条 →</button>}</p>
           {layout?.kicker && <p className="today__kicker">{layout.kicker}</p>}
         </header>
 
+        <QuickNote onError={onError} onOpen={() => onTab("notebook")} />
         <button type="button" className="ws-text-button today__paper-toggle" aria-pressed={paper} onClick={togglePaper}>{paper ? "■" : "□"} front page · {paper ? "hide" : "show"}</button>
         {paper && <Paper onError={onError} />}
         <h2 className="section-label today__day">your day</h2>

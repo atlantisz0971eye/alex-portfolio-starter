@@ -5,22 +5,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FEELINGS, KIND_LABEL, KINDS, MINE, MINE_LABEL, QUESTIONS, SEEN_VIA, type Capture, type DayContext, type FieldNote, type FieldView, type Kind, type Mine } from "../lib/fieldnoteShape";
 import { lagText, parsePasted, PLATFORM_LABEL } from "../lib/linkParse";
 import { parseResponse } from "./api";
+import { CarcosaCheckin } from "./Carcosa";
+import type { FieldSub } from "./Shell";
 
 /**
- * Carcosa → Fieldnotes: research notes on working with AI. Four kinds, written by hand and kept as written: a trigger
- * record (a link plus the first reaction, quick enough for a phone), a thirty-second note at the end of a work day, the
- * full record of a session, and a reflection every few weeks. Earlier notes stay folded away while writing, so a new
- * one is not written to match the last; looking back belongs to the reflection.
+ * Fieldnotes: research notes on working with AI. Four kinds, written by hand and kept as written: a trigger record (a
+ * link plus the first reaction, quick enough for a phone), a thirty-second note at the end of a work day, the full
+ * record of a session, and a reflection every few weeks. Each kind is a section with its own address, so the one in
+ * use can be bookmarked. Earlier notes are never on a writing section, so a new one is not written to match the last;
+ * looking back has a section of its own ("回看"), and belongs to the reflection.
  */
 type Draft = { raw: string; pasted: string; satisfaction?: number; intensity?: number; mine?: Mine; feelings: string[]; extra: string; via: string; answers: Record<string, string>; about: string; from: string; to: string };
 const EMPTY: Draft = { raw: "", pasted: "", feelings: [], extra: "", via: "", answers: {}, about: "", from: "", to: "" };
 const DRAFT_KEY = "ws-fieldnotes-draft";
-const MODE_KEY = "ws-fieldnotes-kind";
-const MODES: { id: Kind; label: string; hint: string }[] = [
-  { id: "trigger", label: "触发", hint: "刷到新发布或别人的作品时，当下记。贴链接，写第一反应，1–3 分钟。只贴链接不写感受也可以。" },
-  { id: "micro", label: "收工", hint: "每个工作日收工时，30 秒：一个分数，一句原话。" },
-  { id: "session", label: "单次", hint: "值得展开的一次工作：换了工具或分工、情绪强烈、分数异常时写，10–15 分钟。不用每项都填。" },
-  { id: "reflection", label: "反思", hint: "每 2–4 周一次，对照这段时间的记录回看。" },
+const MODES: { id: Kind; hint: string }[] = [
+  { id: "trigger", hint: "刷到新发布或别人的作品时，当下记。贴链接，写第一反应，1–3 分钟。只贴链接不写感受也可以。" },
+  { id: "micro", hint: "每个工作日收工时，30 秒：一个分数，一句原话。" },
+  { id: "session", hint: "值得展开的一次工作：换了工具或分工、情绪强烈、分数异常时写，10–15 分钟。不用每项都填。" },
+  { id: "reflection", hint: "每 2–4 周一次，对照这段时间的记录回看。" },
 ];
 
 const when = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -138,16 +140,17 @@ function PeriodSummary({ notes, gaps, from, to }: { notes: FieldNote[]; gaps: Fi
   </ul>;
 }
 
-export function Fieldnotes({ onError }: { onError: (message: string) => void }) {
+export function Fieldnotes({ section, onSection, onError }: { section: FieldSub; onSection: (section: FieldSub) => void; onError: (message: string) => void }) {
   const [view, setView] = useState<FieldView | null>(null);
   const [failed, setFailed] = useState("");
-  const [kind, setKind] = useState<Kind>("trigger");
+  // "回看" writes nothing; the form underneath keeps the kind it would have, so the hooks below stay the same
+  const reviewing = section === "review";
+  const kind: Kind = reviewing ? "trigger" : section;
   const [drafts, setDrafts] = useState<Record<Kind, Draft>>({ micro: EMPTY, session: EMPTY, trigger: EMPTY, reflection: EMPTY });
   const [restored, setRestored] = useState(false);
   const [saving, setSaving] = useState(false);
   const [just, setJust] = useState<string[]>([]);
   const [reading, setReading] = useState<string[]>([]);
-  const [looking, setLooking] = useState(false);
   const [filter, setFilter] = useState<Kind | "all">("all");
 
   const load = useCallback(async () => {
@@ -161,13 +164,10 @@ export function Fieldnotes({ onError }: { onError: (message: string) => void }) 
     try {
       const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "null") as Partial<Record<Kind, Partial<Draft>>> | null;
       if (saved) setDrafts((current) => Object.fromEntries(KINDS.map((k) => [k, { ...current[k], ...saved[k] }])) as Record<Kind, Draft>);
-      const mode = localStorage.getItem(MODE_KEY);
-      if (KINDS.some((k) => k === mode)) setKind(mode as Kind);
     } catch { /* start empty */ }
     setRestored(true);
   }, []);
   useEffect(() => { if (restored) try { localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts)); } catch { /* per-browser convenience */ } }, [drafts, restored]);
-  const choose = (next: Kind) => { setKind(next); try { localStorage.setItem(MODE_KEY, next); } catch { /* per-browser */ } };
 
   const draft = drafts[kind];
   const set = (patch: Partial<Draft>) => setDrafts((current) => ({ ...current, [kind]: { ...current[kind], ...patch } }));
@@ -215,13 +215,20 @@ export function Fieldnotes({ onError }: { onError: (message: string) => void }) 
   const mode = MODES.find((m) => m.id === kind)!;
   const last = view.notes[0];
 
-  return <section className="is-embedded fn">
+  const privacy = <p className="carcosa-muted carcosa-privacy">你写的原话、分数和回答只存在你自己的存储里，不发给任何模型，也不通过 MCP 开放。粘贴链接后，服务器会去读一次那个页面并留下快照；只有页面上的文字会发给 DeepSeek 归类。账本那一行由代码从提交记录生成。</p>;
+
+  if (reviewing) return <section className="is-embedded fn">
     <div className="carcosa-row">
-      <nav className="carcosa-tabs fn-modes" aria-label="Kind of note">
-        {MODES.map((m) => <button key={m.id} type="button" aria-pressed={kind === m.id} className={kind === m.id ? "is-on" : ""} onClick={() => choose(m.id)}>{m.label}</button>)}
+      <nav className="carcosa-tabs fn-filter" aria-label="Filter">
+        {(["all", ...KINDS] as const).map((k) => <button key={k} type="button" aria-pressed={filter === k} className={filter === k ? "is-on" : ""} onClick={() => setFilter(k)}>{k === "all" ? `全部 ${total}` : `${KIND_LABEL[k]} ${view.counts[k]}`}</button>)}
       </nav>
       <a className="ws-text-button" href="/api/workspace/fieldnotes?export=md" download><Download size={14} /> export</a>
     </div>
+    {history.length === 0 ? <p className="carcosa-muted">还没有记录。</p> : history.map((note) => <NoteCard key={note.id} note={note} reading={reading.includes(note.id)} onChanged={replace} onError={onError} />)}
+    {privacy}
+  </section>;
+
+  return <section className="is-embedded fn">
     <p className="carcosa-muted">{mode.hint}</p>
 
     <div className="fn-form">
@@ -285,17 +292,14 @@ export function Fieldnotes({ onError }: { onError: (message: string) => void }) 
       </li>)}</ul>
     </>}
 
-    {kind !== "reflection" && <>
-      <h2 className="section-label">earlier <span>{total}</span></h2>
-      {!looking ? <p className="carcosa-muted">写的时候不展示以前的记录，免得向自己的过去看齐。<button type="button" className="ws-text-button" onClick={() => setLooking(true)}>回看</button></p> : <>
-        <nav className="carcosa-tabs fn-filter" aria-label="Filter">
-          {(["all", ...KINDS] as const).map((k) => <button key={k} type="button" aria-pressed={filter === k} className={filter === k ? "is-on" : ""} onClick={() => setFilter(k)}>{k === "all" ? "全部" : `${KIND_LABEL[k]} ${view.counts[k]}`}</button>)}
-          <button type="button" onClick={() => setLooking(false)}>收起</button>
-        </nav>
-        {history.length === 0 ? <p className="carcosa-muted">还没有记录。</p> : history.map((note) => <NoteCard key={note.id} note={note} reading={reading.includes(note.id)} onChanged={replace} onError={onError} />)}
-      </>}
+    {kind === "micro" && <>
+      <h2 className="section-label">carcosa</h2>
+      <p className="carcosa-muted">顺手给 Carcosa 的今日自报。它和上面的记录分开存：每日一读时自报会发给 DeepSeek，上面的原话和分数不会。</p>
+      <CarcosaCheckin />
     </>}
 
-    <p className="carcosa-muted carcosa-privacy">你写的原话、分数和回答只存在你自己的存储里，不发给任何模型，也不通过 MCP 开放。粘贴链接后，服务器会去读一次那个页面并留下快照；只有页面上的文字会发给 DeepSeek 归类。账本那一行由代码从提交记录生成。</p>
+    {kind !== "reflection" && <p className="carcosa-muted fn-earlier">写的时候不展示以前的记录，免得向自己的过去看齐。{total > 0 && <> 共 {total} 条，在 <button type="button" className="ws-text-button" onClick={() => onSection("review")}>回看</button> 里。</>}</p>}
+
+    {privacy}
   </section>;
 }
