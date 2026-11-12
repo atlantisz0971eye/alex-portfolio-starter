@@ -59,15 +59,16 @@ app/
 
 ## Alex Workspace · 导航
 
-七个入口，按“在那里做什么”分组，任何内容最多在入口下面一层：
+八个入口，按“在那里做什么”分组，任何内容最多在入口下面一层：
 
-- **Today**：今天的计划、日程、新邮件。
+- **Today**：今天的计划、日程、新邮件；日期下面一行是 Carcosa 的状态，快到平时收工的时间会多出“收工：记一条”，直接打开收工微记录。
+- **Fieldnotes**：研究记录。四种记录各是一个分页（**触发**、**收工**、**单次**、**反思**），加上 **回看**。每个分页有自己的地址（例如 `/workspace#fieldnotes/trigger`），可以收藏或加到手机主屏，一步到位。
 - **Notebook**：随手写，由模型归档；右上角 **archive** 是旧的 Mindstreams 页面和白板。
 - **Projects**：**Status**（各项目现状）、**Devlog**（开发日志）、**Alignment**（本地 / GitHub / 生产三方比对，仅站主）。
 - **Library**、**Mail**、**Calendar**。
-- **Carcosa**：**Yak**（宠物与每日一读）、**Self**（日记网络）、**Fieldnotes**（研究记录）。
+- **Carcosa**：**Yak**（宠物、今天的自报、每日一读）和 **Patterns**（作息、她学到的规律、吃了什么、日记网络 Self、删除自报）。
 
-宽屏（≥1000px）时入口常驻左上角一行小字，点一下就切换；窄屏和手机上点 **index** 打开整页大字导航。助手、主题、Members、Drive sync 和退出都在 index 里。当前位置写在地址里（例如 `/workspace#projects/devlog`），刷新、后退和收藏都会回到原处。
+宽屏（≥1060px）时入口常驻左上角一行小字，点一下就切换；窄屏和手机上点 **index** 打开整页大字导航。助手、主题、Members、Drive sync 和退出都在 index 里。当前位置写在地址里（例如 `/workspace#projects/devlog`），刷新、后退和收藏都会回到原处。
 
 ## Alex Workspace · 把项目同步到 Google Drive
 
@@ -143,7 +144,7 @@ Devlog 在 **Projects → Devlog** 分页。各个项目的开发日志按时间
 
 ## Alex Workspace · Carcosa
 
-**Carcosa** 有三个分页：**Yak**（宠物本身）、**Self**（日记网络）、**Fieldnotes**（研究记录）。它依赖的账本和 Devlog 在 **Projects** 里。
+**Carcosa** 有两个分页：**Yak**（每天看的：宠物、今天的自报、每日一读）和 **Patterns**（偶尔看的：作息、规律、吃了什么、日记网络 Self）。它依赖的账本和 Devlog 在 **Projects** 里。
 
 **账本（Projects → Alignment）**：把三个来源按提交号对齐，保证 Devlog 里看到的是真的。
 - 本地：Drive Sync 1.3 起每次上报会带上每个文件夹的 git 状态（当前分支、HEAD、未提交和未推送的数量）；
@@ -165,7 +166,7 @@ Devlog 在 **Projects → Devlog** 分页。各个项目的开发日志按时间
 
 ## Alex Workspace · Fieldnotes（AI 协作自我民族志）
 
-**Carcosa → Fieldnotes** 是研究记录：和 AI 一起工作时的分工、情绪与判断，以及刷到新发布时的反应。四种记录，都是手写：
+**Fieldnotes**（顶层入口）是研究记录：和 AI 一起工作时的分工、情绪与判断，以及刷到新发布时的反应。四种记录，都是手写：
 
 - **触发**：粘贴链接（或 app 里“复制链接”得到的整段文字），写第一反应、情绪关键词、强度。只贴链接不写感受也能保存，这类条目本身就是“看到了但没记感受”的数据。
 - **收工**：每个工作日 30 秒，满足感 1–10、“这像不像我做的”、一句原话。
