@@ -1,4 +1,4 @@
-import { list } from "@vercel/blob";
+import { list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { readJsonSafe, updateJson } from "./blobJson";
 import { ledgerView, londonTime, workDay, type DayRow } from "./carcosa/ledger";
@@ -25,22 +25,41 @@ const monthOfId = (id: string) => (/^\d{4}-\d{2}_[0-9a-f-]{36}$/.test(id) ? id.s
 const cut = (value: unknown, max: number) => (typeof value === "string" ? [...value.replace(/\r\n/g, "\n").trim()].slice(0, max).join("") : "");
 const score = (value: unknown) => (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10 ? value : undefined);
 
-async function months(): Promise<string[]> {
+/**
+ * A note that could not be added to its month's file is written as a file of its own instead, so that saving never
+ * depends on changing an existing file. Such notes are read alongside the month files until one is folded in.
+ */
+const loosePath = async (id: string) => `${await scopeRoot()}fieldnotes/loose/${id}.json`;
+
+async function files(): Promise<{ months: string[]; loose: string[] }> {
   const prefix = `${await scopeRoot()}fieldnotes/`;
-  const found: string[] = [];
+  const months: string[] = [];
+  const loose: string[] = [];
   let cursor: string | undefined;
   do {
     const page = await list({ prefix, cursor, limit: 1000 });
-    for (const blob of page.blobs) { const month = blob.pathname.slice(prefix.length).match(/^(\d{4}-\d{2})\.json$/)?.[1]; if (month) found.push(month); }
+    for (const blob of page.blobs) {
+      const name = blob.pathname.slice(prefix.length);
+      const month = name.match(/^(\d{4}-\d{2})\.json$/)?.[1];
+      const id = name.match(/^loose\/(\d{4}-\d{2}_[0-9a-f-]{36})\.json$/)?.[1];
+      if (month) months.push(month); else if (id) loose.push(id);
+    }
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
-  return found.sort();
+  return { months: months.sort(), loose };
 }
 
-/** Every note, oldest first. */
+/** Every note, oldest first. A note found both in a month file and on its own is the month file's. */
 export async function readNotes(): Promise<FieldNote[]> {
-  const files = await Promise.all((await months()).map(async (month) => readJsonSafe<FieldNote[]>(await monthPath(month), [])));
-  return files.flat().sort((a, b) => a.at.localeCompare(b.at));
+  const found = await files();
+  const [inMonths, alone] = await Promise.all([
+    Promise.all(found.months.map(async (month) => readJsonSafe<FieldNote[]>(await monthPath(month), []))),
+    Promise.all(found.loose.map(async (id) => readJsonSafe<FieldNote | null>(await loosePath(id), null))),
+  ]);
+  const notes = inMonths.flat();
+  const known = new Set(notes.map((n) => n.id));
+  for (const note of alone) if (note && !known.has(note.id)) notes.push(note);
+  return notes.sort((a, b) => a.at.localeCompare(b.at));
 }
 
 export type NoteInput = { kind?: unknown; raw?: unknown; satisfaction?: unknown; intensity?: unknown; mine?: unknown; feelings?: unknown; via?: unknown; answers?: unknown; pasted?: unknown; about?: unknown; from?: unknown; to?: unknown };
@@ -90,7 +109,13 @@ export async function addNote(input: NoteInput): Promise<FieldNote> {
 
   if (kind === "micro" || kind === "session") note.context = (await dayContext(note.about ?? day)) ?? undefined;
   // undefined keys do not survive JSON, so the stored note has only what was given
-  await updateJson<FieldNote[]>(await monthPath(at.slice(0, 7)), [], (notes) => [...notes, note]);
+  try {
+    await updateJson<FieldNote[]>(await monthPath(at.slice(0, 7)), [], (notes) => [...notes, note]);
+  } catch (error) {
+    // what the person wrote must not be lost to a file that will not take a change: a new file always can be written
+    console.error("fieldnotes: month file refused the note, saving it on its own", error);
+    await put(await loosePath(note.id), JSON.stringify(note), { access: "private", contentType: "application/json", allowOverwrite: false });
+  }
   return note;
 }
 
@@ -98,14 +123,17 @@ async function change(id: string, fn: (note: FieldNote) => FieldNote | undefined
   const month = monthOfId(id);
   if (!month) throw new FieldnoteError("not found");
   let result: FieldNote | undefined;
+  const alone = await readJsonSafe<FieldNote | null>(await loosePath(id), null);
   await updateJson<FieldNote[]>(await monthPath(month), [], (notes) => {
     const index = notes.findIndex((n) => n.id === id);
-    if (index < 0) return undefined;
-    const next = fn(notes[index]);
-    result = next ?? notes[index];
+    // a note saved on its own joins its month's file the first time something is added to it
+    const current = index >= 0 ? notes[index] : alone;
+    if (!current) return undefined;
+    const next = fn(current);
+    result = next ?? current;
     if (!next) return undefined;
-    notes[index] = next;
-    return notes;
+    if (index >= 0) notes[index] = next; else notes.push(next);
+    return notes.sort((a, b) => a.at.localeCompare(b.at));
   });
   if (!result) throw new FieldnoteError("not found");
   return result;
@@ -131,7 +159,7 @@ export const setWithdrawn = (id: string, on: boolean) => change(id, (note) => {
 export async function findNote(id: string): Promise<FieldNote | null> {
   const month = monthOfId(id);
   if (!month) return null;
-  return (await readJsonSafe<FieldNote[]>(await monthPath(month), [])).find((n) => n.id === id) ?? null;
+  return (await readJsonSafe<FieldNote[]>(await monthPath(month), [])).find((n) => n.id === id) ?? (await readJsonSafe<FieldNote | null>(await loosePath(id), null));
 }
 
 /**
