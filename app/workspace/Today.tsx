@@ -32,6 +32,26 @@ function ago(value: number) {
 
 type Props = { onError: (message: string) => void; onSignOut: () => void; onTab: (tab: Tab) => void; refresh: number; onChanged: () => void; onSeen: () => void };
 
+/** One line that goes straight into the notebook, so a thought does not need a trip to another page. */
+function QuickNote({ onError, onOpen }: { onError: (message: string) => void; onOpen: () => void }) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    const value = text.trim();
+    if (!value || saving) return;
+    setSaving(true);
+    try { await keepInNotebook(value); setText(""); notice("Kept in your notebook."); }
+    catch (cause) { onError(cause instanceof Error ? cause.message : "Could not keep it."); }
+    finally { setSaving(false); }
+  }
+  return <div className="today__note">
+    <textarea className="mind__input" rows={1} value={text} placeholder="Write a thought. It goes to your notebook." aria-label="Write in the notebook" maxLength={4000} disabled={saving}
+      onChange={(event) => setText(event.target.value)}
+      onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void save(); } }} />
+    <p className="mind__hint">{saving ? "Saving…" : "Enter to save"} · <button type="button" onClick={onOpen}>open notebook</button></p>
+  </div>;
+}
+
 /** The home screen: a plan for today built from the calendar and new mail, today's schedule, and what just arrived. */
 export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }: Props) {
   const [view, setView] = useState<View | null>(null);
@@ -136,6 +156,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
           {layout?.kicker && <p className="today__kicker">{layout.kicker}</p>}
         </header>
 
+        <QuickNote onError={onError} onOpen={() => onTab("notebook")} />
         <button type="button" className="ws-text-button today__paper-toggle" aria-pressed={paper} onClick={togglePaper}>{paper ? "■" : "□"} front page · {paper ? "hide" : "show"}</button>
         {paper && <Paper onError={onError} />}
         <h2 className="section-label today__day">your day</h2>
