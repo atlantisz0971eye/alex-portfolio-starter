@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, LogOut, Mail as MailIcon, Moon, Sparkles, Sun, SunMoon, Users, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, GitBranch, LogOut, Mail as MailIcon, Moon, PenLine, Sparkles, Sun, SunMoon, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
 
@@ -21,16 +21,38 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 export type PublicUser = { id: string; name: string; role: "owner" | "member"; features: { mail: boolean; github: boolean; today: boolean }; root: string };
 export const UserContext = createContext<{ user: PublicUser | null; openMembers: () => void }>({ user: null, openMembers: () => undefined });
 
-export type Tab = "today" | "library" | "mail" | "calendar" | "carcosa" | "mindstreams" | "devlog";
+/**
+ * The destinations, grouped by what is done there rather than by the feature each grew out of. Nothing sits more than
+ * one level below a destination: Projects holds the three views of development, Carcosa the three about the person.
+ */
+export type Tab = "today" | "notebook" | "projects" | "library" | "mail" | "calendar" | "carcosa";
+export type ProjectsSub = "status" | "devlog" | "alignment";
+export type CarcosaSub = "pet" | "self" | "fieldnotes";
+export type Route = { tab: Tab; projects: ProjectsSub; carcosa: CarcosaSub };
+
+export const PROJECTS_SECTIONS: { id: ProjectsSub; label: string; owner?: boolean }[] = [{ id: "status", label: "Status" }, { id: "devlog", label: "Devlog" }, { id: "alignment", label: "Alignment", owner: true }];
+export const CARCOSA_SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "pet", label: "Yak" }, { id: "self", label: "Self" }, { id: "fieldnotes", label: "Fieldnotes" }];
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "today", label: "Today", icon: Sun },
+  { id: "notebook", label: "Notebook", icon: PenLine },
+  { id: "projects", label: "Projects", icon: GitBranch },
   { id: "library", label: "Library", icon: BookOpen },
   { id: "mail", label: "Mail", icon: MailIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
-  // the notebook (Mindstreams) and the devlog live inside Carcosa now
   { id: "carcosa", label: "Carcosa", icon: Waypoints },
 ];
+
+/** The address of a place, kept in the URL so a reload, the back button and a bookmark all land where they should. */
+export const hashOf = (route: Route) => `#${route.tab}${route.tab === "projects" ? `/${route.projects}` : route.tab === "carcosa" ? `/${route.carcosa}` : ""}`;
+export function readRoute(base: Route, hash: string): Route | null {
+  const [tab, sub] = hash.replace(/^#/, "").split("/");
+  if (!ITEMS.some((item) => item.id === tab)) return null;
+  const next: Route = { ...base, tab: tab as Tab };
+  if (tab === "projects" && PROJECTS_SECTIONS.some((s) => s.id === sub)) next.projects = sub as ProjectsSub;
+  if (tab === "carcosa" && CARCOSA_SECTIONS.some((s) => s.id === sub)) next.carcosa = sub as CarcosaSub;
+  return next;
+}
 
 /** Desktop navigation. On phones the same destinations live in the bottom tab bar. */
 /** The destinations this person may use: a member without mail does not see the Mail tab. */
@@ -42,7 +64,8 @@ function useItems() {
 export function Sidebar({ tab, onTab, onSignOut, onAssistant, badges = {} }: { tab: Tab; onTab: (tab: Tab) => void; onSignOut: () => void; onAssistant: () => void; badges?: Partial<Record<Tab, boolean>> }) {
   const { user, openMembers } = useContext(UserContext);
   const items = useItems();
-  // Only the byte look uses this: the navigation folds into one word in the corner and opens as a page of huge words.
+  // Only the byte look uses this: on a wide screen the destinations stay in the corner strip as words; the index opens
+  // them as a page of huge words, with the assistant and the account links, and is the only way in on a narrow one.
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
@@ -90,11 +113,21 @@ export function TopRow({ onSignOut }: { onSignOut: () => void }) {
 }
 
 export function PageTitle({ children, actions, quiet = false }: { children: ReactNode; actions?: ReactNode; quiet?: boolean }) {
-  // inside another page (Carcosa) a section keeps its buttons but not its own giant title
+  // inside a page with sections (Projects, Carcosa) a section keeps its buttons but not its own giant title
   if (quiet) return actions ? <div className="pagetitle pagetitle--quiet"><div className="pagetitle__actions">{actions}</div></div> : null;
   // The byte look sizes a title by its length so every word fills the width; other looks ignore this.
   const text = typeof children === "string" ? children : "";
   const wide = /[\u2e80-\u9fff\uff00-\uffef]/.test(text);
   const chars = text ? ({ "--chars": [...text].reduce((sum, ch) => sum + (/[\u2e80-\u9fff\uff00-\uffef]/.test(ch) ? 2 : 1), 0) } as CSSProperties) : undefined;
   return <div className="pagetitle"><h1 style={chars} data-wide={wide || undefined}>{children}</h1>{actions && <div className="pagetitle__actions">{actions}</div>}</div>;
+}
+
+/** The head of a page that has sections: its title, then the sections as a row of words. */
+export function SectionHead<T extends string>({ title, sections, sub, onSub }: { title: string; sections: { id: T; label: string }[]; sub: T; onSub: (sub: T) => void }) {
+  return <header className="carcosa-head">
+    <PageTitle>{title}</PageTitle>
+    <nav className="carcosa-tabs" aria-label={title}>
+      {sections.map((s) => <button key={s.id} type="button" aria-pressed={sub === s.id} className={sub === s.id ? "is-on" : ""} onClick={() => onSub(s.id)}>{s.label}</button>)}
+    </nav>
+  </header>;
 }

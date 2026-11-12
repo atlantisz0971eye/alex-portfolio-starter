@@ -3,34 +3,21 @@
 import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { parseResponse } from "./api";
-import { PageTitle } from "./Shell";
+import { notice } from "./notice";
 
 /**
- * The Carcosa tab: the creature (Yak), what really happened in development, the devlog written from it, and the notebook. "Now" puts
- * the three sources side by side (the working folders as Drive Sync sees them, GitHub, production), lists what does
- * not line up, the last days, and what the agents did. The ledger and the notebook are the former Devlog and Mindstreams.
- * Fieldnotes holds the research notes on working with AI.
+ * Projects → Alignment: what really happened in development. It puts the three sources side by side (the working
+ * folders as Drive Sync sees them, GitHub, production), lists what does not line up, the last days, and what the
+ * agents did.
  */
-export type CarcosaSub = "pet" | "now" | "ledger" | "notebook" | "fieldnotes";
-
 type Alignment = { repo: string; local?: { device: string; folder: string; branch: string; head: string; dirty: number; ahead: number; behind: number; seen: string }; main?: string; prod?: { sha: string; at: string }; lastDeploy?: { sha: string; state: string; at: string }; aligned: boolean };
 type Issue = { repo: string; kind: string; text: string; day?: string };
 type Day = { day: string; key: string; label: string; repo?: string; syncs: number; changed: number; ticks: number; commits: number; withClaude: number; deploysOk: number; deploysFailed: number; devlog: boolean };
 type Audit = { at: string; actor: string; action: string; detail: string };
 type View = { polledAt: string | null; syncVersion: string | null; alignment: Alignment[]; issues: Issue[]; days: Day[]; audit: Audit[]; written?: string[] };
 
-const SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "pet", label: "Yak" }, { id: "now", label: "Now" }, { id: "ledger", label: "Ledger" }, { id: "notebook", label: "Notebook" }, { id: "fieldnotes", label: "Fieldnotes" }];
 const short = (sha?: string) => (sha ? sha.slice(0, 7) : "—");
 const when = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-
-export function CarcosaHead({ sub, onSub }: { sub: CarcosaSub; onSub: (sub: CarcosaSub) => void }) {
-  return <header className="carcosa-head">
-    <PageTitle>Carcosa</PageTitle>
-    <nav className="carcosa-tabs" aria-label="Carcosa">
-      {SECTIONS.map((s) => <button key={s.id} type="button" aria-pressed={sub === s.id} className={sub === s.id ? "is-on" : ""} onClick={() => onSub(s.id)}>{s.label}</button>)}
-    </nav>
-  </header>;
-}
 
 export function CarcosaNow({ onError }: { onError: (message: string) => void }) {
   const [view, setView] = useState<View | null>(null);
@@ -49,7 +36,7 @@ export function CarcosaNow({ onError }: { onError: (message: string) => void }) 
     try {
       const data = await parseResponse<View>(await fetch("/api/workspace/carcosa/ledger", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "check" }) }));
       setView(data);
-      if (data.written?.length) onError(`Carcosa wrote: ${data.written.join(", ")}`);
+      if (data.written?.length) notice(`Carcosa wrote: ${data.written.join(", ")}`);
     } catch (cause) { onError(cause instanceof Error ? cause.message : "Could not check now."); }
     finally { setChecking(false); }
   }
