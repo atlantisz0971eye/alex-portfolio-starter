@@ -1,4 +1,4 @@
-import { BlobPreconditionFailedError, del, get, put } from "@vercel/blob";
+import { BlobPreconditionFailedError, del, get, head, put } from "@vercel/blob";
 
 /**
  * Safe JSON files in private Blob storage. A plain "read, change, write back" loses one of two writers that meet; these
@@ -9,15 +9,34 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const conflict = (error: unknown) => error instanceof BlobPreconditionFailedError || (error instanceof Error && /already exists|precondition/i.test(error.message));
 const missing = (error: unknown) => error instanceof Error && /not.?found/i.test(`${error.name} ${error.message}`);
 
-/** The file's content and ETag (none when it does not exist). */
-export async function readJsonTagged<T>(path: string, fallback: T): Promise<{ value: T; etag?: string }> {
+/** A download may carry the tag in its weak form (`W/"…"`, as sent with compressed text); the store's own is the bare one. */
+const bare = (etag: string) => etag.replace(/^W\//, "").replace(/^"|"$/g, "");
+
+/** The ETag the store itself reports for the file, the one a conditional write is checked against. None when it does not exist. */
+async function storeTag(path: string): Promise<string | undefined> {
+  try { return (await head(path)).etag || undefined; }
+  catch (error) { if (missing(error)) return undefined; throw error; }
+}
+
+/**
+ * The file's content and ETag (none when it does not exist). With `forWrite`, the ETag is the store's own rather than
+ * the one on the download, which need not be the same string, and the content is known to be what that tag stands for:
+ * either the two tags agree, or the store's tag was the same before and after the download.
+ */
+export async function readJsonTagged<T>(path: string, fallback: T, forWrite = false): Promise<{ value: T; etag?: string }> {
   let last: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
+      const before = forWrite ? await storeTag(path) : undefined;
       const result = await get(path, { access: "private", useCache: false });
       if (!result) return { value: fallback };
-      if (result.statusCode === 200) return { value: JSON.parse(await new Response(result.stream).text()) as T, etag: result.blob.etag };
-      last = new Error(`blob_${result.statusCode}`);
+      if (result.statusCode === 200) {
+        const value = JSON.parse(await new Response(result.stream).text()) as T;
+        if (!forWrite) return { value, etag: result.blob.etag };
+        if (before && bare(before) === bare(result.blob.etag)) return { value, etag: before };
+        if (before && (await storeTag(path)) === before) return { value, etag: before };
+        last = new Error("blob_changed_while_reading");
+      } else last = new Error(`blob_${result.statusCode}`);
     } catch (error) {
       if (missing(error)) return { value: fallback };
       last = error;
@@ -35,7 +54,7 @@ export const readJsonSafe = async <T>(path: string, fallback: T) => (await readJ
  */
 export async function updateJson<T>(path: string, fallback: T, change: (current: T) => T | undefined): Promise<T> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const { value, etag } = await readJsonTagged(path, fallback);
+    const { value, etag } = await readJsonTagged(path, fallback, true);
     const next = change(structuredClone(value));
     if (next === undefined) return value;
     try {
@@ -55,7 +74,7 @@ export async function updateJson<T>(path: string, fallback: T, change: (current:
  */
 export async function withLease<T>(path: string, ms: number, work: () => Promise<T>): Promise<T | null> {
   const now = Date.now();
-  const { value, etag } = await readJsonTagged<{ until: number } | null>(path, null);
+  const { value, etag } = await readJsonTagged<{ until: number } | null>(path, null, true);
   if (value && value.until > now) return null;
   try {
     await put(path, JSON.stringify({ until: now + ms }), { access: "private", contentType: "application/json", ...(etag ? { ifMatch: etag, allowOverwrite: true } : { allowOverwrite: false }) });
