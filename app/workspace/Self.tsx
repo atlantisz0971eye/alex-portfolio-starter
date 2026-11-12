@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseResponse } from "./api";
 import { readJournalFiles } from "./journalParse";
+import { notice } from "./notice";
 
 type Kind = "theme" | "image" | "feeling" | "person" | "place" | "author";
 type Node = { id: string; label: string; kind: Kind; count: number; score: number; first: string; last: string; peak: string; pieceIds: string[]; x: number; y: number };
@@ -135,7 +136,7 @@ export function Self({ onError }: { onError: (message: string) => void }) {
         added += result.added;
         setNote(`Saving ${Math.min(at + 40, report.pieces.length)} of ${report.pieces.length}…`);
       }
-      onError(`${report.files} files, ${report.pieces.length} entries with a date (${added} new)${report.undated ? `, ${report.undated} skipped for having no date` : ""}.`);
+      notice(`${report.files} files, ${report.pieces.length} entries with a date (${added} new)${report.undated ? `, ${report.undated} skipped for having no date` : ""}.`);
       await readAndBuild();
     });
     if (file.current) file.current.value = "";
