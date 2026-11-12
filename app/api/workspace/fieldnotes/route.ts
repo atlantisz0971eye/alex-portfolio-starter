@@ -18,7 +18,8 @@ export async function GET(request: Request) {
       return new Response(body, { headers: { "Content-Type": "text/markdown; charset=utf-8", "Content-Disposition": `attachment; filename="fieldnotes-${new Date().toISOString().slice(0, 10)}.md"`, "Cache-Control": "private, no-store" } });
     }
     return Response.json(await fieldView(), { headers: { "Cache-Control": "private, no-store" } });
-  } catch {
+  } catch (error) {
+    console.error("fieldnotes read failed", error);
     return Response.json({ error: "fieldnotes_failed" }, { status: 502 });
   }
 }
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   } catch (error) {
     if (error instanceof FieldnoteError) return Response.json({ error: "invalid_fieldnote" }, { status: 400 });
+    // the action and the failure only; what the person wrote never goes to the logs
+    console.error("fieldnotes write failed", String(body.action), error);
     return Response.json({ error: "fieldnotes_failed" }, { status: 502 });
   }
 }
