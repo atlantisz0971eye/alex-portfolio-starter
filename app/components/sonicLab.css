@@ -1,0 +1,99 @@
+/* Shared by the portfolio and the standalone alexsonicLAb: keep the two copies identical. */
+/* ---------- alexsonicLAb: an opaque instrument that reads the page underneath as ASCII and techno ---------- */
+.sonic-lab {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  overflow: hidden;
+  outline: none;
+  cursor: crosshair;
+  overscroll-behavior: contain;
+  touch-action: none;
+  color: #f2f2f0;
+  background-color: #0b0b0c;
+  background-image: radial-gradient(circle, rgba(255,255,255,.09) 1px, transparent 1.6px);
+  background-size: 20px 22px;
+  background-position: 10px 11px;
+  font: 12px/1.4 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "PingFang SC", monospace;
+  -webkit-tap-highlight-color: transparent;
+}
+.sonic-lab__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+@keyframes sonic-blink { 50% { opacity: .35; } }
+/* Leaving: the instrument is wiped away band by band, like scan lines. */
+.sonic-lab.is-leaving { pointer-events: none; animation: sonic-wipe .7s steps(14, end) forwards; }
+@keyframes sonic-wipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
+/* The DJ deck: a grid of monospace characters. Its keys are characters too. */
+/* The bottom of the Lab: the way in, then the console. */
+.sonic-lab__bottom {
+  position: absolute;
+  left: 2.2vw;
+  right: 2.2vw;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.sonic-enter {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 13px 26px 12px;
+  border: 0;
+  color: #0b0b0c;
+  background: #f2f2f0;
+  font: 800 17px/1 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace;
+  letter-spacing: .08em;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #f2f2f0, 0 0 0 5px #0b0b0c, 0 0 0 6px rgba(242,242,240,.35), 0 0 42px rgba(242,242,240,.18);
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.sonic-enter b { font-size: 20px; animation: sonic-blink 1.1s steps(2, jump-none) infinite; }
+.sonic-enter small { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; font-size: 10px; font-weight: 500; letter-spacing: .06em; color: #6b6d72; }
+.sonic-enter:hover { background: #5af08a; box-shadow: 0 0 0 1px #5af08a, 0 0 0 5px #0b0b0c, 0 0 0 6px rgba(90,240,138,.5), 0 0 48px rgba(90,240,138,.28); }
+.sonic-enter:focus-visible { outline: 2px solid #5af08a; outline-offset: 8px; }
+.sonic-deck {
+  position: relative;
+  width: 100%;
+  margin-top: 14px;
+  background: #0b0b0c;
+  color: #8a8d94;
+  font: 12px/1.45 ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace;
+  white-space: pre;
+  cursor: default;
+  user-select: none;
+}
+.sonic-deck__probe { position: absolute; visibility: hidden; pointer-events: none; }
+.sonic-deck__line { height: 1.45em; overflow: hidden; }
+.sonic-deck button { padding: 0; border: 0; background: none; color: inherit; font: inherit; line-height: inherit; cursor: pointer; white-space: pre; }
+.sonic-deck .is-frame { color: #3c3f45; }
+.sonic-deck .is-dim { color: #55585e; }
+.sonic-deck .is-bright { color: #f2f2f0; }
+.sonic-deck .is-key { color: #c9ccd2; }
+.sonic-deck .is-key:hover { color: #0b0b0c; background: #f2f2f0; }
+.sonic-deck .is-on { color: #0b0b0c; background: #5af08a; }
+.sonic-deck .is-pending { color: #5af08a; animation: sonic-blink .5s steps(2, jump-none) infinite; }
+.sonic-deck .is-bar { color: #8a8d94; }
+.sonic-deck .is-bar:hover { color: #f2f2f0; }
+.sonic-deck .is-meter { color: #5af08a; }
+.sonic-deck .is-blink { color: #c9ccd2; animation: sonic-blink 1.6s steps(2, jump-none) infinite; }
+/* The oscilloscope sits inside framed empty lines, one character in from each border. */
+.sonic-deck__scope { position: relative; }
+.sonic-deck__scope canvas { position: absolute; top: 2px; left: 1ch; height: calc(100% - 4px); pointer-events: none; }
+.sonic-deck .is-fader { color: #f2f2f0; cursor: ns-resize; touch-action: none; }
+.sonic-deck .is-fader.is-dim { color: #44474c; }
+.sonic-deck .is-platter { color: #c9ccd2; }
+.sonic-deck .is-platter.is-dim { color: #3c3f45; }
+.sonic-deck .is-track { color: #3c3f45; }
+.sonic-deck .is-track:hover { color: #8a8d94; }
+.sonic-deck .is-knob { color: #5af08a; }
+@media (max-width: 640px) {
+  .sonic-deck { font-size: 11px; }
+  .sonic-enter { font-size: 15px; padding: 11px 20px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sonic-lab.is-leaving { animation: none; opacity: 0; }
+  .sonic-deck .is-blink, .sonic-deck .is-pending { animation: none; }
+}
