@@ -1135,6 +1135,12 @@ body.is-resizing .react-flow, body.is-resizing iframe { pointer-events: none; }
 .mind__input { display: block; width: 100%; resize: none; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 18px; line-height: 1.5; }
 .mind__input:focus { border-bottom-color: var(--text); }
 .mind__hint { margin: 6px 0 22px; font-size: 13px; color: var(--text-2); }
+.today__state { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 4px 3ch; margin: -8px 0 18px; font-size: 14px; }
+.today__state:empty { display: none; }
+.today__state button { padding: 0; font: inherit; color: var(--text-2); text-align: left; }
+.today__state button:hover { color: var(--text); }
+.today__state .today__close { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.fn-earlier { margin-top: 28px; }
 .today__note { position: relative; z-index: 2; max-width: 44em; }
 .today__note .mind__hint button { padding: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .mind__overview { max-width: 40em; margin: 0 0 22px; font-size: 18px; line-height: 1.55; }

@@ -11,6 +11,7 @@ import { PageTitle, TopRow, type Tab } from "./Shell";
 import { keepInNotebook } from "./keep";
 import { notice } from "./notice";
 import { Paper } from "./Paper";
+import { CarcosaLine, useClosingTime } from "./Carcosa";
 
 type Plan = { generatedAt: string; date: string; text: string; proposals: (Proposal & { status?: "applied" | "dismissed" })[]; reason: string; basedOn: { from: string; subject: string }[] };
 type Event = { id: string; title: string; start: string; end: string; allDay: boolean; category: string; location: string; occurrenceDate: string };
@@ -30,7 +31,7 @@ function ago(value: number) {
   return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
 }
 
-type Props = { onError: (message: string) => void; onSignOut: () => void; onTab: (tab: Tab) => void; refresh: number; onChanged: () => void; onSeen: () => void };
+type Props = { onError: (message: string) => void; onSignOut: () => void; onTab: (tab: Tab) => void; onCloseDay: () => void; refresh: number; onChanged: () => void; onSeen: () => void };
 
 /** One line that goes straight into the notebook, so a thought does not need a trip to another page. */
 function QuickNote({ onError, onOpen }: { onError: (message: string) => void; onOpen: () => void }) {
@@ -53,7 +54,8 @@ function QuickNote({ onError, onOpen }: { onError: (message: string) => void; on
 }
 
 /** The home screen: a plan for today built from the calendar and new mail, today's schedule, and what just arrived. */
-export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }: Props) {
+export function Today({ onError, onSignOut, onTab, onCloseDay, refresh, onChanged, onSeen }: Props) {
+  const closing = useClosingTime();
   const [view, setView] = useState<View | null>(null);
   const [planning, setPlanning] = useState(false);
   // What the assistant is looking up right now, for the plan and for a card being answered.
@@ -153,6 +155,7 @@ export function Today({ onError, onSignOut, onTab, refresh, onChanged, onSeen }:
         <header className="today__head">
           <PageTitle actions={view?.connected ? <button type="button" className="ws-round" aria-label="Make a new plan" onClick={() => void regenerate()} disabled={planning}>{planning ? <Loader2 className="ws-spin" size={18} /> : <RefreshCw size={18} />}</button> : undefined}>{layout?.headline || "Today"}</PageTitle>
           <p className="today__date"><Sun size={15} /> {today.format(new Date())}</p>
+          <p className="today__state"><CarcosaLine onOpen={() => onTab("carcosa")} />{closing && <button type="button" className="today__close" onClick={onCloseDay}>收工：记一条 →</button>}</p>
           {layout?.kicker && <p className="today__kicker">{layout.kicker}</p>}
         </header>
 

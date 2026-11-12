@@ -286,7 +286,6 @@ export function CarcosaPet() {
   const { creature, reload, act } = useCarcosa();
   if (!creature) return <section className="is-embedded"><p className="carcosa-muted">Carcosa is waking…</p></section>;
   const c = creature;
-  const wipe = () => { if (window.confirm("删除所有自报记录？删除后不能恢复，她学到的规律也会从头开始。")) void act({ action: "wipe" }); };
   return <section className="is-embedded carcosa-pet">
     <div className="carcosa-pet__top">
       <Scene creature={c} />
@@ -307,6 +306,16 @@ export function CarcosaPet() {
     <h2 className="section-label">reading</h2>
     <ReadingCard creature={c} />
 
+  </section>;
+}
+
+/** Carcosa → Patterns: what she has worked out over weeks. Looked at now and then, so it stays off the daily page. */
+export function CarcosaPatterns({ children }: { children?: ReactNode }) {
+  const { creature, act } = useCarcosa();
+  if (!creature) return <section className="is-embedded"><p className="carcosa-muted">Carcosa is waking…</p></section>;
+  const c = creature;
+  const wipe = () => { if (window.confirm("删除所有自报记录？删除后不能恢复，她学到的规律也会从头开始。")) void act({ action: "wipe" }); };
+  return <section className="is-embedded carcosa-pet carcosa-patterns">
     <h2 className="section-label">routine</h2>
     <p className="carcosa-muted">{c.learning ? `还在学你的作息（已看过 ${c.routine.days} 天，满 5 天开始判断）。` : `从最近 ${c.routine.days} 个工作日学到：通常 ${clock(c.routine.start)} 开始，${clock(c.routine.end)} 收工；一天大约吃 ${c.routine.medianLoad}。`}{` 今天 ${c.today.firstAt ?? "还没开始"}${c.today.lastAt && c.today.lastAt !== c.today.firstAt ? `–${c.today.lastAt}` : ""}，吃了 ${c.today.load}；连续 ${c.streak} 天。`}</p>
     <Routine creature={c} />
@@ -320,6 +329,32 @@ export function CarcosaPet() {
     <p className="carcosa-muted">提交 3 · 同步每个文件 0.4（最多 12 个）· 勾选每项 1 · 生产部署 2 · 按时收工 4 · 休息日 8；六小时消化一半。</p>
     {c.bites.length === 0 ? <p className="carcosa-muted">Nothing yet.</p> : <ul className="carcosa-audit">{c.bites.map((b, n) => <li key={n}><time>{day.format(new Date(b.at))}</time> <b>+{Math.round(b.value * 10) / 10}</b> {b.label}</li>)}</ul>}
 
+    {children}
+
     <p className="carcosa-muted carcosa-privacy">自报只存在你自己的存储里。读的时候，节律、自报、提交信息、学校邮件摘要和日记报告（不含原文）会发给 DeepSeek；日记原文只给 Gemini。<button type="button" className="ws-text-button" onClick={wipe}>删除所有自报</button></p>
   </section>;
+}
+
+/** Today's self-report for Carcosa, for use outside her page (the end-of-day field note sits next to it). */
+export function CarcosaCheckin() {
+  const { creature } = useCarcosa();
+  if (!creature) return null;
+  return <Checkin key={creature.checkin?.at ?? "none"} creature={creature} />;
+}
+
+/** One line of how she is, for the Today page. */
+export function CarcosaLine({ onOpen }: { onOpen: () => void }) {
+  const { creature } = useCarcosa();
+  if (!creature) return null;
+  return <button type="button" className="today__carcosa" onClick={onOpen} title="Open Carcosa">{PHASE[creature.phase]} · {SKY[creature.sky]}</button>;
+}
+
+/** Whether it is about time to stop: from half an hour before the usual end of the day (or 17:00 while she is still learning it). */
+export function useClosingTime() {
+  const { creature } = useCarcosa();
+  if (!creature || creature.today.rest) return false;
+  const [hour, minute] = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).split(":").map(Number);
+  // the work day runs from 05:00, so hours are counted from there, as the routine's are
+  const now = (hour + minute / 60 - 5 + 24) % 24;
+  return now >= (creature.routine.end ?? 12) - 0.5;
 }

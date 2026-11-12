@@ -18,9 +18,9 @@ import { Devlog } from "./Devlog";
 import { Mind } from "./Mind";
 import { Members } from "./Members";
 import { NOTICE } from "./notice";
-import { CARCOSA_SECTIONS, hashOf, PROJECTS_SECTIONS, readRoute, SectionHead, Sidebar, TabBar, ThemeContext, UserContext, type CarcosaSub, type ProjectsSub, type PublicUser, type Route, type Tab, type Theme, type ThemeMode } from "./Shell";
+import { CARCOSA_SECTIONS, FIELD_SECTIONS, hashOf, PROJECTS_SECTIONS, readRoute, SectionHead, Sidebar, TabBar, ThemeContext, UserContext, type CarcosaSub, type FieldSub, type ProjectsSub, type PublicUser, type Route, type Tab, type Theme, type ThemeMode } from "./Shell";
 import { Today } from "./Today";
-import { CarcosaPet, CarcosaProvider } from "./Carcosa";
+import { CarcosaPatterns, CarcosaPet, CarcosaProvider } from "./Carcosa";
 import { CarcosaNow } from "./CarcosaPage";
 import { Fieldnotes } from "./Fieldnotes";
 import { Projects } from "./Projects";
@@ -134,9 +134,9 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [intent, setIntent] = useState<AssistantIntent | null>(null);
   const [citation, setCitation] = useState<{ seq: number; page?: number; offset?: number } | null>(null);
-  // Where the viewer is: a destination, and the section last open in each of the two that have sections.
-  const [route, setRoute] = useState<Route>({ tab: "today", projects: "status", carcosa: "pet" });
-  const { tab, projects: projectsSub, carcosa: carcosaSub } = route;
+  // Where the viewer is: a destination, and the section last open in each of those that have sections.
+  const [route, setRoute] = useState<Route>({ tab: "today", fieldnotes: "trigger", projects: "status", carcosa: "pet" });
+  const { tab, fieldnotes: fieldSub, projects: projectsSub, carcosa: carcosaSub } = route;
   const routeRef = useRef(route);
   routeRef.current = route;
   // The address being moved to from the URL; until the page has caught up with it, the URL is not written back.
@@ -146,9 +146,10 @@ function App() {
     // the sections last used are remembered per browser; an address in the URL wins over them
     let next = routeRef.current;
     try {
+      const fieldnotes = localStorage.getItem("ws-fieldnotes-sub");
       const projects = localStorage.getItem("ws-projects-sub");
       const carcosa = localStorage.getItem("ws-carcosa-sub");
-      next = { ...next, projects: PROJECTS_SECTIONS.find((s) => s.id === projects)?.id ?? next.projects, carcosa: CARCOSA_SECTIONS.find((s) => s.id === carcosa)?.id ?? next.carcosa };
+      next = { ...next, fieldnotes: FIELD_SECTIONS.find((s) => s.id === fieldnotes)?.id ?? next.fieldnotes, projects: PROJECTS_SECTIONS.find((s) => s.id === projects)?.id ?? next.projects, carcosa: CARCOSA_SECTIONS.find((s) => s.id === carcosa)?.id ?? next.carcosa };
     } catch { /* defaults */ }
     follow(readRoute(next, window.location.hash) ?? next);
     // back, forward, or an address typed by hand: a book on top would hide the page that was asked for
@@ -162,6 +163,8 @@ function App() {
     if (window.location.hash !== want) window.history[window.location.hash ? "pushState" : "replaceState"](null, "", want);
   }, [route]);
   const setTab = useCallback((next: Tab) => setRoute((current) => ({ ...current, tab: next })), []);
+  // looking back is not where writing starts, so it is not what a later visit opens on
+  const chooseField = useCallback((next: FieldSub) => { setRoute((current) => ({ ...current, tab: "fieldnotes", fieldnotes: next })); if (next !== "review") try { localStorage.setItem("ws-fieldnotes-sub", next); } catch { /* per-viewer */ } }, []);
   const chooseProjects = useCallback((next: ProjectsSub) => { setRoute((current) => ({ ...current, projects: next })); try { localStorage.setItem("ws-projects-sub", next); } catch { /* per-viewer */ } }, []);
   const chooseCarcosa = useCallback((next: CarcosaSub) => { setRoute((current) => ({ ...current, carcosa: next })); try { localStorage.setItem("ws-carcosa-sub", next); } catch { /* per-viewer */ } }, []);
   const [mindstreamRefresh, setMindstreamRefresh] = useState(0);
@@ -429,9 +432,13 @@ function App() {
       <Sidebar tab={tab} onTab={go} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
       <div className="shell__main">
         {tab === "today"
-          ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
+          ? <Today onError={setError} onSignOut={() => void signOut()} onTab={setTab} onCloseDay={() => chooseField("micro")} refresh={todayRefresh} onChanged={() => setCalendarRefresh((value) => value + 1)} onSeen={() => setTodayBadge(false)} />
           : tab === "mail"
           ? <Mail onError={setError} onSignOut={() => void signOut()} />
+          : tab === "fieldnotes" ? <div className="page page--carcosa">
+            <SectionHead title="Fieldnotes" sections={FIELD_SECTIONS} sub={fieldSub} onSub={chooseField} />
+            <Fieldnotes section={fieldSub} onSection={chooseField} onError={setError} />
+          </div>
           : tab === "notebook" ? <Mind onError={setError} onSignOut={() => void signOut()} refresh={notesRefresh + mindstreamRefresh} openId={streamOpenId} />
           : tab === "projects" ? <div className="page page--carcosa">
             <SectionHead title="Projects" sections={PROJECTS_SECTIONS.filter((s) => !s.owner || user?.role === "owner")} sub={projectsSub} onSub={chooseProjects} />
@@ -441,9 +448,7 @@ function App() {
           </div>
           : tab === "carcosa" ? <div className="page page--carcosa">
             <SectionHead title="Carcosa" sections={CARCOSA_SECTIONS} sub={carcosaSub} onSub={chooseCarcosa} />
-            {carcosaSub === "self" ? <section className="is-embedded"><Self onError={setError} /></section>
-              : carcosaSub === "fieldnotes" ? <Fieldnotes onError={setError} />
-              : <CarcosaPet />}
+            {carcosaSub === "patterns" ? <CarcosaPatterns><h2 className="section-label">journal</h2><Self onError={setError} /></CarcosaPatterns> : <CarcosaPet />}
           </div>
           : tab === "calendar" ? <Calendar onError={setError} onSignOut={() => void signOut()} onAssistant={() => setGlobalOpen(true)} refresh={calendarRefresh} />
           : <Library documents={documents} loading={loading} uploading={uploading || opening} ocr={ocr} onOpen={(id) => void openDocument(id)} onManage={setManaging} onAdd={(file) => void addFile(file)} onSignOut={() => void signOut()} />}
@@ -451,7 +456,7 @@ function App() {
       <TabBar tab={tab} onTab={go} onAssistant={() => setGlobalOpen(true)} badges={{ today: todayBadge }} />
     </div>
     <DocumentSheet document={documents.find((item) => item.id === managing) ?? null} ocr={ocr} actions={manage} onClose={() => setManaging(null)} />
-    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "notebook" ? "mindstreams" : tab === "projects" ? (projectsSub === "alignment" ? "carcosa" : "devlog") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
+    <GlobalAssistant open={globalOpen && !book} onClose={() => setGlobalOpen(false)} screen={tab === "notebook" ? "mindstreams" : tab === "fieldnotes" ? "carcosa" : tab === "projects" ? (projectsSub === "alignment" ? "carcosa" : "devlog") : tab} onChanged={() => { setCalendarRefresh((value) => value + 1); setNotesRefresh((value) => value + 1); setMindstreamRefresh((value) => value + 1); }} onError={setError} />
     {book && <>
       <BookReader key={book.document.id} book={book} onBack={closeBook} onAssistant={openAssistant} onError={setError} stream={streamAssistant} citation={citation} reloadKey={reloadKey} ocrPending={book.document.ocrPending?.length ?? 0} onOcr={() => setOcrOpen(true)} />
       <OcrSheet open={ocrOpen} onClose={() => setOcrOpen(false)} document={book.document} state={ocr} onStart={() => void runOcr(book.document.id, book.document.ocrPending ?? [])} onStop={() => { ocrStop.current = true; }} />

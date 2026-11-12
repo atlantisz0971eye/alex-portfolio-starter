@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Calendar as CalendarIcon, GitBranch, LogOut, Mail as MailIcon, Moon, PenLine, Sparkles, Sun, SunMoon, Users, Waypoints } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, FlaskConical, GitBranch, LogOut, Mail as MailIcon, Moon, PenLine, Sparkles, Sun, SunMoon, Users, Waypoints } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { SyncButton } from "./SyncStatus";
 
@@ -23,18 +23,23 @@ export const UserContext = createContext<{ user: PublicUser | null; openMembers:
 
 /**
  * The destinations, grouped by what is done there rather than by the feature each grew out of. Nothing sits more than
- * one level below a destination: Projects holds the three views of development, Carcosa the three about the person.
+ * one level below a destination: Fieldnotes holds the four kinds of research note and the place to look back,
+ * Projects the three views of development, Carcosa the creature and what she has learned about the person.
  */
-export type Tab = "today" | "notebook" | "projects" | "library" | "mail" | "calendar" | "carcosa";
+export type Tab = "today" | "fieldnotes" | "notebook" | "projects" | "library" | "mail" | "calendar" | "carcosa";
+export type FieldSub = "trigger" | "micro" | "session" | "reflection" | "review";
 export type ProjectsSub = "status" | "devlog" | "alignment";
-export type CarcosaSub = "pet" | "self" | "fieldnotes";
-export type Route = { tab: Tab; projects: ProjectsSub; carcosa: CarcosaSub };
+export type CarcosaSub = "pet" | "patterns";
+export type Route = { tab: Tab; fieldnotes: FieldSub; projects: ProjectsSub; carcosa: CarcosaSub };
+
+export const FIELD_SECTIONS: { id: FieldSub; label: string }[] = [{ id: "trigger", label: "触发" }, { id: "micro", label: "收工" }, { id: "session", label: "单次" }, { id: "reflection", label: "反思" }, { id: "review", label: "回看" }];
 
 export const PROJECTS_SECTIONS: { id: ProjectsSub; label: string; owner?: boolean }[] = [{ id: "status", label: "Status" }, { id: "devlog", label: "Devlog" }, { id: "alignment", label: "Alignment", owner: true }];
-export const CARCOSA_SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "pet", label: "Yak" }, { id: "self", label: "Self" }, { id: "fieldnotes", label: "Fieldnotes" }];
+export const CARCOSA_SECTIONS: { id: CarcosaSub; label: string }[] = [{ id: "pet", label: "Yak" }, { id: "patterns", label: "Patterns" }];
 
 const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
   { id: "today", label: "Today", icon: Sun },
+  { id: "fieldnotes", label: "Fieldnotes", icon: FlaskConical },
   { id: "notebook", label: "Notebook", icon: PenLine },
   { id: "projects", label: "Projects", icon: GitBranch },
   { id: "library", label: "Library", icon: BookOpen },
@@ -44,11 +49,12 @@ const ITEMS: { id: Tab; label: string; icon: typeof BookOpen }[] = [
 ];
 
 /** The address of a place, kept in the URL so a reload, the back button and a bookmark all land where they should. */
-export const hashOf = (route: Route) => `#${route.tab}${route.tab === "projects" ? `/${route.projects}` : route.tab === "carcosa" ? `/${route.carcosa}` : ""}`;
+export const hashOf = (route: Route) => `#${route.tab}${route.tab === "fieldnotes" ? `/${route.fieldnotes}` : route.tab === "projects" ? `/${route.projects}` : route.tab === "carcosa" ? `/${route.carcosa}` : ""}`;
 export function readRoute(base: Route, hash: string): Route | null {
   const [tab, sub] = hash.replace(/^#/, "").split("/");
   if (!ITEMS.some((item) => item.id === tab)) return null;
   const next: Route = { ...base, tab: tab as Tab };
+  if (tab === "fieldnotes" && FIELD_SECTIONS.some((s) => s.id === sub)) next.fieldnotes = sub as FieldSub;
   if (tab === "projects" && PROJECTS_SECTIONS.some((s) => s.id === sub)) next.projects = sub as ProjectsSub;
   if (tab === "carcosa" && CARCOSA_SECTIONS.some((s) => s.id === sub)) next.carcosa = sub as CarcosaSub;
   return next;

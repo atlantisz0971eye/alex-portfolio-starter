@@ -63,18 +63,18 @@
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot a:hover, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot button:hover, .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__assistant:hover { color: var(--text) !important; background: transparent !important; }
 .ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__foot svg { display: none; }
 
-/* With seven destinations the page of huge words is sized by the height as well, so it still fits one screen. */
-.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button { font-size: min(12.5vw, 10vh); margin-bottom: min(2.2vw, 2vh); }
+/* With eight destinations the page of huge words is sized by the height as well, so it still fits one screen. */
+.ws-root[data-skin="byte"] .sidebar[data-open] .sidebar__nav button { font-size: min(12.5vw, 8.8vh); margin-bottom: min(2.2vw, 1.8vh); }
 /* On a wide screen the destinations also stay in the corner strip as plain words, so moving between them is one click. */
-@media (min-width: 1000px) {
-  .ws-root[data-skin="byte"] .sidebar:not([data-open]) { gap: 2.4ch; }
-  .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav { display: flex; flex-direction: row; align-items: baseline; gap: 2.2ch; pointer-events: auto; }
-  .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav button { display: inline; height: auto; padding: 0; background: transparent; color: var(--text-2); font-size: 14px; text-transform: lowercase; }
+@media (min-width: 1060px) {
+  .ws-root[data-skin="byte"] .sidebar:not([data-open]) { gap: 2ch; }
+  .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav { display: flex; flex-direction: row; align-items: baseline; gap: 1.8ch; pointer-events: auto; }
+  .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav button { display: inline; height: auto; padding: 0; background: transparent; color: var(--text-2); font-size: 13px; text-transform: lowercase; }
   .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav button svg { display: none; }
   .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav button:hover { color: var(--text); background: transparent; }
   .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav button.is-on { color: var(--text); font-weight: 700; background: transparent; }
   .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__nav .badge-dot { position: static; display: inline-block; width: 6px; height: 6px; margin-left: 4px; background: var(--blue); vertical-align: super; }
-  .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__index { order: 3; font-size: 14px; }
+  .ws-root[data-skin="byte"] .sidebar:not([data-open]) .sidebar__index { order: 3; font-size: 13px; }
 }
 
 /* ---- pages: type at scale, no boxes ---- */
@@ -89,6 +89,7 @@
 .ws-root[data-skin="byte"] .section-label { padding-top: 0; border-top: 0; margin: 5vw 0 12px; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: lowercase; color: var(--blue); }
 .ws-root[data-skin="byte"] .section-label::before { content: "■ "; }
 .ws-root[data-skin="byte"] .today__date { color: var(--text-2); margin: 0 0 3vw; }
+.ws-root[data-skin="byte"] .today__state { margin: -2.2vw 0 3vw; }
 .ws-root[data-skin="byte"] .today__plan .ws-markdown { font-size: 21px; line-height: 30px; max-width: 34em; }
 .ws-root[data-skin="byte"] .today__grid { position: relative; z-index: 2; }
 .ws-root[data-skin="byte"] .pagetitle + * , .ws-root[data-skin="byte"] .today__head + * { position: relative; z-index: 2; }
